@@ -6,4 +6,10 @@ services:
     volumes:
       - ../:/root/src  # Share the parent folder with /root/src inside the container
     command: sleep inf  # Set the command to sleep indefinitely
+
+  devros2:
+    image: osrf/ros:humble-desktop
+    volumes:
+      - ../:/root/src
+    command: sleep inf  # Set the command to sleep indefinitely
  

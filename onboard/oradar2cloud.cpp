@@ -77,7 +77,12 @@ int main(int argc, char *argv[])
     int model = ORADAR_MS200;
 
     OrdlidarDriver device(type, model);
-    full_scan_data_st scan_data, out_data;
+    //full_scan_data_st scan_data, out_data;
+    unsigned char packet[sizeof(full_scan_data_st)+4];
+    uint16_t* numBytes = reinterpret_cast<uint16_t*>(packet + 4);
+    uint16_t* numPoints = reinterpret_cast<uint16_t*>(packet + 6);
+    full_scan_data_st* scan_data_ptr = reinterpret_cast<full_scan_data_st*>(packet + 8);
+    memcpy(packet, "DOGI", 4); // Create a magic number
     
     int serialBaudrate = 230400;
     bool is_logging = false;
@@ -118,20 +123,16 @@ int main(int argc, char *argv[])
     para.filter_type = FullScanFilter::FS_Intensity;
     while (running)
     {
-        ret = device.GrabFullScanBlocking(scan_data, 1000);
+        ret = device.GrabFullScanBlocking(*scan_data_ptr, 1000);
         if (ret)
         {
-            printf("count = %lld, point_num: %d\n", ++count, scan_data.vailtidy_point_num);
+            printf("count = %lld, point_num: %d\n", ++count, scan_data_ptr->vailtidy_point_num);
             //filter.filter(scan_data, para, out_data);
-            if (is_logging)
-            {
-                for (int i = 0; i < scan_data.vailtidy_point_num; i++)
-                {
-                    printf("[%d: %f, %f] \n", i, (scan_data.data[i].distance * 0.001), scan_data.data[i].angle);
-                }
-            }
-            // Send data over UDP
-            ssize_t numBytesSent = sendto(udpSocket, &scan_data, scan_data.vailtidy_point_num * sizeof(point_data_t), 0, (struct sockaddr*)&destAddr, sizeof(destAddr));
+
+            // Send data over UDP (scan_data is inside the packet buffer)
+            
+            *numBytes = scan_data_ptr->vailtidy_point_num * sizeof(point_data_t) + 6;
+            ssize_t numBytesSent = sendto(udpSocket, packet, *numBytes, 0, (struct sockaddr*)&destAddr, sizeof(destAddr));
             if (numBytesSent < 0) {
                 perror("Failed to send data over UDP");
                 //exit(EXIT_FAILURE);

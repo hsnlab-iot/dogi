@@ -1,5 +1,7 @@
-# Build folder
+# CMake and Colcon folders
 **/build/*
+**/install/*
+**/log/*
 
 # Prerequisites
 *.d
