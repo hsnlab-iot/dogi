@@ -1,0 +1,9 @@
+version: '3'
+
+services:
+  devapp:
+    build: .  # Use the image in the current folder
+    volumes:
+      - ../:/root/src  # Share the parent folder with /root/src inside the container
+    command: sleep inf  # Set the command to sleep indefinitely
+ 
