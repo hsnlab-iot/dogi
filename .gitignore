@@ -1,3 +1,5 @@
+.local/*
+
 # CMake and Colcon folders
 **/build/*
 **/install/*

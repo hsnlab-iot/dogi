@@ -130,7 +130,8 @@ int main(int argc, char *argv[])
             //filter.filter(scan_data, para, out_data);
 
             // Send data over UDP (scan_data is inside the packet buffer)
-            
+	    // This is not the best format as angle increase is constant. This should be chnaged later!
+            *numPoints = scan_data_ptr->vailtidy_point_num;
             *numBytes = scan_data_ptr->vailtidy_point_num * sizeof(point_data_t) + 6;
             ssize_t numBytesSent = sendto(udpSocket, packet, *numBytes, 0, (struct sockaddr*)&destAddr, sizeof(destAddr));
             if (numBytesSent < 0) {

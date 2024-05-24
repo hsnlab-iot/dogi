@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.5s)
 PROJECT(oradar_test)
 #add_compile_options(-std=c++11) # Use C++11
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread")
 
 #Include directories
 INCLUDE_DIRECTORIES(
