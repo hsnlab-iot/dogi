@@ -1,0 +1,9 @@
+services:
+  gstreamer:
+    build: .
+    container_name: gstreamer
+    devices:
+      - "/dev/video0:/dev/video0"
+    network_mode: host        
+    environment:
+      - VIDEO_DST=10.6.6.20
