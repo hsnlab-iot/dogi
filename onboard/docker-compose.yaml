@@ -1,9 +1,12 @@
 services:
-  gstreamer:
+  onboard:
     build: .
-    container_name: gstreamer
+    container_name: onboard
     devices:
       - "/dev/video0:/dev/video0"
+      - "/dev/ttyAMA0:/dev/ttyAMA0"
+      - "/dev/ttyAMA1:/dev/ttyAMA1"
     network_mode: host        
     environment:
       - VIDEO_DST=10.6.6.20
+      - VIDEO_PORT=5100

@@ -1,1 +1,0 @@
-gst-launch-1.0 v4l2src device=/dev/video0 ! image/jpeg,width=1920,height=1080,framerate=30/1 ! jpegdec ! videoconvert ! x264enc tune=zerolatency bitrate=2000 speed-preset=superfast b-adapt=false key-int-max=3 sliced-threads=true ! video/x-h264,profile=main,stream-format=byte-stream, alignement=nal ! h264parse ! rtph264pay config-interval=1 ! udpsink host=192.168.2.101 port=5000

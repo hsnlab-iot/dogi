@@ -6,16 +6,17 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Update and install GStreamer
 RUN apt update && \
-    apt install -y \
-    busybox \
+    apt install -y --no-install-recommends \
+    busybox vim tmux socat \
     gstreamer1.0-tools \
     gstreamer1.0-plugins-base \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \
     supervisor \
-    && apt clean && busybox --install
+    && busybox --install
 
+COPY src/ /root
 COPY src/stream_2.sh /usr/local/bin/streamer.sh
 RUN chmod +x /usr/local/bin/streamer.sh
 
