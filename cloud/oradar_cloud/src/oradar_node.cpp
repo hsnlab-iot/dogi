@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <cmath>
 
 #include "oradar_cloud/ordlidar_protocol.h"
 
@@ -98,9 +99,9 @@ public:
     laserScanMsg.header.frame_id = "lidar_frame"; // Replace "lidar_frame" with the appropriate frame ID
 
     // THESE VALUES SHOULD BE IN RADIAN !!! Now they are in degree
-    laserScanMsg.angle_min = scan_data_ptr->data[0].angle;
-    laserScanMsg.angle_max = scan_data_ptr->data[scan_data_ptr->vailtidy_point_num-1].angle;
-    laserScanMsg.angle_increment = 0.81; // This could be calculated, but lets be lazy
+    laserScanMsg.angle_min = float(scan_data_ptr->data[0].angle) * M_PI / 180.0;
+    laserScanMsg.angle_max = float(scan_data_ptr->data[scan_data_ptr->vailtidy_point_num-1].angle) * M_PI / 180.0;
+    laserScanMsg.angle_increment = float(0.81) * M_PI / 180.0; // This could be calculated, but lets be lazy
 
     laserScanMsg.range_min = 0.5; 
     laserScanMsg.range_max = 20.0;
@@ -133,7 +134,7 @@ public:
     if (! udpThread_) {
       udpThread_->join();
     }
-    close(sockFd_);
+    // close(sockFd_); # Temporary solution ONLY! This should be closed!
   }
 
 private:

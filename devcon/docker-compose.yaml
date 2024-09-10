@@ -6,10 +6,25 @@ services:
     volumes:
       - ../:/root/src  # Share the parent folder with /root/src inside the container
     command: sleep inf  # Set the command to sleep indefinitely
+    #network_mode: host
 
   devros2:
     image: osrf/ros:humble-desktop
     volumes:
       - ../:/root/src
     command: sleep inf  # Set the command to sleep indefinitely
+    #network_mode: host
+    #privileged: true
+    ports:
+      - "5005:5005/udp"
  
+  devgui:
+    image: tiryoh/ros2-desktop-vnc:humble
+    security_opt:
+      - seccomp:unconfined
+    shm_size: '512m'
+    ports:
+      - "46000:80"
+      - "5003:5003/udp"
+    volumes:
+      - ../:/root/src
