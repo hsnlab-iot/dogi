@@ -1,0 +1,11 @@
+services:
+  control:
+    build: .
+    container_name: control
+    #network_mode: host
+    environment:
+      - DISPLAY=:0
+    ports:
+      - "6080:6080"
+      - "5100:5100/udp"
+    command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
