@@ -1,0 +1,11 @@
+services:
+  gui:
+    build: .
+    container_name: gui
+    #network_mode: host
+    environment:
+      - DISPLAY=:0
+    ports:
+      - "8080:8080"
+      - "5100:5100/udp"
+    command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
