@@ -15,14 +15,19 @@ RUN apt update && \
     gstreamer1.0-libav \
     ffmpeg \
     supervisor \
-    xvfb tigervnc-standalone-server openbox lxterminal \
+    xvfb tigervnc-standalone-server openbox lxterminal xterm \
     novnc websockify \
     busybox \
     && busybox --install
 
 RUN apt install -y --no-install-recommends \
-    socat tmux build-essential git vim python3 python3-pip python3-serial pipx tcpdump \
+    socat tmux build-essential git vim python3 python3-pip python3-serial python3-opencv pipx tcpdump \
     && apt clean
+
+RUN pip install ultralytics
+
+RUN apt install -y python3-gst-1.0 libzmq3-dev && \
+    pip install zmq
 
 # Copy the supervisor configuration file
 COPY src/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
