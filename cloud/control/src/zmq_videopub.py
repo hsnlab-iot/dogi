@@ -5,13 +5,18 @@ import numpy as np
 import zmq
 import time
 import threading
+from PIL import Image, ImageDraw
 
+reader = None
+image_ok = Image.new('RGB', (64, 64), 'green')
+image_nok = Image.new('RGB', (64, 64), 'red')
 
 class H264Reader():
 
     def __init__(self, socket_c):
         
         self.last_c = time.time()
+        self.rate_c = 0
         self.socket_c = socket_c
 
         # Create a GStreamer pipeline from string
@@ -31,7 +36,7 @@ class H264Reader():
         self.pipeline_c.set_state(Gst.State.PLAYING)
 
     def on_new_sample_c(self, sink):
-        print("!c")
+        #print("!c")
         global socket_c
         sample = sink.emit("pull-sample")
         buffer = sample.get_buffer()
@@ -44,12 +49,30 @@ class H264Reader():
         img_array = np.frombuffer(buffer_data, dtype=np.uint8)
         self.socket_c.send(img_array)
 
-        now = time.time()
-        print(f"{(now - self.last_c) * 1000} ms")
-        self.last_c = now
+        self.rate_c = 1 / (time.time() - self.last_c)
+        self.last_c = time.time()
 
-        print("c!")
         return Gst.FlowReturn.OK
+
+def check_last_c(reader):
+
+    while True:
+        now = time.time()
+
+        if now - reader.last_c < 0.1:
+            draw = ImageDraw.Draw(image_ok)
+            draw.rectangle([(0, 0), (64, 64)], fill='green')
+            image_ok.show()
+            print(reader.rate_c)
+        else:
+            draw = ImageDraw.Draw(image_nok)
+            draw.rectangle([(0, 0), (64, 64)], fill='red')
+            image_nok.show()
+            print("No video")
+        
+        time.sleep(1)
+    
+
 
 def main():
 
@@ -58,7 +81,12 @@ def main():
     socket_c.bind("ipc:///tmp/video_frames_c.ipc")
 
     Gst.init(None)
-    node = H264Reader(socket_c)
+    reader = H264Reader(socket_c)
+
+
+    # Create and start the thread
+    thread = threading.Thread(target=check_last_c, args=(reader,))
+    thread.start()
 
     event = threading.Event()
     event.wait()

@@ -8,9 +8,10 @@ from DOGZILLALib.DOGZILLALib import DOGZILLALib as dog
 
 model = YOLO('yolov8m-seg.pt')
 dogControl = dog.DOGZILLA("/dev/ttyAMA0")
+time.sleep(1)   # Wait for the dogControl
 
-MAXPITCH = 10
-MAXYAW = 10
+MAXPITCH = 16
+MAXYAW = 16
 
 # Subscribe to video
 zmqcontext = zmq.Context()
@@ -19,77 +20,132 @@ subscriber.setsockopt(zmq.CONFLATE, 1)
 subscriber.setsockopt_string(zmq.SUBSCRIBE, '')  # Subscribe to all topics
 subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 
-att = [0, 0 ,0] # yaw, pitch, roll
-att_changed = True
-turn = 0
-oldturn = 0
-
-time.sleep(1)   # Wait for the dogControl
-
+# Function to process the frame
 def process_frame(frame_bytes):
+    global att, att_changed
     
     width = 640
     height = 480
     img_array = np.frombuffer(frame_bytes, dtype=np.uint8)
     img_array = img_array.reshape((height, width, 3))
-    cv2.imshow("YOLO Object Detection", img_array)
-    return
 
-    results = model.track(img_array, imgsz=[height, width], conf=0.4, persist=True)
+    #img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+    #cv2.imshow("Dogi video", img_array)
+
+    results = model.track(img_array, imgsz=[height, width], conf=0.4, classes=[7], verbose=False, persist=True)
     annotated_frame = results[0].plot()
     
-    cv2.imshow("YOLO Object Detection", annotated_frame)
+    annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+    cv2.imshow("YOLO Dogi video", annotated_frame)
+    #print(result[0].boxes.xywhn)
 
+    if len(results[0].boxes.xywhn) > 0:
+        #print(results[0].boxes.xywhn[0])
+        #print(results[0].boxes.cls)
+        (x, y, w, h) = results[0].boxes.xywhn[0].cpu().numpy()
+        x = round(x,2)
+        y = round(y,2)
+        return (x, y)
+    else:
+        return None
+    
+# Function to process the keys    
 def process_keys():
-    global att_changed
-    global turn
 
-    if turn > 0:
-        turn-=1
-    elif turn < 0:
-        turn+=1
-
+    # Simulate a ball on a screen
+    x = 0.5
+    y = 0.5
     key = cv2.waitKey(1)
     if key == ord('s'):
-        if att[1] < MAXPITCH:
-            att[1] += 1
-            att_changed = True
+        y = 0.75
     elif key == ord('w'):
-        if att[1] > -MAXPITCH:
-            att[1] -= 1
-            att_changed = True
+        y = 0.25
     elif key == ord('a'):
-        if att[0] < MAXYAW:
-            att[0] += 1
-            att_changed = True
-        else:
-            turn = 3
+        x = 0.25
     elif key == ord('d'):
-        if att[0] > -MAXYAW:
-            att[0] -= 1
-            att_changed = True
-        else:
-            turn = -3
+        x = 0.75
+    else:
+        return None
+    
+    return (x, y)
+
+
+att_yaw = 0
+o_att_yaw = 0
+att_pitch = 0
+o_att_pitch = 0
+skip = 0
+
+turn = 0
+o_turn = 0
 
 while True:
 
     try:
         frame_bytes = subscriber.recv()
-        process_frame(frame_bytes)
-        process_keys()
-        if att_changed:
-            print("ATTITUDE")
-            dogControl.attitude(["y", "p", "r"], att)
-            att_changed = False
-        if turn != oldturn:
+        ball = process_frame(frame_bytes)
+
+        if not ball:
+            ball = process_keys()
+
+        if skip > 0:
+            skip -= 1
+            continue
+
+        if ball:
+            (x, y) = ball
+            if turn > 0:
+                if x < 0.5:
+                    turn = 3    # Continue turn left
+                else:
+                    turn = 0
+                    skip - 3    # Stop turning and pause
+            elif turn < 0:
+                if x > 0.5:
+                    turn = -3   # Continue turn right
+                else:
+                    turn = 0
+                    skip = 3    # Stop turning and pause
+            else:   # No turn in progress
+                if x < 0.5:
+                    if att_yaw == MAXYAW:
+                        att_yaw = 0
+                        turn = 3    # Start turning left
+                        skip = 3
+                    else:
+                        att_yaw += 1    # Lean left
+                elif x > 0.5:
+                    if att_yaw == -MAXYAW:
+                        att_yaw = 0
+                        turn = -3   # Start turning right
+                        skip = 3
+                    else:
+                        att_yaw -= 1    # Lean right
+            
+                if y < 0.5 and att_pitch > -MAXPITCH:
+                    att_pitch -= 1
+                if y > 0.5 and att_pitch < MAXPITCH:
+                    att_pitch += 1
+        
+        if turn != o_turn:
+            o_turn = turn
             print("TURN", turn)
             if turn > 0:
                 dogControl.turn(10)
+                turn -= 1
             elif turn < 0:
                 dogControl.turn(-10)
+                turn += 1
             else:
                 dogControl.stop()
-            oldturn = turn
+                att_yaw = 0 # Reset the attitude yaw
+
+        elif att_yaw != o_att_yaw or att_pitch != o_att_pitch:
+            o_att_yaw = att_yaw
+            o_att_pitch = att_pitch 
+            print("ATTITUDE", att_yaw, att_pitch)
+            dogControl.attitude(["y", "p", "r"], [att_yaw, att_pitch, 0])
+
 
     except zmq.error.Again:
         pass  # No frame received, continue processing
