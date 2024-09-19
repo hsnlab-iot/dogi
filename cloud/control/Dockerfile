@@ -31,6 +31,7 @@ RUN apt install -y python3-gst-1.0 libzmq3-dev && \
 
 # Copy the supervisor configuration file
 COPY src/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 COPY src/ /root
 
