@@ -12,6 +12,7 @@ time.sleep(1)   # Wait for the dogControl
 
 MAXPITCH = 16
 MAXYAW = 16
+TURNBASE = 7
 
 # Subscribe to video
 zmqcontext = zmq.Context()
@@ -32,7 +33,7 @@ def process_frame(frame_bytes):
     #img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
     #cv2.imshow("Dogi video", img_array)
 
-    results = model.track(img_array, imgsz=[height, width], conf=0.4, classes=[7], verbose=False, persist=True)
+    results = model.track(img_array, imgsz=[height, width], conf=0.25, classes=[32], verbose=False, persist=True)
     annotated_frame = results[0].plot()
     
     annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
@@ -96,13 +97,13 @@ while True:
             (x, y) = ball
             if turn > 0:
                 if x < 0.5:
-                    turn = 3    # Continue turn left
+                    turn = TURNBASE    # Continue turn left
                 else:
                     turn = 0
                     skip - 3    # Stop turning and pause
             elif turn < 0:
                 if x > 0.5:
-                    turn = -3   # Continue turn right
+                    turn = -TURNBASE   # Continue turn right
                 else:
                     turn = 0
                     skip = 3    # Stop turning and pause
@@ -110,15 +111,15 @@ while True:
                 if x < 0.5:
                     if att_yaw == MAXYAW:
                         att_yaw = 0
-                        turn = 3    # Start turning left
-                        skip = 3
+                        turn = TURNBASE    # Start turning left
+                        skip = 10
                     else:
                         att_yaw += 1    # Lean left
                 elif x > 0.5:
                     if att_yaw == -MAXYAW:
                         att_yaw = 0
-                        turn = -3   # Start turning right
-                        skip = 3
+                        turn = -TURNBASE   # Start turning right
+                        skip = 10
                     else:
                         att_yaw -= 1    # Lean right
             
@@ -132,10 +133,8 @@ while True:
             print("TURN", turn)
             if turn > 0:
                 dogControl.turn(10)
-                turn -= 1
             elif turn < 0:
                 dogControl.turn(-10)
-                turn += 1
             else:
                 dogControl.stop()
                 att_yaw = 0 # Reset the attitude yaw
@@ -145,6 +144,11 @@ while True:
             o_att_pitch = att_pitch 
             print("ATTITUDE", att_yaw, att_pitch)
             dogControl.attitude(["y", "p", "r"], [att_yaw, att_pitch, 0])
+
+        if turn > 0:
+            turn -= 1
+        elif turn < 0:
+            turn += 1
 
 
     except zmq.error.Again:
