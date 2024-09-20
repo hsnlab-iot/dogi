@@ -9,6 +9,7 @@ services:
       #- ROBOT_IP=10.20.11.49
     ports:
       - "6080:6080"
+      - "5050:5050"
       - "5100:5100/udp"
     deploy:
       resources:
@@ -17,4 +18,5 @@ services:
           - driver: nvidia
             device_ids: ['0']
             capabilities: [gpu]
-    command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+    #command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+    #command: ["/bin/sh", "-c", "sleep inf"]

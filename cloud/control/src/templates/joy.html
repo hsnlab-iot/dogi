@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dogi control</title>
+    <script src="{{ url_for('static', filename='js/joy.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+    <style>
+        .container {
+            display: flex;
+        }
+        .circle-button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="joy1Div" style="width:200px;height:200px;margin:auto;"></div>
+    <div id="joy2Div" style="width:200px;height:200px;margin:auto;"></div>
+</div>
+
+<button id="button_reset" class="circle-button" style="background-color: red;">Reset</button>
+<button id="button_pee" class="circle-button" style="background-color: red;">Pee</button>
+<button id="button_wave" class="circle-button" style="background-color: red;">Wave</button>
+
+<script>
+    var socket = io();
+    socket.on('connect', function() {
+        socket.emit('my event', {data: 'I\'m connected!'});
+    });
+
+    var Joy1 = new JoyStick('joy1Div', {}, function(stickData) {
+        // Send the stickData as a JSON string
+        socket.emit('joy1', stickData.cardinalDirection);
+    });
+    var Joy2 = new JoyStick('joy2Div', {}, function(stickData) {
+        // Send the stickData as a JSON string
+        socket.emit('joy2', stickData.cardinalDirection);
+    });
+
+    document.querySelector('#button_reset').addEventListener('click', function() {
+        // Code to be executed when button_reset is clicked
+        socket.emit('action', 'reset');
+    });
+    document.querySelector('#button_pee').addEventListener('click', function() {
+        // Code to be executed when button_reset is clicked
+        socket.emit('action', 'pee');
+    });
+    document.querySelector('#button_wave').addEventListener('click', function() {
+        // Code to be executed when button_reset is clicked
+        socket.emit('action', 'wave');
+    });
+
+</script>
+
+</body>
+</html>
