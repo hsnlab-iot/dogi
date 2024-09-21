@@ -27,6 +27,7 @@
 <button id="button_reset" class="circle-button" style="background-color: red;">Reset</button>
 <button id="button_pee" class="circle-button" style="background-color: red;">Pee</button>
 <button id="button_wave" class="circle-button" style="background-color: red;">Wave</button>
+<button id="button_look" class="circle-button" style="background-color: red;">Look</button>
 
 <script>
     var socket = io();
@@ -54,6 +55,10 @@
     document.querySelector('#button_wave').addEventListener('click', function() {
         // Code to be executed when button_reset is clicked
         socket.emit('action', 'wave');
+    });
+    document.querySelector('#button_look').addEventListener('click', function() {
+        // Code to be executed when button_reset is clicked
+        socket.emit('action', 'look');
     });
 
 </script>

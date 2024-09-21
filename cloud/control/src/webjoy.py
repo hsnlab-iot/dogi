@@ -2,6 +2,7 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 import pickle
 import socket
+import time
 
 app = Flask(__name__)
 #app.config['SECRET_KEY'] = 'secret_key'
@@ -72,6 +73,14 @@ def handle_event(data):
         sock.send(pickle.dumps({'name': 'action', 'args': (11, )}))
     if data == "wave":
         sock.send(pickle.dumps({'name': 'action', 'args': (13, )}))
+    if data == "look":
+        sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, 0])}))
+        time.sleep(1.5)
+        sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, 16])}))
+        time.sleep(1.5)
+        sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, -16])}))
+        time.sleep(1.5)
+        sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 0, 0])}))
 
 @socketio.on_error()  # Handle socketio errors
 def handle_error(e):
