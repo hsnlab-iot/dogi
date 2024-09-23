@@ -81,6 +81,17 @@ def handle_event(data):
         sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, -16])}))
         time.sleep(1.5)
         sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 0, 0])}))
+    if data == "sit":
+        sock.send(pickle.dumps({'name': 'reset'}))
+        time.sleep(1)
+        sock.send(pickle.dumps({'name': 'motor', 'args': ([32, 93])}))
+        sock.send(pickle.dumps({'name': 'motor', 'args': ([42, 93])}))
+        sock.send(pickle.dumps({'name': 'motor', 'args': ([31, -73])}))
+        sock.send(pickle.dumps({'name': 'motor', 'args': ([41, -73])}))
+        sock.send(pickle.dumps({'name': 'motor', 'args': ([12, 10])}))
+        sock.send(pickle.dumps({'name': 'motor', 'args': ([22, 10])}))
+        sock.send(pickle.dumps({'name': 'motor', 'args': ([11, 30])}))
+        sock.send(pickle.dumps({'name': 'motor', 'args': ([21, 30])}))
 
 @socketio.on_error()  # Handle socketio errors
 def handle_error(e):
