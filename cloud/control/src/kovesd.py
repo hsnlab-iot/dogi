@@ -28,7 +28,7 @@ subscriber.setsockopt_string(zmq.SUBSCRIBE, '')  # Subscribe to all topics
 subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 
 
-def dogControl(command, args):
+def dogControl(command, args = None):
     if args:
         sock.send(pickle.dumps({'name': command, 'args': args}))
     else:
