@@ -13,7 +13,7 @@ RUN apt update && \
     xvfb tigervnc-standalone-server openbox lxterminal xterm \
     novnc websockify \
     busybox socat tmux build-essential git vim tcpdump software-properties-common curl \
-    python3 python3-pip python3-serial python3-opencv mediapipe pipx python3-dev python3-gst-1.0 \
+    python3 python3-pip python3-serial python3-opencv pipx python3-dev python3-gst-1.0 \
     python3-zmq libzmq3-dev \
     && busybox --install
 
@@ -22,14 +22,14 @@ RUN \
     cd /root && \
     python3 -m venv .yolo && source /root/.yolo/bin/activate && \ 
     pip install --upgrade pip && \
-    pip install --break-system-packages --retries 20 ultralytics pyzmq && \
+    pip install --break-system-packages --retries 20 ultralytics pyzmq ollama mediapipe && \
     deactivate
 
 RUN \
     cd /root && \
     python3 -m venv .flask && source /root/.flask/bin/activate && \ 
     pip install flask flask-socketio \
-    numpy pyzmq opencv-python-headless && \
+    numpy pyzmq opencv-python-headless ollama && \
     deactivate
 
 # Wprkaround for supervisord (missing symbol)
