@@ -13,7 +13,7 @@ RUN apt update && \
     xvfb tigervnc-standalone-server openbox lxterminal xterm \
     novnc websockify \
     busybox socat tmux build-essential git vim tcpdump software-properties-common curl \
-    python3 python3-pip python3-serial python3-opencv pipx python3-dev python3-gst-1.0 \
+    python3 python3-pip python3-serial python3-opencv mediapipe pipx python3-dev python3-gst-1.0 \
     python3-zmq libzmq3-dev \
     && busybox --install
 
@@ -36,6 +36,9 @@ RUN \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt install -y python3.9 python3.9-distutils && \
     pipx install supervisor --python /usr/bin/python3.9
+
+# Packages & model for MediaPipe Hand tracking
+RUN wget -q https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
 
 # Copy the supervisor configuration file
 COPY src/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
