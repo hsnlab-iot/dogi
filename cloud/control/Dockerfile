@@ -28,7 +28,8 @@ RUN \
 RUN \
     cd /root && \
     python3 -m venv .flask && source /root/.flask/bin/activate && \ 
-    pip install flask flask-socketio && \
+    pip install flask flask-socketio \
+    numpy pyzmq opencv-python-headless && \
     deactivate
 
 # Wprkaround for supervisord (missing symbol)

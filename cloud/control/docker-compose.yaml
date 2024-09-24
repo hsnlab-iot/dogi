@@ -5,11 +5,12 @@ services:
     #network_mode: host
     environment:
       - DISPLAY=:0
-      - ROBOT_IP=192.168.1.140
-      #- ROBOT_IP=10.20.11.49
+      #- ROBOT_IP=192.168.1.140
+      - ROBOT_IP=10.20.11.49
     ports:
       - "6080:6080"
       - "5050:5050"
+      - "5051:5051"
       - "5100:5100/udp"
     deploy:
       resources:

@@ -14,6 +14,7 @@ tmux new-session -d -s data "python3 /root/DOGZILLAProxyServer.py ; sleep inf"
 while ! netstat -tuln | grep -q ":5002 "; do
     sleep 1
 done
+tmux new-session -d -s webvideo "cd /root && source .flask/bin/activate && python3 webvideo.py ; sleep inf"
 tmux new-session -d -s webjoy "cd /root && source .flask/bin/activate && python3 webjoy.py ; sleep inf"
 
 tail -f /dev/null
