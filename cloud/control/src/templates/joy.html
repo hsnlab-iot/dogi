@@ -14,12 +14,29 @@
             border-radius: 50%;
             border: none;
             margin: 10px;
+            background-color: red;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s ease;
+        }
+        .circle-button:hover {
+            background-color: darkred;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div style="width: 640px; height: 480px;">
+    <img src="http://{{ host }}:5051/mjpeg" style="width: 100%; height: 100%;" />
+</div>
+</div>
+</div>
+
+<div class="container" tyle="width: 640px;">
     <div id="joy1Div" style="width:200px;height:200px;margin:auto;"></div>
     <div id="joy2Div" style="width:200px;height:200px;margin:auto;"></div>
 </div>
@@ -46,23 +63,18 @@
     });
 
     document.querySelector('#button_reset').addEventListener('click', function() {
-        // Code to be executed when button_reset is clicked
         socket.emit('action', 'reset');
     });
     document.querySelector('#button_pee').addEventListener('click', function() {
-        // Code to be executed when button_reset is clicked
         socket.emit('action', 'pee');
     });
     document.querySelector('#button_wave').addEventListener('click', function() {
-        // Code to be executed when button_reset is clicked
         socket.emit('action', 'wave');
     });
     document.querySelector('#button_look').addEventListener('click', function() {
-        // Code to be executed when button_reset is clicked
         socket.emit('action', 'look');
     });
     document.querySelector('#button_sit').addEventListener('click', function() {
-        // Code to be executed when button_reset is clicked
         socket.emit('action', 'sit');
     });
 

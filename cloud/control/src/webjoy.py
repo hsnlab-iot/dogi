@@ -1,8 +1,13 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import pickle
 import socket
 import time
+import threading
+from urllib.parse import urlparse
+
+inMotion = False
+lock = threading.Lock()
 
 app = Flask(__name__)
 #app.config['SECRET_KEY'] = 'secret_key'
@@ -17,7 +22,8 @@ joy2_attitude = [0, 0, 0]
 
 @app.route('/')
 def index():
-    return render_template('joy.html')
+    host = urlparse(request.url_root).hostname
+    return render_template('joy.html', host=host)
 
 @socketio.on('connect')
 def handle_connect():
@@ -66,7 +72,14 @@ def handle_event(data):
 
 @socketio.on('action')
 def handle_event(data):
+    global inMotion
     #print('Received event:', data)
+    
+    with lock:
+        if inMotion:
+            return
+        inMotion = True
+
     if data == "reset":
         sock.send(pickle.dumps({'name': 'reset'}))
     if data == "pee":
@@ -92,6 +105,9 @@ def handle_event(data):
         sock.send(pickle.dumps({'name': 'motor', 'args': ([22, 10])}))
         sock.send(pickle.dumps({'name': 'motor', 'args': ([11, 30])}))
         sock.send(pickle.dumps({'name': 'motor', 'args': ([21, 30])}))
+    
+    with lock:
+        inMotion = False
 
 @socketio.on_error()  # Handle socketio errors
 def handle_error(e):
