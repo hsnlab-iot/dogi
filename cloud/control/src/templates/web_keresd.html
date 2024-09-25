@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Keresd</title>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+</head>
+<body>
+
+<div style="width: 640px; height: 480px; border: 2px solid black;">
+    <img src="http://{{ host }}:5051/mjpeg_keresd" style="width: 100%; height: 100%;" />
+</div>
+
+<div style="display: flex;"></div>
+    <div id="en" style="font-size: 24px; border: 2px solid black; background-color: yellow; height: 400px;"></div>
+    <div id="hu" style="font-size: 24px; border: 2px solid black; background-color: white; height: 400px;"></div>
+</div>
+
+<script>
+    var socket = io();
+    
+    socket.on('hutext', function(data) {
+        console.log(data);
+        document.getElementById('hu').innerHTML = data;
+    });
+
+    socket.on('entext', function(data) {
+        console.log(data);
+        document.getElementById('en').innerHTML = data;
+    });
+
+    socket.on('ball', function() {
+    });
+
+    socket.on('obstacle', function() {
+    });
+
+</script>
+
+</body>
+</html>

@@ -19,12 +19,24 @@ ollama_client = ollama.Client(host=f'http://{ollama_ip}:11434')
 # Create a UDP sockets to Dogi
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.connect(('localhost', 5002))
+# Create a UDP sockets to web page
+sock_web = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_web.connect(('localhost', 5003))
 
-sock_voice = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock_voice.connect(('localhost', 5010))
+VOICE_PORT = 5010
+ENVOICE_PORT = 5011
 
-sock_envoice = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock_envoice.connect(('localhost', 5011))
+def send_text_and_wait_for_answer(port, text):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(('localhost', port))
+    sock.send(text.encode('utf-8'))
+    response = sock.recv(2048).decode('utf-8')
+    sock.close()
+    if ':' in response:
+        parts = response.split(':', 1)
+        return float(parts[0]), parts[1].strip()
+
+    return float(response)
 
 MAXPITCH = 20
 MAXYAW = 16
@@ -39,13 +51,14 @@ subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 publisher = zmqcontext.socket(zmq.PUB)
 publisher.bind("ipc:///tmp/video_frames_keresd.ipc")
 
-#sock_voice.send(("Most labdakereső játékot fogok játszani. " \
-#                "Rejtsd el a labdát és én megpróbálom megtalálni, hogy hol van. " \
-#                "Igyekszem ügyesen mozogni és semmihez sem érni. ").encode('utf-8'))
-#time.sleep(15)
+#text = "Most labdakereső játékot fogok játszani. " \
+#        "Rejtsd el a labdát és én megpróbálom megtalálni, hogy hol van. " \
+#        "Igyekszem ügyesen mozogni és semmihez sem érni. "
+#d = send_text_and_wait_for_answer(VOICE_PORT, text)
+#time.sleep(d + 3)
 
-sock_voice.send(("Aki bújt, aki nem, indulok. Figyelj, keresni kezdek. ").encode('utf-8'))
-time.sleep(5)
+d = send_text_and_wait_for_answer(VOICE_PORT, "Aki bújt, aki nem, indulok. Figyelj, keresni kezdek. ")
+time.sleep(d)
 
 
 def dogControl(command, args = None):
@@ -68,18 +81,21 @@ def look_straight():
 
 def move_forward():
     look_straight()
+    time.sleep(1)
     dogControl('forward', (5, ))
     time.sleep(3)
     dogControl('stop')
 
 def turn_left():
     look_straight()
+    time.sleep(1)
     dogControl('turn', (5, ))
     time.sleep(3)
     dogControl('stop')
 
 def turn_right():
     look_straight()
+    time.sleep(1)
     dogControl('turn', (-5, ))
     time.sleep(3)
     dogControl('stop')
@@ -149,26 +165,50 @@ while True:
     obstacles = None
     ball_found = False
     try:
-        ball = ollama_client.generate(model='llava:13b', 
+        whatisit = ollama_client.generate(model='llava:13b', 
             prompt='This is a liveview capture taken by a front camera of a robot dog.' \
-                'Are there are any balls on the picture, Answer with a single word: YES or NO' \
+                'The robot dog is looking straight ahead and a bit down.' \
+                'Make a short description, briefly what is on the picture!' \
+                'Focus on the near objects, ignore far away objects!' \
+                'Try to describe these objects relative to the center of the picture!'  \
                 ,
             images=[img_buffer.tobytes()],
             stream=False)
+        
+        print("TTS")
+        d, hutext = send_text_and_wait_for_answer(ENVOICE_PORT, whatisit['response'].strip())
+        print("Description: ", whatisit['response'].strip())
+        print("Leírás: ", hutext)
+        sock_web.send(pickle.dumps({'action': 'hutext', 'text': hutext}))
+        sock_web.send(pickle.dumps({'action': 'entext', 'text': whatisit['response'].strip()}))
+        time.sleep(d)
+
+        ball = ollama_client.generate(model='llama3.1', 
+            prompt='Answer with a single word, YES or NO! Based on the following description, are there any balls in this description: ' + 
+                whatisit['response'].strip() \
+                ,
+            stream=False)
 
         print("Ball: ", ball['response'].strip())
-        if ball['response'].strip() in ['YES', 'Yes']:
-            sock_voice.send(("Hurrá, megtaláltam a labdát. ").encode('utf-8'))
+
+        if ball['response'].strip() in ['YES', 'Yes', 'YES!']:
+            d = send_text_and_wait_for_answer(VOICE_PORT, "Hurrá, megtaláltam a labdát. ")
+            time.sleep(d)            
             ball_found = True
             ball_place = ollama_client.generate(model='llava:13b', 
                 prompt='This is a liveview capture taken by a front camera of a robot dog.' \
-                    'Describe where zou see the ball on the picture, and how does the ball look like' \
+                    'Describe where you see the ball on the picture, and how does the ball look like' \
                     ,
                 images=[img_buffer.tobytes()],
                 stream=False)
 
+            print("TTS")
+            d, hutext = send_text_and_wait_for_answer(ENVOICE_PORT, ball_place['response'].strip())
             print("Ball place: ", ball_place['response'].strip())
-            sock_envoice.send(ball_place['response'].strip().encode('utf-8'))
+            print("Labda helye: ", hutext)
+            sock_web.send(pickle.dumps({'action': 'hutext', 'text': hutext}))
+            sock_web.send(pickle.dumps({'action': 'entext', 'text': ball_place['response'].strip()}))
+            time.sleep(d)
             print("Ball detected, stopping")
 
             # Stop the thread
@@ -176,15 +216,13 @@ while True:
             thread.join()
             break
 
-        obstacles = ollama_client.generate(model='llava:13b', 
-            prompt='This is a liveview capture taken by a front camera of a robot dog.' \
-                'The robot dog is looking straight ahead and a bit down.' \
-                'The robot dog is in a room with a grass like green floor.' \
-                'List any obstacles in front of the robot dog with great details.' \
-                'If there are not any obstacles on the picture, say just a single word: CLEAR.' \
+        obstacles = ollama_client.generate(model='llama3.1', 
+            prompt='Answer with a word, CLEAR or NOT CLEAR!' \
+                'Based on the following description, are there any obstacles in front of the viewer: ' + 
+                whatisit['response'].strip() \
                 ,
-            images=[img_buffer.tobytes()],
             stream=False)
+        print("Obstacles: ", obstacles['response'].strip())
         
     except Exception as e:
         print('Error:', e)
@@ -193,11 +231,6 @@ while True:
     end_time = time.time()
     execution_time = end_time - start_time
     print("Execution time:", execution_time, "seconds")
-
-    obstaclesstr = obstacles['response'].strip()
-
-    print(obstaclesstr)
-    sock_envoice.send(obstaclesstr.encode('utf-8'))
 
     # Check if 'q' is pressed and if so, break the loop
     stop = False
@@ -208,7 +241,7 @@ while True:
     thread.stopped = True
     thread.join()
 
-    if obstacles['response'].strip() == 'CLEAR':
+    if obstacles['response'].strip() in ['CLEAR', 'Clear', 'CLEAR!']:
         print("No obstacles in front, moving forward")
         move_forward()
         time.sleep(8)

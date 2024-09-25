@@ -14,8 +14,20 @@ model = YOLO('yolov8m-seg.pt')
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.connect(('localhost', 5002))
 
-sock_voice = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock_voice.connect(('localhost', 5010))
+VOICE_PORT = 5010
+ENVOICE_PORT = 5011
+
+def send_text_and_wait_for_answer(port, text):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(('localhost', port))
+    sock.send(text.encode('utf-8'))
+    response = sock.recv(2048).decode('utf-8')
+    sock.close()
+    if ':' in response:
+        parts = response.split(':', 1)
+        return float(parts[0]), parts[1].strip()
+
+    return float(response)
 
 time.sleep(1)   # Wait for the dogControl
 
@@ -33,9 +45,12 @@ subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 publisher = zmqcontext.socket(zmq.PUB)
 publisher.bind("ipc:///tmp/video_frames_kovesd.ipc")
 
-sock_voice.send(("Most labdakövetős játékot fogok játszani. " \
-                "Mozgasd a labdát előttem és én követni fogom. " \
-                "Ha már nem látom a labdát, akkor nem mozdulok. ").encode('utf-8'))
+text = "Most labdakövetős játékot fogok játszani. " \
+        "Mozgasd a labdát előttem és én követni fogom. " \
+        "Ha éppem nem látom a labdát, akkor nem mozdulok. "
+
+d = send_text_and_wait_for_answer(VOICE_PORT, text)
+#time.sleep(d)
 
 def dogControl(command, args = None):
     if args:
@@ -143,7 +158,7 @@ while True:
         elif att_yaw != o_att_yaw or att_pitch != o_att_pitch:
             o_att_yaw = att_yaw
             o_att_pitch = att_pitch 
-            print("ATTITUDE", att_yaw, att_pitch)
+            #print("ATTITUDE", att_yaw, att_pitch)
             dogControl('attitude', (["y", "p", "r"], [att_yaw, att_pitch, 0]))
 
         if turn > 0:
