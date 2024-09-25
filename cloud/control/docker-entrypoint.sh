@@ -19,5 +19,6 @@ tmux new-session -d -s webjoy "cd /root && source .flask/bin/activate && python3
 tmux new-session -d -s webvoice "cd /root && source .flask/bin/activate && python3 web_voice.py ; sleep inf"
 tmux new-session -d -s webkeresd "cd /root && source .flask/bin/activate && python3 web_keresd.py ; sleep inf"
 tmux new-session -d -s webkovesd "cd /root && source .flask/bin/activate && python3 web_kovesd.py ; sleep inf"
+tmux new-session -d -s webmutasd "cd /root && source .flask/bin/activate && python3 web_mutasd.py ; sleep inf"
 
 tail -f /dev/null

@@ -32,7 +32,7 @@ listener_thread.start()
 @app.route('/')
 def index():
     host = urlparse(request.url_root).hostname
-    return render_template('web_keresd.html', host=host)
+    return render_template('web_mutasd.html', host=host)
 
 
 @socketio.on_error()  # Handle socketio errors
