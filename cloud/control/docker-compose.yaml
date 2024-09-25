@@ -1,16 +1,19 @@
 services:
   control:
     build: .
-    container_name: control
+    container_name: dogi
     #network_mode: host
     environment:
       - DISPLAY=:0
       #- ROBOT_IP=192.168.1.140
       - ROBOT_IP=10.20.11.49
+      - OLLAMA_IP=10.6.6.20
+      - TTS_IP=opentts
     ports:
       - "6080:6080"
       - "5050:5050"
       - "5051:5051"
+      - "5040:5040"
       - "5100:5100/udp"
     deploy:
       resources:
@@ -21,3 +24,14 @@ services:
             capabilities: [gpu]
     #command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
     #command: ["/bin/sh", "-c", "sleep inf"]
+
+  opentts:
+    image: synesthesiam/opentts:hu
+    container_name: opentts
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['0']
+            capabilities: [gpu]

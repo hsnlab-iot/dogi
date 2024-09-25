@@ -14,6 +14,9 @@ model = YOLO('yolov8m-seg.pt')
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.connect(('localhost', 5002))
 
+sock_voice = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_voice.connect(('localhost', 5010))
+
 time.sleep(1)   # Wait for the dogControl
 
 MAXPITCH = 20
@@ -27,6 +30,12 @@ subscriber.setsockopt(zmq.CONFLATE, 1)
 subscriber.setsockopt_string(zmq.SUBSCRIBE, '')  # Subscribe to all topics
 subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 
+publisher = zmqcontext.socket(zmq.PUB)
+publisher.bind("ipc:///tmp/video_frames_kovesd.ipc")
+
+sock_voice.send(("Most labdakövetős játékot fogok játszani. " \
+                "Mozgasd a labdát előttem és én követni fogom. " \
+                "Ha már nem látom a labdát, akkor nem mozdulok. ").encode('utf-8'))
 
 def dogControl(command, args = None):
     if args:
@@ -49,6 +58,8 @@ def process_frame(frame_bytes):
     results = model.track(img_array, imgsz=[height, width], conf=0.25, classes=[32], verbose=False, persist=True)
     annotated_frame = results[0].plot()
     
+    publisher.send(annotated_frame.tobytes())
+
     annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
     cv2.imshow("YOLO Dogi video", annotated_frame)
     #print(result[0].boxes.xywhn)
@@ -63,26 +74,6 @@ def process_frame(frame_bytes):
     else:
         return None
     
-# Function to process the keys    
-def process_keys():
-
-    # Simulate a ball on a screen
-    x = 0.5
-    y = 0.5
-    key = cv2.waitKey(1)
-    if key == ord('s'):
-        y = 0.75
-    elif key == ord('w'):
-        y = 0.25
-    elif key == ord('a'):
-        x = 0.25
-    elif key == ord('d'):
-        x = 0.75
-    else:
-        return None
-    
-    return (x, y)
-
 
 att_yaw = 0
 o_att_yaw = 0
@@ -98,9 +89,6 @@ while True:
     try:
         frame_bytes = subscriber.recv()
         ball = process_frame(frame_bytes)
-
-        if not ball:
-            ball = process_keys()
 
         if skip > 0:
             skip -= 1
@@ -173,5 +161,6 @@ while True:
 
 # Release the video capture and close the window
 subscriber.close()
+publisher.close()
 zmqcontext.term()
 cv2.destroyAllWindows()

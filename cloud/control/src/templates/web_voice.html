@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Voice</title>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+</head>
+<body>
+    
+    <button id="enable">Enable backround audio</button>
+
+<script>
+    var context;
+    socket = io();
+
+    window.onload = function() {
+        context = new AudioContext();
+    }
+
+    document.getElementById('enable').addEventListener('click', function() {
+        // Enable audio in the background
+        context.resume().then(() => {
+            console.log('Playback resumed successfully');
+        });
+
+        fetch('/test', {
+            method: 'GET',
+        });
+    });
+
+    
+    socket.on('connect', function() {
+        socket.emit('connection', {data: 'I\'m connected!'});
+        console.log('Connected to server');
+    });
+
+    socket.on('audio_play', function(data) {
+        console.log('Received request:', data);
+        var audio = new Audio('static/' + data);
+        audio.play();
+    });
+</script>
+</body>
+</html>
