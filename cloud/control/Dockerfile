@@ -40,6 +40,7 @@ RUN \
 
 # Packages & model for MediaPipe Hand tracking
 RUN wget -q https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+RUN wget -q https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/latest/gesture_recognizer.task
 
 # Copy the supervisor configuration file
 COPY src/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
