@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Mutasd</title>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+</head>
+<body>
+
+<div style="display: flex;">
+    <div style="flex: 1;">
+        <div style="width: 640px; height: 480px; border: 2px solid black;">
+            <img src="http://{{ host }}:5051/mjpeg_mutasd" style="width: 100%; height: 100%;" />
+        </div>
+    </div>
+    <div>
+        <div style="display: flex; flex-wrap: wrap; height: 800px;">
+            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action1</div>
+            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action2</div>
+            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action3</div>
+            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action4</div>
+            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action5</div>
+            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action6</div>
+            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action7</div>
+            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action8</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var socket = io();
+    
+    socket.on('action', function(data) {
+        console.log(data);
+        var actionBox = document.querySelector(`#action${data}`);
+        actionBox.style.backgroundColor = 'green';
+        setTimeout(function() {
+            actionBox.style.backgroundColor = '';
+        }, 3000);
+    });
+
+</script>
+
+</body>
+</html>
