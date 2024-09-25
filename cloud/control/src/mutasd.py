@@ -71,6 +71,9 @@ def run(model: str, num_hands: int,
   subscriber.setsockopt_string(zmq.SUBSCRIBE, '')  # Subscribe to all topics
   subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 
+  publisher = zmqcontext.socket(zmq.PUB)
+  publisher.bind("ipc:///tmp/video_frames_mutasd.ipc")
+
   # Visualization parameters
   row_size = 50  # pixels
   left_margin = 24  # pixels
@@ -119,8 +122,9 @@ def run(model: str, num_hands: int,
         pass  # No frame received, continue processing
     
     if frame_bytes is None:
-        break
+        continue
 
+    category_name = 'None'
     img_array = np.frombuffer(frame_bytes, dtype=np.uint8)
     img_array = img_array.reshape((height, width, 3))
     img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
@@ -201,6 +205,9 @@ def run(model: str, num_hands: int,
 
     if recognition_frame is not None:
         cv2.imshow('gesture_recognition', recognition_frame)
+        publisher.send(recognition_frame.tobytes())
+
+    print(category_name)
 
     # Stop the program if the ESC key is pressed.
     if cv2.waitKey(1) == ord('q'):
