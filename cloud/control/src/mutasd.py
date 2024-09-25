@@ -203,7 +203,7 @@ def run(model: str, num_hands: int,
         cv2.imshow('gesture_recognition', recognition_frame)
 
     # Stop the program if the ESC key is pressed.
-    if cv2.waitKey(1) == 27:
+    if cv2.waitKey(1) == ord('q'):
         break
 
   recognizer.close()
@@ -230,19 +230,19 @@ def main():
       help='The minimum confidence score for hand detection to be considered '
            'successful.',
       required=False,
-      default=0.5)
+      default=0.3)
   parser.add_argument(
       '--minHandPresenceConfidence',
       help='The minimum confidence score of hand presence score in the hand '
            'landmark detection.',
       required=False,
-      default=0.5)
+      default=0.3)
   parser.add_argument(
       '--minTrackingConfidence',
       help='The minimum confidence score for the hand tracking to be '
            'considered successful.',
       required=False,
-      default=0.5)
+      default=0.3)
   # Finding the camera ID can be very reliant on platform-dependent methods.
   # One common approach is to use the fact that camera IDs are usually indexed sequentially by the OS, starting from 0.
   # Here, we use OpenCV and create a VideoCapture object for each potential ID with 'cap = cv2.VideoCapture(i)'.
