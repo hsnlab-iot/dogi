@@ -6,13 +6,11 @@ import socket
 import pickle
 import threading
 import ollama
-import base64
-from PIL import Image
+import random
 from io import BytesIO
 
 # OLLAMA_HOST should be set in the env or use localhost
 ollama_client = ollama.Client(host='http://10.6.6.20:11434')
-#ollama_llm = Ollama(model=os.environ.get("VISION_MODEL", "llava"), base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"))
 
 # Create a UDP socket to Dogi
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -29,7 +27,7 @@ subscriber.setsockopt_string(zmq.SUBSCRIBE, '')  # Subscribe to all topics
 subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 
 
-def dogControl(command, args):
+def dogControl(command, args = None):
     if args:
         sock.send(pickle.dumps({'name': command, 'args': args}))
     else:
@@ -46,6 +44,24 @@ def look_front():
 
 def look_straint():
     dogControl('attitude', (['r', 'p', 'y'], [0, 0, 0]))
+
+def move_forward():
+    look_straint()
+    dogControl('forward', (5, ))
+    time.sleep(3)
+    dogControl('stop')
+
+def turn_left():
+    look_straint()
+    dogControl('turn', (5, ))
+    time.sleep(3)
+    dogControl('stop')
+
+def turn_right():
+    look_straint()
+    dogControl('turn', (-5, ))
+    time.sleep(3)
+    dogControl('stop')
 
 # Function to process the frame
 def take_frame():
@@ -72,16 +88,15 @@ def look_left_right():
     while not threading.current_thread().stopped:
         look_left()
         time.sleep(1.5)
+        if threading.current_thread().stopped:
+            break
         look_right()
         time.sleep(1.5)
+        if threading.current_thread().stopped:
+            break
         look_straint()
         time.sleep(1.5)
-
-def convert_to_base64(opencv_image):
-    pil_image = Image.fromarray(cv2.cvtColor(opencv_image, cv2.COLOR_BGR2RGB))
-    buffered = BytesIO()
-    pil_image.save(buffered, format="JPEG")  # You can change the format if needed
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+    look_straint()
 
 while True:
 
@@ -92,7 +107,11 @@ while True:
     time.sleep(1.5)
     front_pic = take_frame()
     
-    # Display the three pics side by side
+    # Save front_pic into the current folder in jpeg format
+    filename = "front_pic_{}.jpeg".format(time.time())
+    cv2.imwrite(filename, front_pic)
+
+    # Display the picture
     cv2.imshow("Front", front_pic)
     cv2.waitKey(1)
 
@@ -100,34 +119,69 @@ while True:
     thread = threading.Thread(target=look_left_right)
     thread.start()
 
-    # Save front_pic into the current folder in jpeg format
-    filename = "front_pic_{}.jpeg".format(time.time())
-    cv2.imwrite(filename, front_pic)
-
     is_success, img_buffer = cv2.imencode(".jpg", front_pic)
+    print("Ask ollama about obstacles")
+    start_time = time.time()
 
-    #img_base64 = convert_to_base64(front_pic)
-    print("Ask ollama to describe the image")
+    ball = None
+    obstacles = None
     try:
-        response = ollama_client.generate(model='llava:13b', 
-            prompt='describe this image and make sure to include anything notable about it (include text you see in the image):', 
+        ball = ollama_client.generate(model='llava:13b', 
+            prompt='This is a liveview capture taken by a front camera of a robot dog.' \
+                'If there are any balls on the picture, Describe me with great details, where is the ball' \
+                'If there are no balls on the picture, please say just a single word: NO.' \
+                ,
             images=[img_buffer.tobytes()],
             stream=False)
-        print(response)
+
+        obstacles = ollama_client.generate(model='llava:13b', 
+            prompt='This is a liveview capture taken by a front camera of a robot dog.' \
+                'The robot dog is looking straight ahead and a bit down.' \
+                'The robot dog is in a room with a grass like green floor.' \
+                'List any obstacles in front of the robot dog with great details.' \
+                'If there are not any obstacles on the picture, please say just a single word: CLEAR.' \
+                ,
+            images=[img_buffer.tobytes()],
+            stream=False)
+        
     except Exception as e:
         print('Error:', e)
-#    llm_with_media_context = ollama_llm.bind(images=[img_base64])
-#    response = llm_with_media_context.invoke("Describe this image in detail.")
-#    print(response)
+        continue
 
-    # Stop the thread when desired
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print("Execution time:", execution_time, "seconds")
+
+    ballstr = ball['response'].strip()
+    obstaclesstr = obstacles['response'].strip()
+
+    print(ballstr)
+    print(obstaclesstr)
+
+    # Check if 'q' is pressed and if so, break the loop
+    stop = False
+    if cv2.waitKey(0) & 0xFF == ord('q'):
+        stop = True
+
+    # Stop the thread
     thread.stopped = True
     thread.join()
 
-    # Check if 'q' is pressed and if so, break the loop
-    if cv2.waitKey(0) & 0xFF == ord('q'):
+    if ballstr not in ['NO', 'No']:
+        print("Ball detected, stopping")
         break
 
+    if obstacles['response'].strip() == 'CLEAR':
+        print("No obstacles in front, moving forward")
+        move_forward()
+    else:
+        print("Obstacles detected, turning")
+        if random.choice([True, False]):
+            print("Turning left")
+            turn_left()
+        else:
+            print("Turning right")
+            turn_right()
 
 # Release the video capture and close the window
 subscriber.close()
