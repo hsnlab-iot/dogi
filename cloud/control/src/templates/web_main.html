@@ -1,23 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Web Keresd</title>
+    <title>Robotkutya</title>
     <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
+
 <body>
-    <div>
-        <ul class="tabs">
-            <li class="tab" onclick="clickPage(0)">{{ page0_name }}</li>
-            <li class="tab" onclick="clickPage(1)">{{ page1_name }}</li>
-            <li class="tab" onclick="clickPage(2)">{{ page2_name }}</li>
-            <li class="tab" onclick="clickPage(3)">{{ page3_name }}</li>
-        </ul>
+    <div class="header">
+        <div class="tabs">
+            <div class="tab tab1" onclick="clickPage(0)">{{ page0_name }}</div>
+            <div class="tab tab2" onclick="clickPage(1)">{{ page1_name }}</div>
+            <div class="tab tab3" onclick="clickPage(2)">{{ page2_name }}</div>
+            <div class="tab tab4" onclick="clickPage(3)">{{ page3_name }}</div>
+        </div>
+        <h1 class="title">Robotkutya v9.27</h1>
     </div>
     
-    <div id="iframeContainer" style="width: 1040px; height: 800px;">
-        <iframe id="myIframe" src="" frameborder="0" width="100%" height="100%"></iframe>
+    <div class="content-wrapper">
+        <div id="iframeContainer" class="iframe-container">
+            <iframe id="myIframe"></iframe>
+        </div>
+
+        <div class="logos">
+            <img src="{{ url_for('static', filename='images/bme_logo_nagy_bordo.svg') }}" alt="BME Logo">
+            <img src="{{ url_for('static', filename='images/Ericsson_logo.svg') }}" alt="Ericsson Logo">
+        </div>
     </div>
-    
+
     <script>
         var socket = io();
 

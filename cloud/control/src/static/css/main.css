@@ -1,0 +1,94 @@
+@font-face {
+    font-family: 'Jedth';
+    src: url('jedth.ttf') format('truetype'); /* Ensure the path is correct */
+    font-weight: normal;
+    font-style: normal;
+}
+
+body {
+    background-image: url('../images/deep_navy_blue_metal_texture_background.jpg'); /* Set background image */
+    background-size: cover; /* Ensure the image covers the entire page */
+    background-position: center; /* Center the background image */
+    background-repeat: no-repeat; /* Prevent the image from repeating */    font-family: Arial, sans-serif;
+    color: white;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column; /* Stacks the header, iframe, and logos vertically */
+    min-height: 100vh;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between; /* Space between tabs and title */
+    align-items: center; /* Center items vertically */
+    padding: 10px; /* Padding around header */
+    width: 100%; /* Full width for the header */
+}
+
+.tabs {
+    display: flex;
+    justify-content: flex-start; /* Align tabs to the left */
+}
+
+.tab {
+    padding: 10px 15px; /* Adjust padding for better spacing */
+    margin-right: 5px; /* Space between tabs */
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.tab:hover {
+    opacity: 0.8;
+}
+
+.tab1 { background-color: #FF5733; } /* Red */
+.tab2 { background-color: #33FF57; } /* Green */
+.tab3 { background-color: #3357FF; } /* Blue */
+.tab4 { background-color: #F1C40F; } /* Yellow */
+
+.content-wrapper {
+    display: flex;
+    justify-content: space-between; /* Space between iframe and logos */
+    width: 100%; /* Full width for the content */
+    flex-grow: 1; /* Allow content to grow vertically */
+}
+.iframe-container {
+    display: flex;
+    justify-content: center; /* Center iframe horizontally */
+    align-items: center;
+    height: 760px; /* Fixed height for iframe area */
+    border: 5px solid #FFFFFF; /* Border around iframe area */
+    border-radius: 8px; /* Rounded corners for the border */
+    width: 100%; /* Allow flexibility in width */
+    max-width: 1280px; /* Set the max width for the container */
+    position: relative; /* For logos positioning */
+    margin-top: 0;
+    margin-left: 0;
+}
+
+iframe {
+    width: 100%; /* Ensure iframe takes the full width of its container */
+    height: 100%;
+    border: none; /* Remove default iframe border */
+}
+
+.logos {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+}
+
+.logos img {
+    width: 100px; /* Keeping logo width at 100 pixels */
+    margin-bottom: 10px;
+}
+
+.title {
+    font-family: 'Jedth'; /* Use the custom font */
+    font-size: 24px; /* Font size for the title */
+    color: white; /* Title color */
+    margin: 0; /* Remove default margin */
+}
