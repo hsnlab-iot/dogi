@@ -13,15 +13,27 @@
         </div>
     </div>
     <div>
-        <div style="display: flex; flex-wrap: wrap; height: 800px;">
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action1</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action2</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action3</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action4</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action5</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action6</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action7</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action8</div>
+        <div style="display: flex; flex-wrap: wrap; height: 600px;">
+            <div style="flex-basis: 50%; width: 50%; height: 400px; display: flex; flex-wrap: wrap;">
+                <div style="width: 200px; height: 200px; border: 2px solid black;">action1
+                    <img src="{{ url_for('static', filename='images/open_palm.png') }}" style="width: 100%; height: 100%;" />
+                </div>
+                <div style="width: 200px; height: 200px; border: 2px solid black;">action2
+                    <img src="{{ url_for('static', filename='images/point_up.png') }}" style="width: 100%; height: 100%;" />
+                </div>
+                <div style="width: 200px; height: 200px; border: 2px solid black;">action3
+                    <img src="{{ url_for('static', filename='images/thumbs_up.png') }}" style="width: 100%; height: 100%;" />
+                </div>
+                <div style="width: 200px; height: 200px; border: 2px solid black;">action4
+                    <img src="{{ url_for('static', filename='images/thumbs_down.png') }}" style="width: 100%; height: 100%;" />
+                </div>
+                <div style="width: 200px; height: 200px; border: 2px solid black;">action5
+                    <img src="{{ url_for('static', filename='images/closed_fist.png') }}" style="width: 100%; height: 100%;" />
+                </div>
+                <div style="width: 200px; height: 200px; border: 2px solid black;">action6
+                    <img src="{{ url_for('static', filename='images/ilu.png') }}" style="width: 100%; height: 100%;" />
+                </div>
+            </div>
         </div>
     </div>
 </div>

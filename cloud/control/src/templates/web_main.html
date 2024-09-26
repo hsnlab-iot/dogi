@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Keresd</title>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+</head>
+<body>
+    <div>
+        <ul class="tabs">
+            <li class="tab" onclick="clickPage(0)">{{ page0_name }}</li>
+            <li class="tab" onclick="clickPage(1)">{{ page1_name }}</li>
+            <li class="tab" onclick="clickPage(2)">{{ page2_name }}</li>
+            <li class="tab" onclick="clickPage(3)">{{ page3_name }}</li>
+        </ul>
+    </div>
+    
+    <div id="iframeContainer" style="width: 1040px; height: 800px;">
+        <iframe id="myIframe" src="" frameborder="0" width="100%" height="100%"></iframe>
+    </div>
+    
+    <script>
+        var socket = io();
+
+        function clickPage(page) {
+            socket.emit('page_change', page);
+        }
+ 
+        socket.on('page_load', function(url) {
+            document.getElementById('myIframe').src = url;
+        });
+        
+    </script>
+</body>>
+</html>
