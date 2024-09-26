@@ -22,6 +22,8 @@ import socket
 import pickle
 import math
 
+import DogiLib
+
 import cv2
 import mediapipe as mp
 
@@ -36,6 +38,8 @@ mp_drawing_styles = mp.solutions.drawing_styles
 # Global variables to calculate FPS
 COUNTER, FPS = 0, 0
 START_TIME = time.time()
+
+dogi = DogiLib()
 
 
 def run(model: str, num_hands: int,
@@ -58,11 +62,6 @@ def run(model: str, num_hands: int,
       height: The height of the frame captured from the camera.
   """
 
-  # Create a UDP socket to Dogi
-  sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  sock.connect(('localhost', 5002))
-
-  time.sleep(1)   # Wait for the dogControl
 
   # Subscribe to video
   zmqcontext = zmq.Context()
@@ -114,6 +113,8 @@ def run(model: str, num_hands: int,
   recognizer = vision.GestureRecognizer.create_from_options(options)
 
   # Continuously capture images from the camera and run inference
+  
+  last_action = time.time()
   while True:
 
     try:
@@ -125,6 +126,7 @@ def run(model: str, num_hands: int,
         continue
 
     category_name = 'None'
+
     img_array = np.frombuffer(frame_bytes, dtype=np.uint8)
     img_array = img_array.reshape((height, width, 3))
     img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
@@ -205,9 +207,18 @@ def run(model: str, num_hands: int,
 
     if recognition_frame is not None:
         cv2.imshow('gesture_recognition', recognition_frame)
+        recognition_frame = cv2.cvtColor(recognition_frame, cv2.COLOR_RGB2BGR)
         publisher.send(recognition_frame.tobytes())
 
     print(category_name)
+
+    if time.time() - last_action > 5:
+      if category_name == 'ilu':
+        dogi.control('action', (13, ))
+      elif category_name == 'point_up':
+        dogi.control('action', (11, ))
+        
+      last_action = time.time()
 
     # Stop the program if the ESC key is pressed.
     if cv2.waitKey(1) == ord('q'):
