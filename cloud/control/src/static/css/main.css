@@ -76,7 +76,7 @@ iframe {
     border: none; /* Remove default iframe border */
 }
 
-.logos {
+.logos-container {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -84,9 +84,17 @@ iframe {
     flex-grow: 1; /* Allow logos to grow vertically */
 }
 
-.logos img {
-    width: 200px; /* Keeping logo width at 100 pixels */
+.logos {
+    display: inline-block;
+    background-color: white; /* White background for logos */
+    padding: 10px; /* Padding around logos */
+    border-radius: 5px; /* Rounded corners for the container */
     margin-bottom: 10px;
+}
+
+.logos img {
+    display: block;
+    width: 200px; /* Keeping logo width at 100 pixels */
 }
 
 .title {
