@@ -39,7 +39,7 @@ mp_drawing_styles = mp.solutions.drawing_styles
 COUNTER, FPS = 0, 0
 START_TIME = time.time()
 
-dogi = DogiLib()
+dogi = DogiLib.DogiLib()
 
 
 def run(model: str, num_hands: int,
@@ -110,6 +110,7 @@ def run(model: str, num_hands: int,
                                           min_hand_presence_confidence=min_hand_presence_confidence,
                                           min_tracking_confidence=min_tracking_confidence,
                                           result_callback=save_result)
+  
   recognizer = vision.GestureRecognizer.create_from_options(options)
 
   # Continuously capture images from the camera and run inference
@@ -125,11 +126,11 @@ def run(model: str, num_hands: int,
     if frame_bytes is None:
         continue
 
-    category_name = 'None'
+    category_name = None
 
     img_array = np.frombuffer(frame_bytes, dtype=np.uint8)
     img_array = img_array.reshape((height, width, 3))
-    img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+    # img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
 
     image = cv2.flip(img_array, 1)
 
@@ -207,18 +208,18 @@ def run(model: str, num_hands: int,
 
     if recognition_frame is not None:
         cv2.imshow('gesture_recognition', recognition_frame)
-        recognition_frame = cv2.cvtColor(recognition_frame, cv2.COLOR_RGB2BGR)
         publisher.send(recognition_frame.tobytes())
 
-    print(category_name)
+    if category_name is not None and category_name != 'None':
+      print(category_name)
 
-    if time.time() - last_action > 5:
-      if category_name == 'ilu':
-        dogi.control('action', (13, ))
-      elif category_name == 'point_up':
-        dogi.control('action', (11, ))
-        
-      last_action = time.time()
+      if time.time() - last_action > 5:
+        if category_name == 'ILoveYou':
+          dogi.control('action', (13, ))
+        elif category_name == 'Pointing_Up':
+          dogi.control('action', (11, ))
+          
+        last_action = time.time()
 
     # Stop the program if the ESC key is pressed.
     if cv2.waitKey(1) == ord('q'):
