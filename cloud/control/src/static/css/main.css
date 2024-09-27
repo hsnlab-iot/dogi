@@ -16,6 +16,7 @@ body {
     display: flex;
     flex-direction: column; /* Stacks the header, iframe, and logos vertically */
     min-height: 100vh;
+    overflow: hidden; /* Prevents scrolling */
 }
 
 .header {
@@ -23,7 +24,7 @@ body {
     justify-content: space-between; /* Space between tabs and title */
     align-items: center; /* Center items vertically */
     padding: 10px; /* Padding around header */
-    width: 100%; /* Full width for the header */
+    width: 98%; /* Full width for the header */
 }
 
 .tabs {
@@ -58,7 +59,7 @@ body {
     display: flex;
     justify-content: center; /* Center iframe horizontally */
     align-items: center;
-    height: 760px; /* Fixed height for iframe area */
+    height: 780px; /* Fixed height for iframe area */
     border: 5px solid #FFFFFF; /* Border around iframe area */
     border-radius: 8px; /* Rounded corners for the border */
     width: 100%; /* Allow flexibility in width */
@@ -66,6 +67,7 @@ body {
     position: relative; /* For logos positioning */
     margin-top: 0;
     margin-left: 0;
+    overflow: hidden; /* Prevents logos from overflowing */
 }
 
 iframe {
@@ -79,10 +81,11 @@ iframe {
     flex-direction: column;
     align-items: center;
     padding: 10px;
+    flex-grow: 1; /* Allow logos to grow vertically */
 }
 
 .logos img {
-    width: 100px; /* Keeping logo width at 100 pixels */
+    width: 200px; /* Keeping logo width at 100 pixels */
     margin-bottom: 10px;
 }
 
