@@ -1,0 +1,53 @@
+.container {
+    display: flex;
+}
+
+.left-column {
+    flex: 1;
+}
+
+.right-column {
+    flex: 1;
+}
+
+.video-container {
+    width: 640px;
+    height: 480px;
+    border: 2px solid black;
+}
+
+.video-stream {
+    width: 100%;
+    height: 100%;
+}
+
+.flex-box {
+    display: flex;
+}
+
+.flex-item {
+    flex: 1;
+    margin-top: 10px;
+}
+.flex-item img {
+    max-height: 200px;
+    width: 100%;
+    height: 100%;
+}
+
+.text-box {
+    border: 2px solid black;
+    font-size: 24px;
+    height: 360px;
+    margin-left: 10px;
+    margin-bottom: 10px;
+    overflow-y: scroll;
+}
+
+.yellow-box {
+    background-color: rgb(145, 145, 90);
+}
+
+.white-box {
+    background-color: white;
+}
