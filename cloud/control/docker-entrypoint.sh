@@ -10,7 +10,7 @@ done
 
 tmux new-session -d -s data "python3 /root/DOGZILLAProxyServer.py ; sleep inf"
 
-# Wait for UDP port 5001 to start listening
+# Wait for UDP port 5002 to start listening
 while ! netstat -tuln | grep -q ":5002 "; do
     sleep 1
 done
