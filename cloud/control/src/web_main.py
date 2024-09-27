@@ -44,16 +44,10 @@ def handle_event(data):
     if pageconfig[data]['app'] != '':
         server = libtmux.Server()
         session = server.new_session(session_name='dogi_session', kill_session=True)
-        window = session.new_window(attach=False)
+        window = session.new_window(attach=True)
         pane = window.active_pane
-        pane.send_keys(f'cd; source .yolo/bin/activate && python {pageconfig[data]["app"]}')
+        pane.send_keys(f'cd; source .yolo/bin/activate && python {pageconfig[data]["app"]}; sleep inf')
         
-    # Example usage
-    @app.route('/start_app')
-    def start_app():
-        app_name = 'my_app.py'  # Replace with the name of your app
-        start_app_in_new_window(app_name)
-        return 'App started in a new window!'
     
 @socketio.on_error()  # Handle socketio errors
 def handle_error(e):
