@@ -3,23 +3,30 @@
 <head>
     <title>Web Keresd</title>
     <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/keresd.css') }}">
 </head>
 <body>
 
-<div style="display: flex;">
-    <div style="flex: 1;">
-        <div style="width: 640px; height: 480px; border: 2px solid black;">
-            <img src="http://{{ host }}:5051/mjpeg_keresd" style="width: 100%; height: 100%;" />
+<div class="container">
+    <div class="left-column">
+        <div class="video-container">
+            <img src="http://{{ host }}:5051/mjpeg_keresd" class="video-stream" />
         </div>
-        <div style="display: flex;">
-            <div style="flex: 1; border: 2px solid black;" id="ball"></div>
-            <div style="flex: 1; border: 2px solid black;" id="obstacle"></div>
-            <div style="flex: 1; border: 2px solid black;" id="decision"></div>
+        <div class="flex-box">
+            <div class="flex-item" id="ball">
+                <img src="{{ url_for('static', filename='images/tennis_ball_robot_dog.png') }}" alt="">
+            </div>
+            <div class="flex-item" id="obstacle">
+                <img src="{{ url_for('static', filename='images/grass_field_rubber_cubes.png') }}" alt="">
+            </div>
+            <div class="flex-item" id="decision">
+                <img src="{{ url_for('static', filename='images/compass.png') }}" alt="">
+            </div>
         </div>
     </div>
-    <div style="flex: 1;">
-        <div style="border: 2px solid black; background-color: yellow; height: 400px; font-size: 24px;" id="en"></div>
-        <div style="border: 2px solid black; background-color: white; height: 400px; font-size: 24px;" id="hu"></div>
+    <div class="right-column">
+        <div class="text-box yellow-box" id="en"></div>
+        <div class="text-box white-box" id="hu"></div>
     </div>
 </div>
 

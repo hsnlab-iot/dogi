@@ -3,25 +3,72 @@
 <head>
     <title>Web Mutasd</title>
     <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+    <style>
+        .container {
+            display: flex;
+            height: 100vh; /* Full viewport height */
+            overflow-y: hidden; /* Prevent vertical scrolling */
+        }
+        .video-container {
+            width: 896px;
+            height: 672px;
+            border: 2px solid black;
+            margin-right: 20px; /* Space between video and table */
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        .video-container img {
+            width: 100%;
+            height: 100%;
+        }
+        .table-container {
+            display: flex;
+            flex-wrap: wrap;
+            max-width: 400px; /* 2 columns, 200px each */
+            height: 480px; /* Keep height same as video */
+            gap: 10px;
+        }
+        .table-cell {
+            flex: 1 1 150px; /* Allow cells to grow, but set a max width of 200px */
+            max-width: 150px;
+            height: calc(33.33% - 10px); /* Each cell takes 1/3rd of the height minus the gap */
+            border: 2px solid black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background-color: white;
+        }
+        .table-cell img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensures the image covers the entire box without distortion */
+        }
+    </style>
 </head>
 <body>
 
-<div style="display: flex;">
-    <div style="flex: 1;">
-        <div style="width: 640px; height: 480px; border: 2px solid black;">
-            <img src="http://{{ host }}:5051/mjpeg_mutasd" style="width: 100%; height: 100%;" />
-        </div>
+<div class="container">
+    <div class="video-container">
+        <img src="http://{{ host }}:5051/mjpeg_mutasd" alt="MJPEG Video" />
     </div>
-    <div>
-        <div style="display: flex; flex-wrap: wrap; height: 800px;">
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action1</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action2</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action3</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action4</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action5</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action6</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action7</div>
-            <div style="flex-basis: 50%; width: 50%; height: 200px; border: 2px solid black;">action8</div>
+    <div class="table-container">
+        <div class="table-cell" id="action1">
+            <img src="{{ url_for('static', filename='images/open_palm.png') }}" alt="Action 1" />
+        </div>
+        <div class="table-cell" id="action2">
+            <img src="{{ url_for('static', filename='images/point_up.png') }}" alt="Action 2" />
+        </div>
+        <div class="table-cell" id="action3">
+            <img src="{{ url_for('static', filename='images/thumbs_up.png') }}" alt="Action 3" />
+        </div>
+        <div class="table-cell" id="action4">
+            <img src="{{ url_for('static', filename='images/thumbs_down.png') }}" alt="Action 4" />
+        </div>
+        <div class="table-cell" id="action5">
+            <img src="{{ url_for('static', filename='images/closed_fist.png') }}" alt="Action 5" />
+        </div>
+        <div class="table-cell" id="action6">
+            <img src="{{ url_for('static', filename='images/ilu.png') }}" alt="Action 6" />
         </div>
     </div>
 </div>
@@ -39,6 +86,3 @@
     });
 
 </script>
-
-</body>
-</html>

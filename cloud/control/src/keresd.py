@@ -19,7 +19,7 @@ ollama_client = ollama.Client(host=f'http://{ollama_ip}:11434')
 # Create a UDP sockets to Dogi
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.connect(('localhost', 5002))
-# Create a UDP sockets to web page
+# Create a UDP sockets to web page server
 sock_web = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock_web.connect(('localhost', 5003))
 

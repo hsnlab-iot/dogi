@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Robotkutya</title>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+
+<body>
+    <div class="header">
+        <div class="tabs">
+            <div class="tab tab1" onclick="clickPage(0)">{{ page0_name }}</div>
+            <div class="tab tab2" onclick="clickPage(1)">{{ page1_name }}</div>
+            <div class="tab tab3" onclick="clickPage(2)">{{ page2_name }}</div>
+            <div class="tab tab4" onclick="clickPage(3)">{{ page3_name }}</div>
+        </div>
+        <h1 class="title">Robotkutya v9.27</h1>
+    </div>
+    
+    <div class="content-wrapper">
+        <div id="iframeContainer" class="iframe-container">
+            <iframe id="myIframe" scrolling="no"></iframe>
+        </div>
+
+        <div class="logos-container">
+            <div class="logos">
+                <img src="{{ url_for('static', filename='images/bme_logo_nagy_bordo.jpg') }}" alt="BME Logo">
+            </div>
+            <div class="logos">
+                <img src="{{ url_for('static', filename='images/Ericsson-logo.png') }}" alt="Ericsson Logo">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var socket = io();
+
+        function clickPage(page) {
+            socket.emit('page_change', page);
+        }
+ 
+        socket.on('page_load', function(url) {
+            document.getElementById('myIframe').src = url;
+        });
+        
+    </script>
+</body>
+</html>

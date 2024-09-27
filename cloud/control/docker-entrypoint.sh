@@ -10,7 +10,7 @@ done
 
 tmux new-session -d -s data "python3 /root/DOGZILLAProxyServer.py ; sleep inf"
 
-# Wait for UDP port 5001 to start listening
+# Wait for UDP port 5002 to start listening
 while ! netstat -tuln | grep -q ":5002 "; do
     sleep 1
 done
@@ -19,5 +19,7 @@ tmux new-session -d -s webjoy "cd /root && source .flask/bin/activate && python3
 tmux new-session -d -s webvoice "cd /root && source .flask/bin/activate && python3 web_voice.py ; sleep inf"
 tmux new-session -d -s webkeresd "cd /root && source .flask/bin/activate && python3 web_keresd.py ; sleep inf"
 tmux new-session -d -s webkovesd "cd /root && source .flask/bin/activate && python3 web_kovesd.py ; sleep inf"
+tmux new-session -d -s webmutasd "cd /root && source .flask/bin/activate && python3 web_mutasd.py ; sleep inf"
+tmux new-session -d -s webmain "cd /root && source .flask/bin/activate && python3 web_main.py ; sleep inf"
 
 tail -f /dev/null

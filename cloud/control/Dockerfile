@@ -29,7 +29,7 @@ RUN \
     cd /root && \
     python3 -m venv .flask && source /root/.flask/bin/activate && \ 
     pip install flask flask-socketio \
-    numpy pyzmq opencv-python-headless ollama requests && \
+    numpy pyzmq opencv-python-headless ollama requests libtmux && \
     deactivate
 
 # Wprkaround for supervisord (missing symbol)
