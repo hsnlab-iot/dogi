@@ -213,13 +213,23 @@ def run(model: str, num_hands: int,
     if category_name is not None and category_name != 'None':
       print(category_name)
 
-      if time.time() - last_action > 5:
+      if time.time() - last_action > 10:
         if category_name == 'ILoveYou':
           dogi.control('action', (13, ))
+          last_action = time.time()
         elif category_name == 'Pointing_Up':
           dogi.control('action', (11, ))
+          last_action = time.time()
+        elif category_name == 'Thumb_Up':
+          dogi.control('action', (10, ))
+          last_action = time.time()
+        elif category_name == 'Thumb_Down':
+          dogi.control('action', (6, ))
+          last_action = time.time()
+        elif category_name == 'Victory':
+          dogi.control('action', (3, ))
+          last_action = time.time()
           
-        last_action = time.time()
 
     # Stop the program if the ESC key is pressed.
     if cv2.waitKey(1) == ord('q'):
