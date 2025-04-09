@@ -3,9 +3,8 @@ services:
     build: .
     container_name: onboard
     devices:
-      - "/dev/video0:/dev/video0"
-      - "/dev/ttyAMA0:/dev/ttyAMA0"
-      - "/dev/ttyAMA1:/dev/ttyAMA1"
+      - "/dev/video4:/dev/video4"
+      - "/dev/serial0:/dev/serial0"
     network_mode: host        
     environment:
       - VIDEO_DST=10.6.6.20

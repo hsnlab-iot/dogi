@@ -17,7 +17,7 @@ RUN apt update && \
     && busybox --install
 
 COPY src/ /root
-COPY src/stream_2.sh /usr/local/bin/streamer.sh
+COPY src/stream_5.sh /usr/local/bin/streamer.sh
 RUN chmod +x /usr/local/bin/streamer.sh
 
 COPY src/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
