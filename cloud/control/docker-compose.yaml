@@ -6,7 +6,7 @@ services:
     environment:
       - DISPLAY=:0
       #- ROBOT_IP=192.168.1.140
-      - ROBOT_IP=10.20.11.49
+      - ROBOT_IP=10.20.5.2
       - OLLAMA_IP=10.6.6.20
       - TTS_IP=opentts
     ports:
