@@ -6,9 +6,24 @@ services:
     environment:
       - DISPLAY=:0
       #- ROBOT_IP=192.168.1.140
-      - ROBOT_IP=10.20.5.2
+      - ROBOT_IP=10.20.5.38
       - OLLAMA_IP=10.6.6.20
-      - TTS_IP=opentts
+      - TTS_ENGINE_API=http://opentts:5500/api/tts
+      - TTS_VOICE=larynx:eva_k-glow_tts
+      #- TTS_VOICE=hu_diana_majlinger
+      #- TTS_ENGINE_API=http://10.6.6.20:8124/synthesize/
+      #- MODEL=llama4:scout
+      #- MODEL=mistral-small3.1
+      #- VISUAL_MODEL=llama4:scout
+      #- VISUAL_MODEL=mistral-small3.1
+      #- MODEL=gemma3:4b
+      - MODEL=gemma3:12b-it-qat
+      #- VISUAL_MODEL=gemma3:4b
+      #- VISUAL_MODEL=gemma3:12b-it-qat
+      #- TRANSLATION_MODEL=gemma3:4b
+      - TRANSLATION_MODEL=gemma3:12b-it-qat
+      #- TRANSLATION=0
+      - TRANSLATION=de
     ports:
       - "6080:6080"
       - "5050-5059:5050-5059"
@@ -24,8 +39,11 @@ services:
     #command: ["/bin/sh", "-c", "sleep inf"]
 
   opentts:
-    image: synesthesiam/opentts:hu
+    #image: synesthesiam/opentts:hu
+    image: synesthesiam/opentts:de
     container_name: opentts
+    ports:
+       - "5500:5500"
     deploy:
       resources:
         reservations:

@@ -3,6 +3,8 @@ from flask_socketio import SocketIO, emit
 from urllib.parse import urlparse
 import libtmux
 
+PORT = 5059
+
 app = Flask(__name__)
 
 socketio = SocketIO(app)
@@ -54,4 +56,4 @@ def handle_error(e):
     print('SocketIO Error:', e)
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5059)
+    socketio.run(app, host='0.0.0.0', port=PORT)

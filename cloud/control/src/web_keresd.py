@@ -7,14 +7,16 @@ import threading
 from urllib.parse import urlparse
 import socket
 
+PORT = 5053
+
 app = Flask(__name__)
 
 socketio = SocketIO(app)
 socketio.init_app(app, cors_allowed_origins="*")
 
-# Open UDP socket on port 5003 to receive action events
+# Open UDP socket on port 5053 to receive action events
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-udp_socket.bind(('0.0.0.0', 5003))
+udp_socket.bind(('0.0.0.0', PORT))
 
 def listen_for_actions():
     while True:
@@ -22,9 +24,9 @@ def listen_for_actions():
         action = pickle.loads(data)
         print('Received action:', action)
 
-        if action.get('action') == 'hutext':
-            print('Emitting hutext :', action.get('text'))
-            socketio.emit('hutext', action.get('text'))
+        if action.get('action') == 'xtext':
+            print('Emitting xtext :', action.get('text'))
+            socketio.emit('xtext', action.get('text'))
         elif action.get('action') == 'entext':
             print('Emitting entext :', action.get('text'))
             socketio.emit('entext', action.get('text'))
@@ -50,4 +52,4 @@ def handle_error(e):
     print('SocketIO Error:', e)
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5053)
+    socketio.run(app, host='0.0.0.0', port=PORT)

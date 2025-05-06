@@ -10,36 +10,19 @@ import random
 from io import BytesIO
 import os
 
+import utils
 
-ollama_ip = os.environ.get('OLLAMA_IP')
-if ollama_ip is None:
-    raise ValueError('OLLAMA_IP environment variable is not set')
-ollama_client = ollama.Client(host=f'http://{ollama_ip}:11434')
-
-# Create a UDP sockets to Dogi
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.connect(('localhost', 5002))
-# Create a UDP sockets to web page server
-sock_web = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock_web.connect(('localhost', 5003))
-
-VOICE_PORT = 5010
-ENVOICE_PORT = 5011
-
-def send_text_and_wait_for_answer(port, text):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(('localhost', port))
-    sock.send(text.encode('utf-8'))
-    response = sock.recv(2048).decode('utf-8')
-    sock.close()
-    if ':' in response:
-        parts = response.split(':', 1)
-        return float(parts[0]), parts[1].strip()
-
-    return float(response)
+PORT = 5053
 
 MAXPITCH = 20
 MAXYAW = 16
+
+# Create a UDP sockets to web page server
+sock_web = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_web.connect(('localhost', PORT))
+
+model = os.environ.get('MODEL', 'llama3.1')
+visual_model = os.environ.get('VISUAL_MODEL', 'llava:13b')
 
 # Subscribe to video
 zmqcontext = zmq.Context()
@@ -51,54 +34,51 @@ subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 publisher = zmqcontext.socket(zmq.PUB)
 publisher.bind("ipc:///tmp/video_frames_keresd.ipc")
 
-#text = "Most labdakereső játékot fogok játszani. " \
-#        "Rejtsd el a labdát és én megpróbálom megtalálni, hogy hol van. " \
-#        "Igyekszem ügyesen mozogni és semmihez sem érni. "
-#d = send_text_and_wait_for_answer(VOICE_PORT, text)
-#time.sleep(d + 3)
-
-d = send_text_and_wait_for_answer(VOICE_PORT, "Aki bújt, aki nem, indulok. Figyelj, keresni kezdek. ")
+text = "Ready or not, here I come! Watch out, I'm starting to look!"
+if utils.get_language() == 'Hungarian':
+    text = "Aki bújt, aki nem, indulok. Figyelj, keresni kezdek. "
+else:
+    text = utils.translate(text)
+wav, d = utils.tts_wav(text)
+utils.play_wav(wav)
 time.sleep(d)
 
-
-def dogControl(command, args = None):
-    if args:
-        sock.send(pickle.dumps({'name': command, 'args': args}))
-    else:
-        sock.send(pickle.dumps({'name': command}))
-
-def look_left():
-    dogControl('attitude', (['r', 'p', 'y'], [0, MAXPITCH, -MAXYAW]))
-
-def look_right():
-    dogControl('attitude', (['r', 'p', 'y'], [0, MAXPITCH, MAXYAW]))
-
-def look_front():
-    dogControl('attitude', (['r', 'p', 'y'], [0, MAXPITCH, 0]))
-
-def look_straight():
-    dogControl('attitude', (['r', 'p', 'y'], [0, 0, 0]))
-
 def move_forward():
-    look_straight()
+    utils.dogy_look(0, 0, 0) # Look straight
     time.sleep(1)
-    dogControl('forward', (5, ))
+    utils.dogy_control('forward', (5, ))
     time.sleep(3)
-    dogControl('stop')
+    utils.dogy_control('stop')
 
 def turn_left():
-    look_straight()
+    utils.dogy_look(0, 0, 0) # Look straight
     time.sleep(1)
-    dogControl('turn', (5, ))
+    utils.dogy_control('turn', (5, ))
     time.sleep(3)
-    dogControl('stop')
+    utils.dogy_control('stop')
 
 def turn_right():
-    look_straight()
+    utils.dogy_look(0, 0, 0) # Look straight
     time.sleep(1)
-    dogControl('turn', (-5, ))
+    utils.dogy_control('turn', (-5, ))
     time.sleep(3)
-    dogControl('stop')
+    utils.dogy_control('stop')
+
+def look_left_right():
+    threading.current_thread().stopped = False
+    while not threading.current_thread().stopped:
+        utils.dogy_look(0, MAXPITCH, -MAXYAW) # Look left
+        time.sleep(1.5)
+        if threading.current_thread().stopped:
+            break
+        utils.dogy_look(0, MAXPITCH, MAXYAW) # Lookright
+        time.sleep(1.5)
+        if threading.current_thread().stopped:
+            break
+        utils.dogy_look(0, MAXPITCH, 0) # Look front
+        time.sleep(1.5)
+
+    utils.dogy_look(0, MAXPITCH, 0) # Look front
 
 # Function to process the frame
 def take_frame():
@@ -121,28 +101,14 @@ def take_frame():
     img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
     return img_array
 
-
-def look_left_right():
-    threading.current_thread().stopped = False
-    while not threading.current_thread().stopped:
-        look_left()
-        time.sleep(1.5)
-        if threading.current_thread().stopped:
-            break
-        look_right()
-        time.sleep(1.5)
-        if threading.current_thread().stopped:
-            break
-        look_straight()
-        time.sleep(1.5)
-    look_straight()
+ollama_client = utils.get_ollama_client()
 
 while True:
 
-    sock.send(pickle.dumps({'name': 'reset'}))
+    utils.dogy_reset()
     time.sleep(1)
 
-    look_front()
+    utils.dogy_look(0, MAXPITCH, 0) # Look front
     time.sleep(1.5)
     front_pic = take_frame()
     
@@ -164,8 +130,9 @@ while True:
 
     obstacles = None
     ball_found = False
+
     try:
-        whatisit = ollama_client.generate(model='llava:13b', 
+        whatisit = ollama_client.generate(model=visual_model, 
             prompt='This is a liveview capture taken by a front camera of a robot dog.' \
                 'The robot dog is looking straight ahead and a bit down.' \
                 'Make a short description, briefly what is on the picture!' \
@@ -174,16 +141,20 @@ while True:
                 ,
             images=[img_buffer.tobytes()],
             stream=False)
-        
+
+        text = whatisit['response'].strip()
+        print(f"Description: {text}")
+        sock_web.send(pickle.dumps({'action': 'entext', 'text': text}))
+        print("Ask translation" )
+        xtext = utils.translate(text)
+        print("Translation: ", xtext)
+        sock_web.send(pickle.dumps({'action': 'xtext', 'text': xtext}))
         print("TTS")
-        d, hutext = send_text_and_wait_for_answer(ENVOICE_PORT, whatisit['response'].strip())
-        print("Description: ", whatisit['response'].strip())
-        print("Leírás: ", hutext)
-        sock_web.send(pickle.dumps({'action': 'hutext', 'text': hutext}))
-        sock_web.send(pickle.dumps({'action': 'entext', 'text': whatisit['response'].strip()}))
+        wav, d = utils.tts_wav(xtext)
+        utils.play_wav(wav)
         time.sleep(d)
 
-        ball = ollama_client.generate(model='llama3.1', 
+        ball = ollama_client.generate(model=model, 
             prompt='Answer with a single word, YES or NO! Based on the following description, are there any balls in this description: ' + 
                 whatisit['response'].strip() \
                 ,
@@ -192,23 +163,32 @@ while True:
         print("Ball: ", ball['response'].strip())
 
         if ball['response'].strip() in ['YES', 'Yes', 'YES!']:
-            d = send_text_and_wait_for_answer(VOICE_PORT, "Hurrá, megtaláltam a labdát. ")
-            time.sleep(d)            
+            text = "I found a ball." # // "Hurrá, megtaláltam a labdát. ")
+            xtext = utils.translate(text)
+            wav, d = utils.tts_wav(xtext)
+            utils.play_wav(wav)
+            time.sleep(d)
+
             ball_found = True
-            ball_place = ollama_client.generate(model='llava:13b', 
+            ball_place = ollama_client.generate(model=visual_model, 
                 prompt='This is a liveview capture taken by a front camera of a robot dog.' \
                     'Describe where you see the ball on the picture, and how does the ball look like' \
                     ,
                 images=[img_buffer.tobytes()],
                 stream=False)
 
+            text = ball_place['response'].strip()
+            print(f"Ball place: {text}")
+            sock_web.send(pickle.dumps({'action': 'entext', 'text': text}))
+            print("Ask translation" )
+            xtext = utils.translate(text)
+            print("Translation: ", xtext)
+            sock_web.send(pickle.dumps({'action': 'xtext', 'text': xtext}))
             print("TTS")
-            d, hutext = send_text_and_wait_for_answer(ENVOICE_PORT, ball_place['response'].strip())
-            print("Ball place: ", ball_place['response'].strip())
-            print("Labda helye: ", hutext)
-            sock_web.send(pickle.dumps({'action': 'hutext', 'text': hutext}))
-            sock_web.send(pickle.dumps({'action': 'entext', 'text': ball_place['response'].strip()}))
+            wav, d = utils.tts_wav(xtext)
+            utils.play_wav(wav)
             time.sleep(d)
+
             print("Ball detected, stopping")
 
             # Stop the thread
@@ -216,7 +196,7 @@ while True:
             thread.join()
             break
 
-        obstacles = ollama_client.generate(model='llama3.1', 
+        obstacles = ollama_client.generate(model=model,
             prompt='Answer with a word, CLEAR or NOT CLEAR!' \
                 'Based on the following description, are there any obstacles in front of the viewer: ' + 
                 whatisit['response'].strip() \
@@ -238,23 +218,22 @@ while True:
         stop = True
 
     # Stop the thread
-    thread.stopped = True
-    thread.join()
+    if not thread.stopped:
+        thread.stopped = True
+        thread.join()
 
     if obstacles['response'].strip() in ['CLEAR', 'Clear', 'CLEAR!']:
         print("No obstacles in front, moving forward")
         move_forward()
-        time.sleep(8)
     else:
         print("Obstacles detected, turning")
         if random.choice([True, False]):
             print("Turning left")
             turn_left()
-            time.sleep(8)
         else:
             print("Turning right")
             turn_right()
-            time.sleep(8)
+    time.sleep(5)
 
 # Release the video capture and close the window
 subscriber.close()

@@ -18,11 +18,8 @@ import sys
 import time
 import zmq
 import numpy as np
-import socket
-import pickle
-import math
 
-import DogiLib
+import utils
 
 import cv2
 import mediapipe as mp
@@ -38,8 +35,6 @@ mp_drawing_styles = mp.solutions.drawing_styles
 # Global variables to calculate FPS
 COUNTER, FPS = 0, 0
 START_TIME = time.time()
-
-dogi = DogiLib.DogiLib()
 
 
 def run(model: str, num_hands: int,
@@ -215,19 +210,19 @@ def run(model: str, num_hands: int,
 
       if time.time() - last_action > 10:
         if category_name == 'ILoveYou':
-          dogi.control('action', (13, ))
+          utils.dogy_control('action', (13, ))
           last_action = time.time()
         elif category_name == 'Pointing_Up':
-          dogi.control('action', (11, ))
+          utils.dogy_control('action', (11, ))
           last_action = time.time()
         elif category_name == 'Thumb_Up':
-          dogi.control('action', (10, ))
+          utils.dogy_control('action', (10, ))
           last_action = time.time()
         elif category_name == 'Thumb_Down':
-          dogi.control('action', (6, ))
+          utils.dogy_control('action', (6, ))
           last_action = time.time()
         elif category_name == 'Victory':
-          dogi.control('action', (3, ))
+          utils.dogy_control('action', (3, ))
           last_action = time.time()
           
 

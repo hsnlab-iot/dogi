@@ -26,16 +26,16 @@
     </div>
     <div class="right-column">
         <div class="text-box yellow-box" id="en"></div>
-        <div class="text-box white-box" id="hu"></div>
+        <div class="text-box white-box" id="x"></div>
     </div>
 </div>
 
 <script>
     var socket = io();
     
-    socket.on('hutext', function(data) {
+    socket.on('xtext', function(data) {
         console.log(data);
-        document.getElementById('hu').innerHTML = data;
+        document.getElementById('x').innerHTML = data;
     });
 
     socket.on('entext', function(data) {

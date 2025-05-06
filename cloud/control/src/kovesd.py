@@ -7,29 +7,11 @@ from ultralytics import YOLO
 import socket
 import pickle
 
+import utils
+
 model = YOLO('yolov8m-seg.pt')
 #dogControl = dog.DOGZILLA("/dev/ttyAMA0")
-
-# Create a UDP socket to Dogi
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.connect(('localhost', 5002))
-
-VOICE_PORT = 5010
-ENVOICE_PORT = 5011
-
-def send_text_and_wait_for_answer(port, text):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(('localhost', port))
-    sock.send(text.encode('utf-8'))
-    response = sock.recv(2048).decode('utf-8')
-    sock.close()
-    if ':' in response:
-        parts = response.split(':', 1)
-        return float(parts[0]), parts[1].strip()
-
-    return float(response)
-
-time.sleep(1)   # Wait for the dogControl
+#time.sleep(1)   # Wait for the dogControl
 
 MAXPITCH = 20
 MAXYAW = 16
@@ -45,18 +27,18 @@ subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 publisher = zmqcontext.socket(zmq.PUB)
 publisher.bind("ipc:///tmp/video_frames_kovesd.ipc")
 
-text = "Most labdakövetős játékot fogok játszani. " \
-        "Mozgasd a labdát előttem és én követni fogom. " \
-        "Ha éppem nem látom a labdát, akkor nem mozdulok. "
-
-d = send_text_and_wait_for_answer(VOICE_PORT, text)
+text = "Now I will play a ball-following game. " \
+        "Move the ball in front of me and I will follow it. " \
+        "If I don't see the ball, I won't move. "
+if utils.get_language() == "Hungarian":
+    text = "Most labdakövetős játékot fogok játszani. " \
+            "Mozgasd a labdát előttem és én követni fogom. " \
+            "Ha éppem nem látom a labdát, akkor nem mozdulok. "
+xtext = utils.translate(text)
+print("Text to speech: ", text)
+wav, d = utils.tts_wav(text)
+utils.play_wav(wav)
 #time.sleep(d)
-
-def dogControl(command, args = None):
-    if args:
-        sock.send(pickle.dumps({'name': command, 'args': args}))
-    else:
-        sock.send(pickle.dumps({'name': command}))
 
 # Function to process the frame
 def process_frame(frame_bytes):
@@ -148,18 +130,18 @@ while True:
             o_turn = turn
             print("TURN", turn)
             if turn > 0:
-                dogControl('turn', (10, ))
+                utils.dogy_control('turn', (10, ))
             elif turn < 0:
-                dogControl('turn', (-10, ))
+                utils.dogy_control('turn', (-10, ))
             else:
-                dogControl('stop')
+                utils.dogy_control('stop')
                 att_yaw = 0 # Reset the attitude yaw
 
         elif att_yaw != o_att_yaw or att_pitch != o_att_pitch:
             o_att_yaw = att_yaw
             o_att_pitch = att_pitch 
             #print("ATTITUDE", att_yaw, att_pitch)
-            dogControl('attitude', (["y", "p", "r"], [att_yaw, att_pitch, 0]))
+            utils.dogy_control('attitude', (["y", "p", "r"], [att_yaw, att_pitch, 0]))
 
         if turn > 0:
             turn -= 1
