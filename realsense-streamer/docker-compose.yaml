@@ -1,0 +1,16 @@
+services:
+
+  streamer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: test_streamer
+    container_name: streamer
+    volumes:
+      - '/dev/bus/usb:/dev/bus/usb'
+      #- '/usr/local/lib/librealsense2.so.2.55.1:/usr/local/lib/librealsense2.so.2.55.1:ro'
+      #- '/usr/local/lib/librealsense2.so.2.55:/usr/local/lib/librealsense2.so.2.55:ro'
+      #- '/usr/local/lib/librealsense2.so:/usr/local/lib/librealsense2.so:ro'
+      #- '/usr/local/bin:/usr/local/bin:ro'
+      - '/home/pi/librealsense:/home/pi/librealsense.ro:ro'
+    privileged: true
