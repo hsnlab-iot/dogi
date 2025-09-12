@@ -13,7 +13,7 @@ source /opt/venv311/bin/activate && \
 if [ -n "$REPLAY_FILE" ]; then
   tmux new-session -d -s replay "python3 /opt/ws/src/ros2_rs_video/src/video_compression/video_compression/replay.py /opt/local/$REPLAY_FILE; sleep inf"
 else
-  tmux new-session -d -s streamer "source /opt/venv311/bin/activate && python3.11 /opt/ws/src/ros2_rs_video/src/video_compression/video_compression/rs_streamer.py; sleep inf"
+  tmux new-session -d -s streamer "source /opt/venv311/bin/activate && python3.11 /opt/ws/src/ros2_rs_video/src/video_compression/video_compression/rs_streamer.py --width 640 --height 480; sleep inf"
 fi
 
 tmux new-session -d -s compress "source /opt/ws/install/setup.bash && ros2 launch /opt/ws/launch/compress.launch.py; sleep inf"

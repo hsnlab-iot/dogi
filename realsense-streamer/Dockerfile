@@ -20,19 +20,20 @@ SHELL ["/bin/bash", "-c"]
 RUN \
  add-apt-repository ppa:deadsnakes/ppa && apt update && \
  apt install -y --no-install-recommends \
-  python3.11 python3.11-venv python3.11-distutils python3.11-dev \
-  python3.10 python3.10-venv python3.10-distutils python3.10-dev
+  python3.11 python3.11-venv python3.11-distutils python3.11-dev 
+#  python3.10 python3.10-venv python3.10-distutils python3.10-dev
 
-RUN \
- python3.10 -m venv /opt/venv310 && \
- source /opt/venv310/bin/activate && \
- python3.10 -m pip install --upgrade pip && \
- python3.10 -m pip install pyrealsense2==2.55.1.6486 numpy zmq
+#RUN \
+# python3.10 -m venv /opt/venv310 && \
+# source /opt/venv310/bin/activate && \
+# python3.10 -m pip install --upgrade pip && \
+# python3.10 -m pip install pyrealsense2==2.55.1.6486 numpy zmq
 
 RUN \
  python3.11 -m venv /opt/venv311 && \
  source /opt/venv311/bin/activate && \
- python3.11 -m pip install --upgrade pip 
+ python3.11 -m pip install --upgrade pip && \
+ python3.11 -m pip install numpy zmq
 
 ARG CACHEBUST=1
 RUN  \

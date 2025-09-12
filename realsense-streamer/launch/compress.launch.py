@@ -14,6 +14,8 @@ def generate_launch_description():
             parameters=[
                 {'zmq_url': 'ipc:///tmp/color_image'},
                 {'mode': 'color'},
+                {'width': 640},
+                {'height': 480},
                 {'bitrate': 2000}
             ]
         ),
@@ -28,6 +30,8 @@ def generate_launch_description():
             parameters=[
                 {'zmq_url': 'ipc:///tmp/depth_image'},
                 {'mode': 'depth_yuv_12'},
+                {'width': 640},
+                {'height': 480},
                 {'bitrate': 2000}
             ]
         )
