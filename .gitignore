@@ -1,3 +1,7 @@
+cache/
+__pycache__/
+WiP/
+*.pt
 .local/*
 
 # CMake and Colcon folders

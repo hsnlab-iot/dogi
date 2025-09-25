@@ -4,30 +4,35 @@ services:
     container_name: dogi
     #network_mode: host
     environment:
+      - DEBUG=1
       - DISPLAY=:0
       #- ROBOT_IP=192.168.1.140
       - ROBOT_IP=10.20.5.38
       - OLLAMA_IP=10.6.6.20
       - TTS_ENGINE_API=http://opentts:5500/api/tts
-      - TTS_VOICE=larynx:eva_k-glow_tts
-      #- TTS_VOICE=hu_diana_majlinger
+      #- TTS_VOICE=larynx:eva_k-glow_tts
+      - TTS_VOICE=hu_diana_majlinger
       #- TTS_ENGINE_API=http://10.6.6.20:8124/synthesize/
-      #- MODEL=llama4:scout
-      #- MODEL=mistral-small3.1
-      #- VISUAL_MODEL=llama4:scout
-      #- VISUAL_MODEL=mistral-small3.1
-      #- MODEL=gemma3:4b
-      - MODEL=gemma3:12b-it-qat
+      # MODEL: In general the AI model to be used
+      # Some choices: gemma3:12b-it-qat (en), llava:13b (en), qwen2.5vl:latest (hu)
+      - MODEL=qwen2.5vl:latest
+      - PROMPT_LANGUAGE=en
       #- VISUAL_MODEL=gemma3:4b
       #- VISUAL_MODEL=gemma3:12b-it-qat
       #- TRANSLATION_MODEL=gemma3:4b
-      - TRANSLATION_MODEL=gemma3:12b-it-qat
+      #- TRANSLATION_MODEL=gemma3:12b-it-qat
+      - TRANSLATION_MODEL=opus
       #- TRANSLATION=0
-      - TRANSLATION=de
+      - TRANSLATION=hu
     ports:
       - "6080:6080"
       - "5050-5059:5050-5059"
       - "5100:5100/udp"
+    volumes:
+      - ./Ultralytics:/root/.config/Ultralytics:rw
+      - ./cache/huggingface:/root/.cache/huggingface:rw
+      - ./cache/debug:/root/debug:ro
+      - ./yolov8m-seg.pt:/root/yolov8m-seg.pt
     deploy:
       resources:
         reservations:
@@ -35,12 +40,10 @@ services:
           - driver: nvidia
             device_ids: ['0']
             capabilities: [gpu]
-    #command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
-    #command: ["/bin/sh", "-c", "sleep inf"]
 
   opentts:
-    #image: synesthesiam/opentts:hu
-    image: synesthesiam/opentts:de
+    image: synesthesiam/opentts:hu
+    #image: synesthesiam/opentts:de
     container_name: opentts
     ports:
        - "5500:5500"

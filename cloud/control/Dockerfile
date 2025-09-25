@@ -32,11 +32,18 @@ RUN \
     numpy pyzmq opencv-python-headless ollama requests libtmux && \
     deactivate
 
-# Wprkaround for supervisord (missing symbol)
 RUN \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt install -y python3.9 python3.9-distutils && \
-    pipx install supervisor --python /usr/bin/python3.9
+    pipx install supervisor
+
+RUN \
+    # Update ultralytics package
+    source /root/.yolo/bin/activate && pip install 'lap>=0.5.12' && \
+    # Upgrade transformers for translation
+    pip install --upgrade transformers sentencepiece sacremoses && \
+    deactivate && \
+    source /root/.flask/bin/activate && \
+    pip install --upgrade transformers sentencepiece sacremoses && \
+    deactivate
 
 # Packages & model for MediaPipe Hand tracking
 RUN cd /root && wget -q https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/latest/gesture_recognizer.task

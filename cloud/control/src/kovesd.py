@@ -27,16 +27,20 @@ subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 publisher = zmqcontext.socket(zmq.PUB)
 publisher.bind("ipc:///tmp/video_frames_kovesd.ipc")
 
-text = "Now I will play a ball-following game. " \
-        "Move the ball in front of me and I will follow it. " \
-        "If I don't see the ball, I won't move. "
+xtext = ""
 if utils.get_language() == "Hungarian":
-    text = "Most labdakövetős játékot fogok játszani. " \
+    xtext = "Most labdakövetős játékot fogok játszani. " \
             "Mozgasd a labdát előttem és én követni fogom. " \
             "Ha éppem nem látom a labdát, akkor nem mozdulok. "
-xtext = utils.translate(text)
-print("Text to speech: ", text)
-wav, d = utils.tts_wav(text)
+else:
+    text = "Now I will play a ball-following game. " \
+        "Move the ball in front of me and I will follow it. " \
+        "If I don't see the ball, I won't move. "
+    xtext = utils.translate("English", text)
+
+print("Text to speech: " + xtext)
+
+wav, d = utils.tts_wav(xtext)
 utils.play_wav(wav)
 #time.sleep(d)
 

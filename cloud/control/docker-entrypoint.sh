@@ -1,5 +1,8 @@
 #!/bin/bash -x
 
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
 tmux new-session -d -s supervisord "/root/.local/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"
 tmux new-session -d -s video "python3 /root/zmq_videopub.py ; sleep inf"
 

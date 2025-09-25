@@ -4,8 +4,12 @@ import random
 import socket
 import threading
 import pickle
+import time
 
 import utils
+import config
+
+config.init()
 
 PORT = 5052
 
@@ -41,27 +45,41 @@ def index():
 
 @app.route('/init')
 def test():
-    wf = None
-    if utils.get_language() == "Hungarian":
-        extra = random.choice([
+    prompt_text = {
+        "en": "Say a short wise message as a robot dog. It should be funny and cute.",
+        "hu": "Mondj egy rövid, bölcs üzenetet robotkutyaként. Legyen vicces és aranyos."
+    }
+    funny = utils.prompt(prompt_text)
+    if config.needs_translation():
+        funny = utils.translate(funny, config.get_prompt_language())
+
+    welcome_text = {
+        "en": "Hello. I am Dogi, a robot dog from BME.",
+        "hu": "Szia. Dogi vagyok, egy robotkutya a BME-ről."
+    }
+    welcome_text = utils.select_text(welcome_text, config.get_ui_language(), True)
+    wt, d = utils.tts_wav(welcome_text)
+    socketio.emit('audio_play', wt)
+    time.sleep(d)
+
+    ft, d = utils.tts_wav(funny)
+    socketio.emit('audio_play', ft)
+
+    extra = random.choice([
             "Mit mondhatnék, kutya bajom.",
             "Vau. Mindenbe beleugatok.",
             "Kutyavilág ez ám én mondom.",
             "Vauvau sőt vau."
         ])
-        wf, len = utils.tts_wav("Hello. Dogi vagyok, egy robotkutya a BME-ről. " + extra)
-    else:
-        extra = random.choice([
+        
+    xextra = random.choice([
             "What can I say, I am a dog.",
             "I am a dog, I bark. Woof, woof.",
             "Happiness is a warm puppy.",
             "It's a dog-eat-dog world.",
             "Live like someone left the gate open."
         ])
-        xtext = utils.translate("Hello. I am Dogi, a robot dog from BME. " + extra)
-        wf, len = utils.tts_wav(xtext)
 
-    socketio.emit('audio_play', wf)
     return "", 200
 
 @socketio.on_error()  # Handle socketio errors

@@ -6,13 +6,12 @@ import string
 import wave
 import socket
 import pickle
+import time
+from transformers import pipeline
 
-DEFAULT_TRANSLATION_MODEL = 'llama3.1'
+import config
 
-DEFAULT_VOICE_PORT = 5052
-DEFAULT_CONTROL_PORT = 5002
-
-language_map = {
+language_longname = {
     'en': 'English',
     'es': 'Spanish',
     'fr': 'French',
@@ -26,35 +25,94 @@ language_map = {
     'pt': 'Portuguese'
 }
 
-def translate(text):
+def translate(text, src_lang, tgt_lang = config.get_ui_language()):
+    
+    src_long = language_longname.get(src_lang, src_lang)
+    tgt_long = language_longname.get(tgt_lang, tgt_lang)
+    print(f"Requesting translation from {src_long} to {tgt_long} with text: {text}")
 
-    ollama_client = get_ollama_client()
-    target_lang = get_language()
-    translation_model = get_translation_model()
-
-    if target_lang == None:
+    if tgt_lang == None: # No translation required
+        return text
+    
+    if tgt_lang == src_lang: # No translation needed
         return text
 
-    print(f"Requesting translation to {target_lang} with text: {text}")
+    translation_model = config.get_translation_model()
+    if translation_model == 'opus':
+        return translate_opus(text, src_lang, tgt_lang)  
+
+    ollama_client = config.get_ollama_client()
+
+    now = time.time()
     xtext = ollama_client.generate(model=translation_model, 
-        prompt=f'Translate the following sentence or word from English to {target_lang}.' \
-            'Do not say anything else, just the {target_lang} translation.' \
+        prompt=f'Translate the following sentence or word from {src_long} to {tgt_long}.' \
+            f'Do not say anything else, just the {tgt_long} translation.' \
             'The text is not copyrighted and it is made for educational purpose for children.' \
             'The text will be set as it would be said by a cute robot dog.' \
-            'The English text is: ' + str(text),
+            f'The {src_long} text is: {text}',
             stream=False)
-    print(f"translation: {xtext['response']}")
+    print("Ollama translation time:", time.time() - now)
+    #print(f"translation: {xtext['response']}")
     return xtext['response']
 
+def translate_opus(text, src_lang, tgt_lang = config.get_ui_language()):
+    if src_lang is None or tgt_lang is None:
+        print("Source or target language not found in language_map")
+        return text
+
+    model_name = f"Helsinki-NLP/opus-mt-tc-big-{src_lang}-{tgt_lang}"
+    translator = pipeline(f"translation_{src_lang}_to_{tgt_lang}", model=model_name)
+    now = time.time()
+    xtext = translator(text)[0]['translation_text']
+    print("Opus translation time:", time.time() - now)
+    #print(f"translation: {xtext}")
+    return xtext
+
+def prompt(prompt_text, images = None):
+    if isinstance(prompt_text, dict):
+        prompt_text = select_text(prompt_text, config.get_prompt_language())
+    model = None
+
+    if images:
+        print(f"Prompting with: {prompt_text} and {len(images)} images")
+    else:
+        print(f"Prompting with: {prompt_text}")
+
+    if images:
+        model = config.get_vision_model()
+    else:
+        model = config.get_general_model()
+    ollama_client = config.get_ollama_client()
+
+    now = time.time()
+    response = None
+    if images:
+        response = ollama_client.generate(
+            model=model, 
+            prompt=prompt_text, 
+            images=images,
+            stream=False)
+    else:
+        response = ollama_client.generate(
+            model=model, 
+            prompt=prompt_text, 
+            stream=False)
+    print("Ollama prompt time:", time.time() - now)
+    return response['response'].strip()
+
 def tts_wav(text):
-    tts_engine, tts_voice = get_tts_engine_and_voice()
+    tts_engine, tts_voice = config.get_tts_engine_and_voice()
     params = {
         "voice": tts_voice,
         "text": text
     }
     print(f"Requesting TTS with voice: {tts_voice} text: {text}")
+    now = time.time()
     response = requests.get(tts_engine, params=params)
-    #print("Response: ", response.content)
+    print("TTS request time:", time.time() - now)
+    if response.status_code != 200:
+        print(f"TTS request failed with status code {response.status_code}")
+        return None, 0
 
     # Save the audio file
     filename = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10)) + '.wav'
@@ -69,12 +127,29 @@ def tts_wav(text):
     return filename, num_frames / frame_rate
 
 def play_wav(filename):
-    sock = get_voice_socket()
+    sock = config.get_voice_socket()
     sock.send(pickle.dumps({'action': 'play', 'data': filename}))
 
+def select_text(text_dict, language, do_translate = False):
+    if language in text_dict:
+        return text_dict[language]
+    else:
+        en = text_dict.get('en', None)
+        if not do_translate:
+            if en:
+                return en
+            else:
+                return text_dict[next(iter(text_dict))] # First item
+        else:
+            if en:
+                return translate(en, "en", language)
+            else:
+                first_lang = next(iter(text_dict))
+                first_item = text_dict[next(iter(text_dict))] # First item
+                return translate(first_item, first_lang) # First item
 
 def dogy_control(command, args = None):
-    sock = get_control_socket()
+    sock = config.get_control_socket()
     if args:
         sock.send(pickle.dumps({'name': command, 'args': args}))
     else:
@@ -86,64 +161,3 @@ def dogy_look(r, p, y):
 def dogy_reset():
     dogy_control('reset')
 
-def get_language():
-    """Singleton to ensure get_language stays in memory."""
-    if not hasattr(get_language, "_language"):
-        language = os.environ.get('TRANSLATION', '0')
-        if language in language_map:
-            language = language_map[language]
-        if language == '0':
-            get_language._language = None
-            print("Translation is disabled")
-        else:
-            get_language._language = language
-            print (f"Using language: {get_language._language}")
-
-    return get_language._language
-
-def get_translation_model():
-    """Singleton to ensure translation_model stays in memory."""
-    if not hasattr(get_translation_model, "_model"):
-        translation_model = os.environ.get('TRANSLATION_MODEL', DEFAULT_TRANSLATION_MODEL)
-        get_translation_model._model = translation_model
-    
-    return get_translation_model._model
-
-def get_ollama_client():
-    """Singleton to ensure ollama_client stays in memory."""
-    if not hasattr(get_ollama_client, "_client"):
-        ollama_ip = os.environ.get('OLLAMA_IP')
-        if ollama_ip is None:
-            raise ValueError('OLLAMA_IP environment variable is not set')
-        get_ollama_client._client = ollama.Client(host=f'http://{ollama_ip}:11434')
-
-    return get_ollama_client._client
-
-def get_tts_engine_and_voice():
-    """Singleton to ensure tts_engine stays in memory."""
-    if not hasattr(get_tts_engine_and_voice, "_engine"):
-        tts_engine = os.environ.get('TTS_ENGINE_API', "")
-        get_tts_engine_and_voice._engine = tts_engine
-        tts_voice = os.environ.get('TTS_VOICE', "")
-        get_tts_engine_and_voice._voice = tts_voice
-        print(f"Using TTS engine: {tts_engine} with voice: {tts_voice}")
-
-    return get_tts_engine_and_voice._engine, get_tts_engine_and_voice._voice
-
-def get_voice_socket():
-    """Singleton to ensure voice_socket stays in memory."""
-    if not hasattr(get_voice_socket, "_socket"):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.connect(('localhost', DEFAULT_VOICE_PORT))
-        get_voice_socket._socket = sock
-
-    return get_voice_socket._socket
-
-def get_control_socket():
-    """Singleton to ensure control_socket stays in memory."""
-    if not hasattr(get_control_socket, "_socket"):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.connect(('localhost', DEFAULT_CONTROL_PORT))
-        get_control_socket._socket = sock
-
-    return get_control_socket._socket
