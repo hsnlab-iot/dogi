@@ -40,6 +40,7 @@ RUN \
     source /root/.yolo/bin/activate && pip install 'lap>=0.5.12' && \
     # Upgrade transformers for translation
     pip install --upgrade transformers sentencepiece sacremoses && \
+    pip install --upgrade flask flask-socketio && \
     deactivate && \
     source /root/.flask/bin/activate && \
     pip install --upgrade transformers sentencepiece sacremoses && \

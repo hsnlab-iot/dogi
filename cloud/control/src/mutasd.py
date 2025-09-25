@@ -19,6 +19,7 @@ import time
 import zmq
 import numpy as np
 
+import config
 import utils
 
 import cv2
@@ -30,7 +31,6 @@ from mediapipe.framework.formats import landmark_pb2
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
-
 
 # Global variables to calculate FPS
 COUNTER, FPS = 0, 0
@@ -57,6 +57,20 @@ def run(model: str, num_hands: int,
       height: The height of the frame captured from the camera.
   """
 
+  config.init()
+
+  text = {
+    "en": "Let's play a game where you show me hand gestures and I perform tricks. " \
+          "Try out different gestures and see what I can do - but be careful, " \
+          "I might react too cutely!",
+    "hu": "Játsszuk azt, hogy kézmozdulatokat mutatsz nekem, " \
+            "én pedig trükk0ket csinálok. Próbálj ki több mozdulatot, " \
+            "és nézd meg, mit tudok - de vigyázz, lehet, hogy túl cukin reagálok!"
+
+  }
+  xtext = utils.select_text(text, config.get_ui_language(), True)
+  wav, d = utils.tts_wav(xtext)
+  utils.play_wav(wav)
 
   # Subscribe to video
   zmqcontext = zmq.Context()

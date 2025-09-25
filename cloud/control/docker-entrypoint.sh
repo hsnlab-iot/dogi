@@ -19,7 +19,8 @@ while ! netstat -tuln | grep -q ":5002 "; do
 done
 tmux new-session -d -s webvideo "cd /root && source .flask/bin/activate && python3 web_video.py ; sleep inf"
 tmux new-session -d -s webjoy "cd /root && source .flask/bin/activate && python3 web_joy.py ; sleep inf"
-tmux new-session -d -s webvoice "cd /root && source .flask/bin/activate && python3 web_voice.py ; sleep inf"
+#tmux new-session -d -s webvoice "cd /root && source .flask/bin/activate && python3 web_voice.py ; sleep inf"
+tmux new-session -d -s webvoice "cd /root && source .yolo/bin/activate && python3 web_voice.py ; sleep inf"
 tmux new-session -d -s webkeresd "cd /root && source .flask/bin/activate && python3 web_keresd.py ; sleep inf"
 tmux new-session -d -s webkovesd "cd /root && source .flask/bin/activate && python3 web_kovesd.py ; sleep inf"
 tmux new-session -d -s webmutasd "cd /root && source .flask/bin/activate && python3 web_mutasd.py ; sleep inf"

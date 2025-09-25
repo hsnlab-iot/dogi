@@ -160,4 +160,3 @@ def dogy_look(r, p, y):
 
 def dogy_reset():
     dogy_control('reset')
-

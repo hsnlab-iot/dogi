@@ -7,11 +7,12 @@ from ultralytics import YOLO
 import socket
 import pickle
 
+import config
 import utils
 
 model = YOLO('yolov8m-seg.pt')
-#dogControl = dog.DOGZILLA("/dev/ttyAMA0")
-#time.sleep(1)   # Wait for the dogControl
+
+config.init()
 
 MAXPITCH = 20
 MAXYAW = 16
@@ -27,19 +28,15 @@ subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
 publisher = zmqcontext.socket(zmq.PUB)
 publisher.bind("ipc:///tmp/video_frames_kovesd.ipc")
 
-xtext = ""
-if utils.get_language() == "Hungarian":
-    xtext = "Most labdakövetős játékot fogok játszani. " \
+text = {
+    "en": "Now I will play a ball-following game. " \
+        "Move the ball in front of me and I will follow it. " \
+        "If I don't see the ball, I won't move. ",
+    "hu": "Most labdakövetős játékot fogok játszani. " \
             "Mozgasd a labdát előttem és én követni fogom. " \
             "Ha éppem nem látom a labdát, akkor nem mozdulok. "
-else:
-    text = "Now I will play a ball-following game. " \
-        "Move the ball in front of me and I will follow it. " \
-        "If I don't see the ball, I won't move. "
-    xtext = utils.translate("English", text)
-
-print("Text to speech: " + xtext)
-
+}
+xtext = utils.select_text(text, config.get_ui_language(), True)
 wav, d = utils.tts_wav(xtext)
 utils.play_wav(wav)
 #time.sleep(d)
