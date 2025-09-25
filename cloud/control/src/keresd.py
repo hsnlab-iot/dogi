@@ -119,6 +119,9 @@ while True:
             random_file = random.choice(jpg_files)
             front_pic = cv2.imread(random_file)
             print(f"Loaded random picture: {random_file}")
+            if front_pic is not None:
+                # Publish the raw bytes of the picture
+                publisher.send(front_pic.tobytes())
         else:
             print("No jpeg files found in the folder.")
     else:
