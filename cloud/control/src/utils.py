@@ -8,6 +8,7 @@ import socket
 import pickle
 import time
 from transformers import pipeline
+import re
 
 import config
 
@@ -63,7 +64,30 @@ def translate_opus(text, src_lang, tgt_lang = config.get_ui_language()):
     model_name = f"Helsinki-NLP/opus-mt-tc-big-{src_lang}-{tgt_lang}"
     translator = pipeline(f"translation_{src_lang}_to_{tgt_lang}", model=model_name)
     now = time.time()
-    xtext = translator(text)[0]['translation_text']
+
+    def split_text_into_chunks(text, max_length=200):
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        chunks = []
+        current_chunk = ""
+        for sentence in sentences:
+            if len(current_chunk) + len(sentence) + 1 <= max_length:
+                if current_chunk:
+                    current_chunk += " " + sentence
+                else:
+                    current_chunk = sentence
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        return chunks
+    chunks = split_text_into_chunks(text)
+
+    xchunks = []
+    for c in chunks:
+        xchunks.append(translator(c)[0]['translation_text'])
+    xtext = ' '.join(xchunks)
     print("Opus translation time:", time.time() - now)
     #print(f"translation: {xtext}")
     return xtext
