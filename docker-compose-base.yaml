@@ -1,0 +1,5 @@
+services:
+  ros2base:
+    build:
+      context: base_images/ros_base
+    image: ros_base:2506
