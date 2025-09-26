@@ -37,7 +37,7 @@ text = {
             "Ha éppem nem látom a labdát, akkor nem mozdulok. "
 }
 xtext = utils.select_text(text, config.get_ui_language(), True)
-wav, d = utils.tts_wav(xtext)
+wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_intro_kovesd")
 utils.play_wav(wav)
 #time.sleep(d)
 

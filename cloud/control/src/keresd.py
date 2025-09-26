@@ -173,7 +173,7 @@ while True:
             xtext = text
 
         print("Ask for TTS")
-        wav, d = utils.tts_wav(xtext)
+        wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_intro_keresd")
         utils.play_wav(wav)
         time.sleep(d)
 

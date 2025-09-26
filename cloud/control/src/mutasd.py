@@ -39,7 +39,7 @@ START_TIME = time.time()
 
 gestures = {
   'ILoveYou': { 'en': 'I love you', 'hu': 'Szeretlek' },
-  'Pointing_Up': { 'en': 'Pointing up', 'hu': 'Felfelé' },
+  'Pointing_Up': { 'en': 'Warning', 'hu': 'Figyelem' },
   'Thumb_Up': { 'en': 'Good job', 'hu': 'Szép munka' },
   'Thumb_Down': { 'en': 'Not good', 'hu': 'Nem tetszik' },
   'Victory': { 'en': 'Victory', 'hu': 'Győzelem' },
@@ -77,6 +77,8 @@ def run(model: str, num_hands: int,
       filename = f"{config.get_ui_language()}_{gesture_key}"
       print(f"Pre-generating voice for: {text}")
       utils.tts_wav(text, filename)
+
+  utils.dogy_reset()
 
   # Subscribe to video
   zmqcontext = zmq.Context()
