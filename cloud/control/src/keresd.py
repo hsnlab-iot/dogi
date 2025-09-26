@@ -42,7 +42,7 @@ text = {
 }
 xtext = utils.select_text(text, config.get_ui_language(), True)
 print(xtext)
-wav, d = utils.tts_wav(xtext)
+wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_intro_keresd")
 utils.play_wav(wav)
 time.sleep(d)
 
@@ -173,7 +173,7 @@ while True:
             xtext = text
 
         print("Ask for TTS")
-        wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_intro_keresd")
+        wav, d = utils.tts_wav(xtext)
         utils.play_wav(wav)
         time.sleep(d)
 
@@ -194,7 +194,7 @@ while True:
                 'en': "Hooray, I found a ball!"
             }
             xtext = utils.select_text(text, config.get_ui_language(), True)
-            wav, d = utils.tts_wav(xtext)
+            wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_hurray_keresd")
             utils.play_wav(wav)
             time.sleep(d)
 

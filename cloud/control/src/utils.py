@@ -135,6 +135,9 @@ def response_filter(response):
     # Remove list markers that are a star with 3 spaces
     response = re.sub(r'^\s*\*\s{3}', '', response, flags=re.MULTILINE)
 
+    # Remove all ** around words
+    response = re.sub(r'\*\*(.*?)\*\*', r'\1', response)
+
     return response
 
 def tts_wav(text, filename = None):
