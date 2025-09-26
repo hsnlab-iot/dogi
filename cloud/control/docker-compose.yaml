@@ -12,6 +12,7 @@ services:
       - TTS_ENGINE_API=http://opentts:5500/api/tts
       #- TTS_VOICE=larynx:eva_k-glow_tts
       - TTS_VOICE=hu_diana_majlinger
+      #- TTS_VOICE=zh_baker
       #- TTS_ENGINE_API=http://10.6.6.20:8124/synthesize/
       # MODEL: In general the AI model to be used
       # Some choices: gemma3:12b-it-qat (en), llava:13b (en), qwen2.5vl:latest (hu)
@@ -22,7 +23,7 @@ services:
       #- TRANSLATION_MODEL=gemma3:4b
       #- TRANSLATION_MODEL=gemma3:12b-it-qat
       - TRANSLATION_MODEL=opus
-      #- TRANSLATION=0
+      # TRANSLATION=0
       - TRANSLATION=hu
     ports:
       - "6080:6080"
@@ -44,6 +45,7 @@ services:
   opentts:
     image: synesthesiam/opentts:hu
     #image: synesthesiam/opentts:de
+    #image: synesthesiam/opentts:zh
     container_name: opentts
     ports:
        - "5500:5500"
