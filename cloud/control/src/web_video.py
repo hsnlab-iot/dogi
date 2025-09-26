@@ -2,7 +2,8 @@ import time
 import numpy as np
 import zmq
 import cv2
-from flask import Flask, Response
+from flask import Flask, Response, make_response
+from flask_cors import CORS
 from threading import Thread, Lock
 
 # Subscribe to video
@@ -38,6 +39,7 @@ lock_kovesd = Lock()
 lock_mutasd = Lock()
 
 app = Flask(__name__)
+CORS(app)
 
 def gen_mjpeg():
     while True:
@@ -91,21 +93,40 @@ def gen_mjpeg_mutasd():
             b'Content-Type: image/jpeg\r\n\r\n' + frame.tobytes() + b'\r\n')
         time.sleep(1/25)
 
+def mjpeg_response(generator):
+    resp = Response(generator, mimetype='multipart/x-mixed-replace; boundary=frame')
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
 @app.route("/mjpeg")
 def mjpeg():
-    return Response(gen_mjpeg(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return mjpeg_response(gen_mjpeg())
+
+@app.route("/jpeg")
+def jpeg():
+    global last_frame
+    with lock:
+        if last_frame is not None:
+            frame = last_frame.copy()
+        else:
+            frame = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
+            _, frame = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 10])
+    response = make_response(frame.tobytes())
+    response.headers['Content-Type'] = 'image/jpeg'
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
 
 @app.route("/mjpeg_keresd")
 def mjpeg_keresd():
-    return Response(gen_mjpeg_keresd(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return mjpeg_response(gen_mjpeg_keresd())
 
 @app.route("/mjpeg_kovesd")
 def mjpeg_kovesd():
-    return Response(gen_mjpeg_kovesd(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return mjpeg_response(gen_mjpeg_kovesd())
 
 @app.route("/mjpeg_mutasd")
 def mjpeg_mutasd():
-    return Response(gen_mjpeg_mutasd(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return mjpeg_response(gen_mjpeg_mutasd())
 
 def get_frames():
     global last_frame

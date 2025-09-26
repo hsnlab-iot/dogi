@@ -8,6 +8,9 @@ from urllib.parse import urlparse
 
 import config
 import utils
+import base64
+from io import BytesIO
+from PIL import Image
 
 config.init()
 
@@ -24,6 +27,8 @@ sock.connect(('localhost', 5002))
 
 joy1_odata = None
 joy2_attitude = [0, 0, 0]
+
+lastimg = None
 
 @app.route('/')
 def index():
@@ -75,6 +80,24 @@ def handle_event(data):
             joy2_attitude[1] += 1
         sock.send(pickle.dumps({'name': 'attitude', 'args': (['p'], [joy2_attitude[1]])}))
 
+@socketio.on('image')
+def handle_event(data):
+    global lastimg
+    #print('Received image:', data)
+    # data is expected to be a data URL, e.g. "data:image/png;base64,..."
+    header, encoded = data.split(',', 1)
+    img_bytes = base64.b64decode(encoded)
+    img = Image.open(BytesIO(img_bytes))
+    timestamp = int(time.time())
+    filename = f"what_pic_{timestamp}.jpeg"
+    img.save(filename, "JPEG")
+    
+    # Convert img to JPEG bytes for prompt function
+    buf = BytesIO()
+    img.save(buf, format='JPEG')
+    buf.seek(0)
+    lastimg = buf.read()
+
 @socketio.on('action')
 def handle_event(data):
     global inMotion
@@ -121,10 +144,30 @@ def handle_event(data):
         jw, d = utils.tts_wav(joke)
         utils.play_wav(jw)
     if data == "on":
-        sock.send(pickle.dumps({'name': 'loadall'}))
+        sock.send(pickle.dumps({'name': 'load_allmotor'}))
     if data == "off":
-        sock.send(pickle.dumps({'name': 'unloadall'}))
-
+        sock.send(pickle.dumps({'name': 'unload_allmotor'}))
+    if data == "what":
+        if lastimg is not None:
+            prompt_text = {
+            'hu': 'Írd le, mit látsz ezen a képen, '\
+                'ami egy robotkutyára szerelt első kamera élőképe.',
+            'en': 'Describe what can you see in this image, '\
+                'which is a live view from a front camera mounted on a robot dog. '\
+            }
+            text = utils.prompt(prompt_text, images=[lastimg])
+            print(f"What: {text}")
+            if config.needs_translation():
+                print("Ask translation" )
+                xtext = utils.translate(text, config.get_prompt_language())
+                print("Translation: ", xtext)
+            else:
+                xtext = text
+            print("Ask for TTS")
+            wav, d = utils.tts_wav(xtext)
+            utils.play_wav(wav)
+        else:
+            print("No image available for 'what' action.")
     with lock:
         inMotion = False
 

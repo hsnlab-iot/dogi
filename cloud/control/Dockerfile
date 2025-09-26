@@ -28,7 +28,7 @@ RUN \
 RUN \
     cd /root && \
     python3 -m venv .flask && source /root/.flask/bin/activate && \ 
-    pip install flask flask-socketio \
+    pip install flask flask-socketio flask_cors \
     numpy pyzmq opencv-python-headless ollama requests libtmux && \
     deactivate
 
@@ -40,7 +40,7 @@ RUN \
     source /root/.yolo/bin/activate && pip install 'lap>=0.5.12' && \
     # Upgrade transformers for translation
     pip install --upgrade transformers sentencepiece sacremoses && \
-    pip install --upgrade flask flask-socketio && \
+    pip install --upgrade flask flask-socketio flask_cors && \
     deactivate && \
     source /root/.flask/bin/activate && \
     pip install --upgrade transformers sentencepiece sacremoses && \

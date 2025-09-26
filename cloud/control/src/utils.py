@@ -137,24 +137,30 @@ def response_filter(response):
 
     return response
 
-def tts_wav(text):
-    tts_engine, tts_voice = config.get_tts_engine_and_voice()
-    params = {
-        "voice": tts_voice,
-        "text": text
-    }
-    print(f"Requesting TTS with voice: {tts_voice} text: {text}")
-    now = time.time()
-    response = requests.get(tts_engine, params=params)
-    print("TTS request time:", time.time() - now)
-    if response.status_code != 200:
-        print(f"TTS request failed with status code {response.status_code}")
-        return None, 0
+def tts_wav(text, filename = None):
+    filename_ok = False
+     # Check if the file already exists
+    if filename and os.path.exists('static/' + filename):
+        filename_ok = True
+        
+    if not filename_ok:
+        tts_engine, tts_voice = config.get_tts_engine_and_voice()
+        params = {
+            "voice": tts_voice,
+            "text": text
+        }
+        print(f"Requesting TTS with voice: {tts_voice} text: {text}")
+        now = time.time()
+        response = requests.get(tts_engine, params=params)
+        print("TTS request time:", time.time() - now)
+        if response.status_code != 200:
+            print(f"TTS request failed with status code {response.status_code}")
+            return None, 0
 
-    # Save the audio file
-    filename = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10)) + '.wav'
-    with open('static/' + filename, 'wb') as file:
-        file.write(response.content)
+        # Save the audio file
+        filename = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10)) + '.wav'
+        with open('static/' + filename, 'wb') as file:
+            file.write(response.content)
 
     # Get duration of the the WAV file
     with wave.open('static/' + filename, 'rb') as wav_file:

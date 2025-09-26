@@ -53,12 +53,13 @@
     <div>
         <button id="button_on" class="circle-button" style="background-color: darkred;">On</button>
         <button id="button_off" class="circle-button" style="background-color: darkred;">Off</button>
-        <button id="button_reset" class="circle-button" style="background-color: red;">Reset</button>
+        <button id="button_reset" class="circle-button" style="background-color: darkred;">Reset</button>
         <button id="button_pee" class="circle-button" style="background-color: red;">Pee</button>
         <button id="button_wave" class="circle-button" style="background-color: red;">Wave</button>
         <button id="button_look" class="circle-button" style="background-color: red;">Look</button>
         <button id="button_sit" class="circle-button" style="background-color: red;">Sit</button>
-        <button id="button_joke" class="circle-button" style="background-color: red;">Joke</button>
+        <button id="button_joke" class="circle-button" style="background-color: darkorange;">Joke</button>
+        <button id="button_what" class="circle-button" style="background-color: darkorange;">What</button>
     </div>
 </div>
 
@@ -100,6 +101,22 @@
     });
     document.querySelector('#button_off').addEventListener('click', function() {
         socket.emit('action', 'off');
+    });
+    document.querySelector('#button_what').addEventListener('click', function() {
+        // Fetch the current JPEG frame from the video source
+        fetch('http://{{ host }}:5051/jpeg')
+            .then(response => response.blob())
+            .then(blob => {
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                const dataURL = reader.result;
+                socket.emit('image', dataURL);
+                setTimeout(function() {
+                    socket.emit('action', 'what');
+                }, 500);
+            };
+            reader.readAsDataURL(blob);
+            });
     });
 
 </script>
