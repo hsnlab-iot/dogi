@@ -28,6 +28,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.framework.formats import landmark_pb2
+import threading
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -36,6 +37,15 @@ mp_drawing_styles = mp.solutions.drawing_styles
 COUNTER, FPS = 0, 0
 START_TIME = time.time()
 
+gestures = {
+  'ILoveYou': { 'en': 'I love you', 'hu': 'Szeretlek' },
+  'Pointing_Up': { 'en': 'Pointing up', 'hu': 'Felfelé' },
+  'Thumb_Up': { 'en': 'Good job', 'hu': 'Szép munka' },
+  'Thumb_Down': { 'en': 'Not good', 'hu': 'Nem tetszik' },
+  'Victory': { 'en': 'Victory', 'hu': 'Győzelem' },
+  'Closed_Fist': { 'en': 'Strength', 'hu': 'Erő' },
+  'Open_Palm': { 'en': 'Peace', 'hu': 'Béke' },
+}
 
 def run(model: str, num_hands: int,
         min_hand_detection_confidence: float,
@@ -59,18 +69,14 @@ def run(model: str, num_hands: int,
 
   config.init()
 
-  text = {
-    "en": "Let's play a game where you show me hand gestures and I perform tricks. " \
-          "Try out different gestures and see what I can do - but be careful, " \
-          "I might react too cutely!",
-    "hu": "Játsszuk azt, hogy kézmozdulatokat mutatsz nekem, " \
-            "én pedig trükk0ket csinálok. Próbálj ki több mozdulatot, " \
-            "és nézd meg, mit tudok - de vigyázz, lehet, hogy túl cukin reagálok!"
-
-  }
-  xtext = utils.select_text(text, config.get_ui_language(), True)
-  wav, d = utils.tts_wav(xtext)
-  utils.play_wav(wav)
+  def voice_response_thread():
+    print("Voice response thread started.")
+    # Future: pre-generate voice responses here
+    for gesture_key, gesture in gestures.items():
+      text = utils.select_text(gesture, config.get_ui_language(), True)
+      filename = f"{config.get_ui_language()}_{gesture_key}"
+      print(f"Pre-generating voice for: {text}")
+      utils.tts_wav(text, filename)
 
   # Subscribe to video
   zmqcontext = zmq.Context()
@@ -81,6 +87,23 @@ def run(model: str, num_hands: int,
 
   publisher = zmqcontext.socket(zmq.PUB)
   publisher.bind("ipc:///tmp/video_frames_mutasd.ipc")
+
+  text = {
+    "en": "Let's play a game where you show me hand gestures and I perform tricks. " \
+          "Try out different gestures and see what I can do - but be careful, " \
+          "I might react too cutely!",
+    "hu": "Játsszuk azt, hogy kézmozdulatokat mutatsz nekem, " \
+            "én pedig trükk0ket csinálok. Próbálj ki több mozdulatot, " \
+            "és nézd meg, mit tudok - de vigyázz, lehet, hogy túl cukin reagálok!"
+
+  }
+  xtext = utils.select_text(text, config.get_ui_language(), True)
+  wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_intro_mutasd")
+  utils.play_wav(wav)
+  time.sleep(d + 0.5)
+
+  voice_thread = threading.Thread(target=voice_response_thread, daemon=True)
+  voice_thread.start()
 
   # Visualization parameters
   row_size = 50  # pixels
@@ -125,6 +148,7 @@ def run(model: str, num_hands: int,
   # Continuously capture images from the camera and run inference
   
   last_action = time.time()
+  next_action = time.time()
   while True:
 
     try:
@@ -222,22 +246,42 @@ def run(model: str, num_hands: int,
     if category_name is not None and category_name != 'None':
       print(category_name)
 
-      if time.time() - last_action > 10:
+      if time.time() > next_action:
         if category_name == 'ILoveYou':
-          utils.dogy_control('action', (13, ))
+          utils.dogy_control('action', (13, ))  # Wavehand
           last_action = time.time()
+          next_action = time.time() + 9
+          utils.play_wav(config.get_ui_language() + "_ILoveYou")
         elif category_name == 'Pointing_Up':
-          utils.dogy_control('action', (11, ))
+          utils.dogy_control('action', (11, ))  # Pee
           last_action = time.time()
+          next_action = time.time() + 9
+          utils.play_wav(config.get_ui_language() + "_Pointing_Up")
         elif category_name == 'Thumb_Up':
-          utils.dogy_control('action', (10, ))
+          utils.dogy_control('action', (10, ))  # 3Axis
           last_action = time.time()
+          next_action = time.time() + 9
+          utils.play_wav(config.get_ui_language() + "_Thumb_Up")
         elif category_name == 'Thumb_Down':
-          utils.dogy_control('action', (6, ))
+          utils.dogy_control('action', (6, )) # Squat
           last_action = time.time()
+          next_action = time.time() + 6
+          utils.play_wav(config.get_ui_language() + "_Thumb_Down")
         elif category_name == 'Victory':
-          utils.dogy_control('action', (3, ))
+          utils.dogy_control('action', (3, )) # Crawl
           last_action = time.time()
+          next_action = time.time() + 7
+          utils.play_wav(config.get_ui_language() + "_Victory")
+        elif category_name == 'Closed_Fist':
+          utils.dogy_control('action', (19, )) # Handshake
+          last_action = time.time()
+          next_action = time.time() + 12
+          utils.play_wav(config.get_ui_language() + "_Closed_Fist")
+        elif category_name == 'Open_Palm':
+          utils.dogy_control('action', (14, )) # Strech
+          last_action = time.time()
+          next_action = time.time() + 12
+          utils.play_wav(config.get_ui_language() + "_Open_Palm")
           
 
     # Stop the program if the ESC key is pressed.

@@ -142,7 +142,7 @@ def tts_wav(text, filename = None):
      # Check if the file already exists
     if filename and os.path.exists('static/' + filename):
         filename_ok = True
-        
+
     if not filename_ok:
         tts_engine, tts_voice = config.get_tts_engine_and_voice()
         params = {
@@ -158,7 +158,10 @@ def tts_wav(text, filename = None):
             return None, 0
 
         # Save the audio file
-        filename = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10)) + '.wav'
+        if filename is None:
+            filename = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10)) + '.wav'
+        if not filename.lower().endswith('.wav'):
+            filename += '.wav'
         with open('static/' + filename, 'wb') as file:
             file.write(response.content)
 
@@ -170,6 +173,8 @@ def tts_wav(text, filename = None):
     return filename, num_frames / frame_rate
 
 def play_wav(filename):
+    if not filename.lower().endswith('.wav'):
+        filename += '.wav'
     sock = config.get_voice_socket()
     sock.send(pickle.dumps({'action': 'play', 'data': filename}))
 
