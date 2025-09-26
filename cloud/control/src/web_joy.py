@@ -6,6 +6,11 @@ import time
 import threading
 from urllib.parse import urlparse
 
+import config
+import utils
+
+config.init()
+
 inMotion = False
 lock = threading.Lock()
 
@@ -23,7 +28,7 @@ joy2_attitude = [0, 0, 0]
 @app.route('/')
 def index():
     host = urlparse(request.url_root).hostname
-    return render_template('joy.html', host=host)
+    return render_template('web_joy.html', host=host)
 
 @socketio.on('connect')
 def handle_connect():
@@ -105,7 +110,21 @@ def handle_event(data):
         sock.send(pickle.dumps({'name': 'motor', 'args': ([22, 10])}))
         sock.send(pickle.dumps({'name': 'motor', 'args': ([11, 30])}))
         sock.send(pickle.dumps({'name': 'motor', 'args': ([21, 30])}))
-    
+    if data == "joke":
+        prompt_text = {
+            "en": "Tell me a joke about robot dogs or real dogs.",
+            "hu": "Mondj egy kutyás vagy robotkutyás viccet.",
+        }
+        joke = utils.prompt(prompt_text)
+        if config.needs_translation():
+            joke = utils.translate(joke, config.get_prompt_language())
+        jw, d = utils.tts_wav(joke)
+        utils.play_wav(jw)
+    if data == "on":
+        sock.send(pickle.dumps({'name': 'loadall'}))
+    if data == "off":
+        sock.send(pickle.dumps({'name': 'unloadall'}))
+
     with lock:
         inMotion = False
 

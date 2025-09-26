@@ -122,7 +122,20 @@ def prompt(prompt_text, images = None):
             prompt=prompt_text, 
             stream=False)
     print("Ollama prompt time:", time.time() - now)
-    return response['response'].strip()
+    filtered_response = response_filter(response['response'])
+    return filtered_response
+
+def response_filter(response):
+    # Remove any leading/trailing whitespace and unwanted characters
+    response = response.strip()
+
+    # Remove bold text marked with **, and followed by a ":"
+    response = re.sub(r'\*\*[^*]+:\*\*', '', response)  # Remove bold text followed by ":"
+    
+    # Remove list markers that are a star with 3 spaces
+    response = re.sub(r'^\s*\*\s{3}', '', response, flags=re.MULTILINE)
+
+    return response
 
 def tts_wav(text):
     tts_engine, tts_voice = config.get_tts_engine_and_voice()

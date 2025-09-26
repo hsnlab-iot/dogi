@@ -15,7 +15,7 @@ services:
       #- TTS_ENGINE_API=http://10.6.6.20:8124/synthesize/
       # MODEL: In general the AI model to be used
       # Some choices: gemma3:12b-it-qat (en), llava:13b (en), qwen2.5vl:latest (hu)
-      - MODEL=qwen2.5vl:latest
+      - MODEL=gemma3:12b-it-qat
       - PROMPT_LANGUAGE=en
       #- VISUAL_MODEL=gemma3:4b
       #- VISUAL_MODEL=gemma3:12b-it-qat

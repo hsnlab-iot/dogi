@@ -257,7 +257,7 @@ while True:
         thread.stopped = True
         thread.join()
 
-    if not (obstacles.upper in ['YES', 'YES!', 'IGEN', 'IGEN!']):
+    if not (obstacles.upper() in ['YES', 'YES!', 'IGEN', 'IGEN!']):
         print("No obstacles in front, moving forward")
         move_forward()
     else:
