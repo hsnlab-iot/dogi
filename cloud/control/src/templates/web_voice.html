@@ -35,7 +35,7 @@
 
     socket.on('audio_play', function(data) {
         console.log('Received request:', data);
-        var audio = new Audio('static/' + data);
+        var audio = new Audio('/voice/' + encodeURIComponent(data));
         audio.play();
     });
 </script>

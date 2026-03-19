@@ -1,0 +1,34 @@
+[language]
+ui = "en"
+prompt = "en"
+
+[models]
+general = "qwen3.5:9B"
+translation = ""
+vision = ""
+
+[openai]
+api_base = "http://10.6.6.20:11434/v1"
+api_key = "not-needed"
+keep_alive = "30m"
+enable_thinking = false
+thinking_budget = 1024
+max_output_tokens = 1536
+translation_max_output_tokens = 2048
+prompt_temperature = 0.9
+prompt_frequency_penalty = 1.5
+
+[tts]
+engine_api = "http://opentts:5500/api/tts"
+voice = "hu_diana_majlinger"
+cache_dir = "~/.cache/voice"
+
+#- TTS_ENGINE_API=http://opentts:5500/api/tts
+#- TTS_VOICE=larynx:eva_k-glow_tts
+#- TTS_VOICE=hu_diana_majlinger
+#- TTS_VOICE=zh_baker
+#- TTS_ENGINE_API=http://10.6.6.20:8124/synthesize/
+
+[ports]
+voice = 5052
+control = 5002

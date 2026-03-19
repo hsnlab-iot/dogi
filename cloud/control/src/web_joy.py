@@ -30,6 +30,25 @@ joy2_attitude = [0, 0, 0]
 
 lastimg = None
 
+def voice_response_thread():
+    print("Voice response thread started.")
+    # Future: pre-generate voice responses here
+    text = {
+        "en": "Just a second, I tell you a joke",
+        "hu": "Egy pillanat, máris mondok egy viccet",
+    }
+    xtext = utils.select_text(text, config.get_ui_language(), True)
+    wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_joke_joy")
+    text = {
+        "en": "Just a second, I tell you a what I see right now",
+        "hu": "Egy pillanat, máris elmondom, mit látok most",
+    }
+    xtext = utils.select_text(text, config.get_ui_language(), True)
+    wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_what_joy")
+
+voice_thread = threading.Thread(target=voice_response_thread, daemon=True)
+voice_thread.start()
+
 @app.route('/')
 def index():
     host = urlparse(request.url_root).hostname
@@ -134,6 +153,7 @@ def handle_event(data):
         sock.send(pickle.dumps({'name': 'motor', 'args': ([11, 30])}))
         sock.send(pickle.dumps({'name': 'motor', 'args': ([21, 30])}))
     if data == "joke":
+        utils.play_wav(config.get_ui_language() + "_joke_joy")
         prompt_text = {
             "en": "Tell me a joke about robot dogs or real dogs.",
             "hu": "Mondj egy kutyás vagy robotkutyás viccet.",
@@ -149,6 +169,7 @@ def handle_event(data):
         sock.send(pickle.dumps({'name': 'unload_allmotor'}))
     if data == "what":
         if lastimg is not None:
+            utils.play_wav(config.get_ui_language() + "_what_joy")
             prompt_text = {
             'hu': 'Írd le, mit látsz ezen a képen, '\
                 'ami egy robotkutyára szerelt első kamera élőképe.',

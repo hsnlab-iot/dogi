@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, send_from_directory
 from flask_socketio import SocketIO
 import random
 import socket
@@ -43,12 +43,18 @@ def index():
     # 2. a button to make interaction needed to play background audio
     return render_template('web_voice.html')
 
+
+@app.route('/voice/<path:filename>')
+def voice_file(filename):
+    return send_from_directory(config.get_voice_cache_dir(), filename)
+
 @app.route('/init')
 def test():
     prompt_text = {
         "en": "Say a short wise message as a robot dog. It should be funny and cute.",
         "hu": "Mondj egy rövid, bölcs üzenetet robotkutyaként. Legyen vicces és aranyos."
     }
+    prompt_text = utils.select_text(prompt_text,  config.get_ui_language(), True)
     funny = utils.prompt(prompt_text)
     if config.needs_translation():
         funny = utils.translate(funny, config.get_prompt_language())
