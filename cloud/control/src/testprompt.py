@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 
 import config
 import utils
@@ -20,6 +21,8 @@ def main():
     parser.add_argument('--topic', default='', help='Optional joke topic')
     parser.add_argument('--prompt', default='', help='Custom prompt text (overrides joke/topic prompt)')
     parser.add_argument('--image', '--iamga', dest='image', default='', help='Optional image file path to attach to the prompt')
+    parser.add_argument('--stream', action='store_true', help='Use streaming response mode')
+    parser.add_argument('--tts', action='store_true', help='Speak the model response using configured TTS')
     args = parser.parse_args()
 
     # Read configuration through config.py singletons.
@@ -48,10 +51,18 @@ def main():
         print(f"Attaching image: {images[0]}\n")
 
     # Route through utils.prompt so all current request settings/debug apply.
-    response = utils.prompt(prompt_text, images=images, stream=True)
+    response = utils.prompt(prompt_text, images=images, stream=args.stream)
 
     print('Model response:')
     print(response)
+
+    if args.tts:
+        if response and str(response).strip():
+            wav, duration = utils.tts_wav(str(response).strip())
+            utils.play_wav(wav)
+            time.sleep(duration)
+        else:
+            print('TTS skipped: empty response.')
 
 
 if __name__ == '__main__':

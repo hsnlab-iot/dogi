@@ -2,6 +2,7 @@ from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 from urllib.parse import urlparse
 import libtmux
+import config
 
 PORT = 5059
 
@@ -28,6 +29,15 @@ def index():
         'page3_name': pageconfig[3]['name'],
     }
     return render_template('web_main.html', **context)
+
+
+@app.route('/reload', methods=['POST', 'GET'])
+def reload_config():
+    try:
+        config.reinit()
+        return {'status': 'ok', 'message': 'configuration reloaded'}, 200
+    except Exception as exc:
+        return {'status': 'error', 'message': str(exc)}, 500
 
 @socketio.on('page_change')
 def handle_event(data):

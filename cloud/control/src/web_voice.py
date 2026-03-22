@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, render_template, send_from_directory
 from flask_socketio import SocketIO
 import random
@@ -46,7 +48,9 @@ def index():
 
 @app.route('/voice/<path:filename>')
 def voice_file(filename):
-    return send_from_directory(config.get_voice_cache_dir(), filename)
+    filepath = os.path.join(config.get_cache_dir(), 'voice')
+    os.makedirs(filepath, exist_ok=True)
+    return send_from_directory(filepath, filename)
 
 @app.route('/init')
 def test():

@@ -16,7 +16,8 @@ services:
     environment:
       #- DEBUG=1  # Fake images in "keresd"
       - DISPLAY=:0
-      - ROBOT_IP=192.168.1.248
+      #- ROBOT_IP=192.168.1.248
+      - ROBOT_IP=10.100.0.38
       #- ROBOT_IP=10.20.5.38
     ports:
       - "6080:6080"

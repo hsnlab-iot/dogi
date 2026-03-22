@@ -21,9 +21,11 @@ DEFAULT_OPENAI_PROMPT_TEMPERATURE = 0.3
 DEFAULT_OPENAI_PROMPT_FREQUENCY_PENALTY = 1.5
 DEFAULT_TRANSLATION_MODEL = 'opus'
 DEFAULT_VISION_MODEL = ''
-DEFAULT_TTS_ENGINE = ''
+DEFAULT_TTS_API_BASE = ''
 DEFAULT_TTS_VOICE = ''
-DEFAULT_VOICE_CACHE_DIR = '~/.cache/voice'
+DEFAULT_TTS_MODEL = ''
+DEFAULT_TTS_PROTOCOL = 'mms'  # 'opentts' | 'openai' | 'mms'
+DEFAULT_CACHE_DIR = '~/.cache/'
 
 DEFAULT_VOICE_PORT = 5052
 DEFAULT_CONTROL_PORT = 5002
@@ -49,15 +51,20 @@ _openai_max_output_tokens = None
 _openai_translation_max_output_tokens = None
 _openai_prompt_temperature = None
 _openai_prompt_frequency_penalty = None
-_tts_engine = None
+_tts_api_base = None
 _tts_voice = None
-_voice_cache_dir = None
+_tts_model = None
+_tts_protocol = None
+_cache_dir = None
 _soul_language = None
 _soul_content = None
 
 
 def _build_default_config():
     return {
+        'general': {
+            'cache_dir': DEFAULT_CACHE_DIR,
+        },
         'language': {
             'ui': DEFAULT_UI_LANG,
             'prompt': DEFAULT_PROMPT_LANG,
@@ -79,9 +86,10 @@ def _build_default_config():
             'prompt_frequency_penalty': DEFAULT_OPENAI_PROMPT_FREQUENCY_PENALTY,
         },
         'tts': {
-            'engine_api': DEFAULT_TTS_ENGINE,
+            'api_base': DEFAULT_TTS_API_BASE,
             'voice': DEFAULT_TTS_VOICE,
-            'cache_dir': DEFAULT_VOICE_CACHE_DIR,
+            'model': DEFAULT_TTS_MODEL,
+            'protocol': DEFAULT_TTS_PROTOCOL,
         },
         'ports': {
             'voice': DEFAULT_VOICE_PORT,
@@ -148,7 +156,7 @@ def init():
     get_translation_model()
     get_openai_client()
     get_soul_content()
-    get_tts_engine_and_voice()
+    get_tts_parameters()
     get_voice_socket()
     get_control_socket()
 
@@ -171,9 +179,11 @@ def reinit():
     global _openai_translation_max_output_tokens
     global _openai_prompt_temperature
     global _openai_prompt_frequency_penalty
-    global _tts_engine
+    global _tts_api_base
     global _tts_voice
-    global _voice_cache_dir
+    global _tts_model
+    global _tts_protocol
+    global _cache_dir
     global _soul_language
     global _soul_content
 
@@ -196,9 +206,11 @@ def reinit():
     _openai_translation_max_output_tokens = None
     _openai_prompt_temperature = None
     _openai_prompt_frequency_penalty = None
-    _tts_engine = None
+    _tts_api_base = None
     _tts_voice = None
-    _voice_cache_dir = None
+    _tts_model = None
+    _tts_protocol = None
+    _cache_dir = None
     _soul_language = None
     _soul_content = None
 
@@ -500,30 +512,52 @@ def get_openai_client():
     return _openai_client
 
 
-def get_tts_engine_and_voice():
-    """Singleton to ensure TTS settings stay in memory."""
-    global _tts_engine
+def get_tts_parameters():
+    """Singleton to ensure TTS settings stay in memory.
+
+    Returns:
+        (api_base, voice, model, protocol) where protocol is one of:
+        'opentts' – OpenTTS HTTP server (uses voice)
+        'openai'  – OpenAI-compatible TTS API (uses model + voice)
+        'mms'     – MMS built-in TTS engine (uses model)
+    """
+    global _tts_api_base
     global _tts_voice
+    global _tts_model
+    global _tts_protocol
 
-    if _tts_engine is None or _tts_voice is None:
-        _tts_engine = _get_config_value('tts', 'engine_api', '')
+    if _tts_api_base is None or _tts_voice is None or _tts_model is None or _tts_protocol is None:
+        _tts_api_base = _get_config_value('tts', 'api_base', '')
         _tts_voice = _get_config_value('tts', 'voice', '')
-        print(f'Using TTS engine: {_tts_engine} with voice: {_tts_voice}')
+        _tts_model = _get_config_value('tts', 'model', '')
+        _tts_protocol = str(
+            _get_config_value('tts', 'protocol', DEFAULT_TTS_PROTOCOL) or DEFAULT_TTS_PROTOCOL
+        ).strip().lower()
 
-    return _tts_engine, _tts_voice
+        if _tts_protocol == "openai":        
+            # Accept either a full speech endpoint or a generic OpenAI-compatible base URL.
+            if _tts_api_base.endswith('/audio/speech'):
+                # remove ending
+                _tts_api_base = _tts_api_base[:-len('/audio/speech')]
+        print(
+            f'Using TTS protocol: {_tts_protocol}, api_base: {_tts_api_base}, '
+            f'voice: {_tts_voice}, model: {_tts_model}'
+        )
+
+    return _tts_api_base, _tts_voice, _tts_model, _tts_protocol
 
 
-def get_voice_cache_dir():
+def get_cache_dir():
     """Singleton to ensure the voice cache directory exists and stays in memory."""
-    global _voice_cache_dir
+    global _cache_dir
 
-    if _voice_cache_dir is None:
-        cache_dir = _get_config_value('tts', 'cache_dir', DEFAULT_VOICE_CACHE_DIR)
-        _voice_cache_dir = os.path.expanduser(str(cache_dir or DEFAULT_VOICE_CACHE_DIR))
-        os.makedirs(_voice_cache_dir, exist_ok=True)
-        print(f'Using voice cache directory: {_voice_cache_dir}')
+    if _cache_dir is None:
+        cache_dir = _get_config_value('general', 'cache_dir', DEFAULT_CACHE_DIR)
+        _cache_dir = os.path.expanduser(str(cache_dir or DEFAULT_CACHE_DIR))
+        os.makedirs(_cache_dir, exist_ok=True)
+        print(f'Using cache directory: {_cache_dir}')
 
-    return _voice_cache_dir
+    return _cache_dir
 
 
 def get_voice_socket():

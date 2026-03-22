@@ -1,6 +1,9 @@
+[general]
+cache = "~/.cache"
+
 [language]
-ui = "en"
-prompt = "en"
+ui = "hu"
+prompt = "hu"
 
 [models]
 general = "qwen3.5:9B"
@@ -19,11 +22,25 @@ prompt_temperature = 0.9
 prompt_frequency_penalty = 1.5
 
 [tts]
-engine_api = "http://opentts:5500/api/tts"
-voice = "hu_diana_majlinger"
-cache_dir = "~/.cache/voice"
+# TTS protocol: 'opentts' | 'openai' | 'mms'
+# opentts: uses voice
+# openai:  uses model + voice
+# mms:     uses model
 
-#- TTS_ENGINE_API=http://opentts:5500/api/tts
+# Diana
+protocol = "opentts"
+api_base = "http://opentts:5500/api/tts"
+voice = "hu_diana_majlinger"
+
+# Facebook english
+#protocol = "mms"
+#model = "facebook/mms-tts-eng"
+
+#protocol = "openai"
+#api_base = "http://10.6.6.20:8880/v1"
+#voice = "alloy"
+#model = "tts-1"
+
 #- TTS_VOICE=larynx:eva_k-glow_tts
 #- TTS_VOICE=hu_diana_majlinger
 #- TTS_VOICE=zh_baker

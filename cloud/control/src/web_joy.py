@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import pickle
@@ -108,7 +110,8 @@ def handle_event(data):
     img_bytes = base64.b64decode(encoded)
     img = Image.open(BytesIO(img_bytes))
     timestamp = int(time.time())
-    filename = f"what_pic_{timestamp}.jpeg"
+    filename = os.path.join(config.get_cache_dir(), 'image', f"what_pic_{timestamp}.jpeg")
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     img.save(filename, "JPEG")
     
     # Convert img to JPEG bytes for prompt function

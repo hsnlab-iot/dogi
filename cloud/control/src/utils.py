@@ -1,5 +1,6 @@
 import os
 import json
+#from matplotlib import text
 import requests
 import random
 import string
@@ -9,8 +10,14 @@ import pickle
 import time
 import base64
 import mimetypes
+import io
+
 from transformers import pipeline
 import re
+
+from transformers import VitsModel, AutoTokenizer
+import torch
+import scipy
 
 import config
 
@@ -230,6 +237,102 @@ def prompt(prompt_text, images = None, stream = False):
 
         return str(reasoning_value)
 
+    def _is_probable_base64(value):
+        if not isinstance(value, str):
+            return False
+
+        stripped = ''.join(value.strip().split())
+        if not stripped or len(stripped) % 4 != 0:
+            return False
+
+        try:
+            base64.b64decode(stripped, validate=True)
+            return True
+        except Exception:
+            return False
+
+    def _append_image_content(content_items, image, prefer_binary):
+        if isinstance(image, str):
+            if image.startswith('data:'):
+                content_items.append({
+                    "type": "image_url",
+                    "image_url": {"url": image}
+                })
+                return
+
+            if os.path.isfile(image):
+                try:
+                    with open(image, 'rb') as f:
+                        image_bytes = f.read()
+                except (FileNotFoundError, IOError) as e:
+                    print(f"Warning: Could not load image {image}: {e}")
+                    return
+
+                mime_type, _ = mimetypes.guess_type(image)
+                if mime_type is None:
+                    mime_type = 'image/jpeg'
+                image_data = base64.standard_b64encode(image_bytes).decode('utf-8')
+                content_items.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime_type};base64,{image_data}"}
+                })
+                return
+
+            if _is_probable_base64(image):
+                content_items.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{image}"}
+                })
+                return
+
+            print(f"Warning: Unsupported image string format: {image[:80]}...")
+            return
+
+        image_bytes = None
+        if isinstance(image, (bytes, bytearray, memoryview)):
+            image_bytes = bytes(image)
+        elif hasattr(image, 'read') and callable(image.read):
+            try:
+                current_pos = image.tell() if hasattr(image, 'tell') and callable(image.tell) else None
+                image_bytes = image.read()
+                if current_pos is not None and hasattr(image, 'seek') and callable(image.seek):
+                    image.seek(current_pos)
+            except Exception as e:
+                print(f"Warning: Could not read image bytes from stream-like object: {e}")
+                return
+
+        if image_bytes is None:
+            print(f"Warning: Unsupported image type {type(image)}; expected string path/data URL/base64 or bytes")
+            return
+
+        if prefer_binary:
+            content_items.append({
+                "type": "input_image",
+                "image": image_bytes,
+            })
+            return
+
+        image_data = base64.standard_b64encode(image_bytes).decode('utf-8')
+        content_items.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}
+        })
+
+    def _build_content(prefer_binary_images):
+        content_items = [{"type": "text", "text": prompt_text}]
+        used_binary = False
+
+        if images:
+            for image in images:
+                before_len = len(content_items)
+                _append_image_content(content_items, image, prefer_binary_images)
+                if prefer_binary_images and len(content_items) > before_len:
+                    last_item = content_items[-1]
+                    if isinstance(last_item, dict) and last_item.get("type") == "input_image":
+                        used_binary = True
+
+        return content_items, used_binary
+
     if isinstance(prompt_text, dict):
         prompt_text = select_text(prompt_text, config.get_prompt_language())
 
@@ -250,54 +353,33 @@ def prompt(prompt_text, images = None, stream = False):
     openai_client = config.get_openai_client()
     now = time.time()
     
-    # Build message content
-    content = [{"type": "text", "text": prompt_text}]
-    
-    if images:
-        for image in images:
-            # If image is a file path, read and encode as base64
-            if isinstance(image, str) and not image.startswith('data:'):
-                try:
-                    with open(image, 'rb') as f:
-                        image_data = base64.standard_b64encode(f.read()).decode('utf-8')
-                    # Determine mime type
-                    mime_type, _ = mimetypes.guess_type(image)
-                    if mime_type is None:
-                        mime_type = 'image/jpeg'
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {"url": f"data:{mime_type};base64,{image_data}"}
-                    })
-                except (FileNotFoundError, IOError) as e:
-                    print(f"Warning: Could not load image {image}: {e}")
-            else:
-                # Assume it's already base64 encoded data URL
-                content.append({
-                    "type": "image_url",
-                    "image_url": {"url": image}
-                })
+    content, used_binary_images = _build_content(prefer_binary_images=True)
+
+    extra_body = config.get_openai_general_extra_body(
+        num_predict=config.get_openai_max_output_tokens()
+    )
+    thinking_enabled_sent = bool(extra_body.get("enable_thinking"))
+
+    messages = [
+        {"role": "system", "content": soul_prompt},
+        {"role": "user", "content": content},
+    ]
+    if not thinking_enabled_sent:
+        messages.append({"role": "assistant", "content": "<think></think>"})
 
     request_kwargs = {
         "model": model,
-        "messages": [
-            {"role": "system", "content": soul_prompt},
-            {"role": "user", "content": content},
-            {"role": "assistant", "content": "<think></think>"}
-        ],
+        "messages": messages,
         "temperature": config.get_openai_prompt_temperature(),
         "frequency_penalty": config.get_openai_prompt_frequency_penalty(),
         "max_tokens": config.get_openai_max_output_tokens(),
+        "extra_body": extra_body,
     }
 
     if stream:
         request_kwargs["stream"] = True
 
-    request_kwargs["extra_body"] = config.get_openai_general_extra_body(
-        num_predict=config.get_openai_max_output_tokens()
-    )
-
     thinking_enabled_config = config.get_openai_enable_thinking()
-    thinking_enabled_sent = bool(request_kwargs.get("extra_body", {}).get("enable_thinking"))
     if thinking_enabled_config and thinking_enabled_sent:
         print("enable_thinking is active for this prompt request")
     elif thinking_enabled_config and not thinking_enabled_sent:
@@ -308,7 +390,23 @@ def prompt(prompt_text, images = None, stream = False):
     debug_openai_request("prompt", request_kwargs)
 
     if stream:
-        stream_response = openai_client.chat.completions.create(**request_kwargs)
+        try:
+            stream_response = openai_client.chat.completions.create(**request_kwargs)
+        except Exception as e:
+            if used_binary_images:
+                print(f"Binary image input not supported by model/provider, retrying with base64 image_url payloads: {e}")
+                content, _ = _build_content(prefer_binary_images=False)
+                fallback_messages = [
+                    {"role": "system", "content": soul_prompt},
+                    {"role": "user", "content": content},
+                ]
+                if not thinking_enabled_sent:
+                    fallback_messages.append({"role": "assistant", "content": "<think></think>"})
+                request_kwargs["messages"] = fallback_messages
+                debug_openai_request("prompt_fallback_base64", request_kwargs)
+                stream_response = openai_client.chat.completions.create(**request_kwargs)
+            else:
+                raise
         full_response_parts = []
         full_reasoning_parts = []
         finish_reason = None
@@ -359,8 +457,23 @@ def prompt(prompt_text, images = None, stream = False):
         filtered_response = response_filter(''.join(full_response_parts))
 
     else:
-
-        response = openai_client.chat.completions.create(**request_kwargs)
+        try:
+            response = openai_client.chat.completions.create(**request_kwargs)
+        except Exception as e:
+            if used_binary_images:
+                print(f"Binary image input not supported by model/provider, retrying with base64 image_url payloads: {e}")
+                content, _ = _build_content(prefer_binary_images=False)
+                fallback_messages = [
+                    {"role": "system", "content": soul_prompt},
+                    {"role": "user", "content": content},
+                ]
+                if not thinking_enabled_sent:
+                    fallback_messages.append({"role": "assistant", "content": "<think></think>"})
+                request_kwargs["messages"] = fallback_messages
+                debug_openai_request("prompt_fallback_base64", request_kwargs)
+                response = openai_client.chat.completions.create(**request_kwargs)
+            else:
+                raise
         print(f"Finish Reason: {response.choices[0].finish_reason}")
         print(f"Usage: {response.usage}")
         debug_openai_response("prompt", response)
@@ -389,7 +502,74 @@ def response_filter(response):
 
 
 def get_voice_file_path(filename):
-    return os.path.join(config.get_voice_cache_dir(), filename)
+    return os.path.join(config.get_cache_dir(), 'voice', filename)
+
+def tts_openai_wav(text, params = None, voice = None):
+    if not params or len(params) < 3:
+        print("TTS OpenAI parameters are missing")
+        return None
+
+    tts_api_base = str(params[0] or "").strip()
+    tts_voice = voice or params[1]
+    tts_model = params[2]
+
+    if not tts_api_base:
+        print("TTS OpenAI api_base is not set")
+        return None
+
+    payload = {
+        "model": tts_model,
+        "voice": tts_voice,
+        "input": text,
+        "response_format": "wav",
+    }
+
+    response = requests.post(tts_api_base + "/audio/speech", json=payload)
+    if response.status_code != 200:
+        print(f"TTS OpenAI request failed with status code {response.status_code}")
+        print(response.text)
+        return None
+
+    return response.content    
+
+def tts_opentts_wav(text, params = None):
+    if not params or len(params) < 2:
+        print("TTS OpenTTS parameters are missing")
+        return None
+
+    tts_api_base = str(params[0] or "").strip()
+    tts_voice = params[1]
+
+    if not tts_api_base:
+        print("TTS OpenTTS api_base is not set")
+        return None
+
+    query = {
+        "voice": tts_voice,
+        "text": text,
+    }
+
+    response = requests.get(tts_api_base, params=query)
+    if response.status_code != 200:
+        print(f"TTS request failed with status code {response.status_code}")
+        return None
+    return response.content
+
+def tts_mms_wav(text, params = None):
+    model_name = params[2] if params and len(params) > 2 and params[2] else "facebook/mms-tts-hun"
+    model = VitsModel.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    inputs = tokenizer(text, return_tensors="pt")
+
+    with torch.no_grad():
+        output = model(**inputs).waveform.squeeze().numpy()
+        # Convert float waveform to PCM int16 so downstream readers expecting PCM can open it.
+        output = output.clip(-1.0, 1.0)
+        output = (output * 32767.0).astype('int16')
+        wav_buffer = io.BytesIO()
+        scipy.io.wavfile.write(wav_buffer, rate=model.config.sampling_rate, data=output)
+        wav_buffer.seek(0)
+        return wav_buffer.read()
 
 def tts_wav(text, filename = None):
     filename_ok = False
@@ -398,18 +578,22 @@ def tts_wav(text, filename = None):
         filename_ok = True
 
     if not filename_ok:
-        tts_engine, tts_voice = config.get_tts_engine_and_voice()
-        params = {
-            "voice": tts_voice,
-            "text": text
-        }
-        print(f"Requesting TTS with voice: {tts_voice} text: {text}")
+        params = config.get_tts_parameters()
+        tts_voice = params[1]
+        tts_model = params[2]
+        tts_protocol = params[3]
+        print(f"Requesting TTS (protocol={tts_protocol}) with voice: {tts_voice} model: {tts_model} text: {text}")
+
+        wav = None
         now = time.time()
-        response = requests.get(tts_engine, params=params)
+        if tts_protocol == 'openai':
+            wav = tts_openai_wav(text, params)
+        elif tts_protocol == 'mms':
+            wav = tts_mms_wav(text, params)
+        elif tts_protocol == 'opentts':
+            wav = tts_opentts_wav(text, params)
+
         print("TTS request time:", time.time() - now)
-        if response.status_code != 200:
-            print(f"TTS request failed with status code {response.status_code}")
-            return None, 0
 
         # Save the audio file
         if filename is None:
@@ -417,12 +601,18 @@ def tts_wav(text, filename = None):
         if not filename.lower().endswith('.wav'):
             filename += '.wav'
         with open(get_voice_file_path(filename), 'wb') as file:
-            file.write(response.content)
+            file.write(wav)
+        print(f"Saved to {filename}")
 
-    # Get duration of the the WAV file
-    with wave.open(get_voice_file_path(filename), 'rb') as wav_file:
-        num_frames = wav_file.getnframes()
-        frame_rate = wav_file.getframerate()
+    # Get duration of the WAV file. Python's wave module cannot read IEEE-float WAV (format=3).
+    wav_path = get_voice_file_path(filename)
+    try:
+        with wave.open(wav_path, 'rb') as wav_file:
+            num_frames = wav_file.getnframes()
+            frame_rate = wav_file.getframerate()
+    except wave.Error:
+        frame_rate, samples = scipy.io.wavfile.read(wav_path)
+        num_frames = samples.shape[0]
 
     return filename, num_frames / frame_rate
 
