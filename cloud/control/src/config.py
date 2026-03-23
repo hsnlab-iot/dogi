@@ -34,8 +34,10 @@ SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 CONTROL_DIR = os.path.dirname(SRC_DIR)
 CONFIG_DIR = os.path.join(CONTROL_DIR, 'config')
 CONFIG_PATH = os.path.join(CONFIG_DIR, 'config.toml')
+PROMPTS_PATH = os.path.join(CONFIG_DIR, 'prompts.toml')
 
 _config_data = None
+_prompts_data = None
 _openai_client = None
 _voice_socket = None
 _control_socket = None
@@ -124,6 +126,21 @@ def _load_config_file():
     return _merge_dict(defaults, loaded)
 
 
+def _load_prompts_file():
+    if not os.path.exists(PROMPTS_PATH):
+        print(f'Warning: prompts file does not exist: {PROMPTS_PATH}')
+        return {}
+
+    with open(PROMPTS_PATH, 'rb') as f:
+        loaded = tomllib.load(f)
+
+    if not isinstance(loaded, dict):
+        print(f'Warning: prompts file has invalid structure: {PROMPTS_PATH}')
+        return {}
+
+    return loaded
+
+
 def get_config_data():
     global _config_data
 
@@ -131,6 +148,52 @@ def get_config_data():
         _config_data = _load_config_file()
 
     return _config_data
+
+
+def get_prompts_data():
+    global _prompts_data
+
+    if _prompts_data is None:
+        _prompts_data = _load_prompts_file()
+
+    return _prompts_data
+
+
+def _format_prompt_entry(prompt_entry, format_kwargs):
+    if not format_kwargs:
+        return prompt_entry
+
+    if isinstance(prompt_entry, str):
+        return prompt_entry.format(**format_kwargs)
+
+    if isinstance(prompt_entry, dict):
+        formatted = {}
+        for key, value in prompt_entry.items():
+            if isinstance(value, str):
+                formatted[key] = value.format(**format_kwargs)
+            else:
+                formatted[key] = value
+        return formatted
+
+    return prompt_entry
+
+
+def get_prompt(section, key, **format_kwargs):
+    section_data = get_prompts_data().get(section)
+    if not isinstance(section_data, dict):
+        raise KeyError(f'Prompt section not found: {section}')
+
+    if key not in section_data:
+        raise KeyError(f'Prompt key not found: {section}.{key}')
+
+    prompt_entry = section_data[key]
+    if not isinstance(prompt_entry, (str, dict)):
+        raise TypeError(
+            f'Prompt entry must be string or language map for {section}.{key}, '
+            f'got {type(prompt_entry).__name__}'
+        )
+
+    return _format_prompt_entry(prompt_entry, format_kwargs)
 
 
 def _get_config_value(section, key, default=None):
@@ -164,6 +227,7 @@ def init():
 def reinit():
     """Reload configuration from disk and rebuild cached clients and sockets."""
     global _config_data
+    global _prompts_data
     global _openai_client
     global _voice_socket
     global _control_socket
@@ -191,6 +255,7 @@ def reinit():
     _close_socket(_control_socket)
 
     _config_data = None
+    _prompts_data = None
     _openai_client = None
     _voice_socket = None
     _control_socket = None

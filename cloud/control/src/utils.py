@@ -504,6 +504,31 @@ def response_filter(response):
 def get_voice_file_path(filename):
     return os.path.join(config.get_cache_dir(), 'voice', filename)
 
+def remove_emojis(text):
+    """Remove emoji and other problematic Unicode characters that TTS engines don't handle well."""
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticons
+        "\U0001F300-\U0001F5FF"  # symbols & pictographs
+        "\U0001F680-\U0001F6FF"  # transport & map symbols
+        "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        "\U00002702-\U000027B0"  # dingbats
+        "\U000024C2-\U0001F251"
+        "\U0001f926-\U0001f937"  # hand gestures
+        "\U00010000-\U0010ffff"  # supplementary multilingual plane
+        "\u2640-\u2642"          # gender symbols
+        "\u2600-\u2B55"          # miscellaneous symbols and pictographs
+        "\u200d"                 # zero-width joiner
+        "\u23cf"
+        "\u23e9"
+        "\u231a"
+        "\ufe0f"                 # variation selector
+        "\u3030"                 # wavy dash
+        "]+"
+        , flags=re.UNICODE
+    )
+    return emoji_pattern.sub(r'', text).strip()
+
 def tts_openai_wav(text, params = None, voice = None):
     if not params or len(params) < 3:
         print("TTS OpenAI parameters are missing")
@@ -572,6 +597,9 @@ def tts_mms_wav(text, params = None):
         return wav_buffer.read()
 
 def tts_wav(text, filename = None):
+    # Clean emojis and problematic characters from text before TTS processing
+    text = remove_emojis(text)
+    
     filename_ok = False
      # Check if the file already exists
     if filename and os.path.exists(get_voice_file_path(filename)):

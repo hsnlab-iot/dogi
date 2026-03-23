@@ -157,10 +157,7 @@ def handle_event(data):
         sock.send(pickle.dumps({'name': 'motor', 'args': ([21, 30])}))
     if data == "joke":
         utils.play_wav(config.get_ui_language() + "_joke_joy")
-        prompt_text = {
-            "en": "Tell me a joke about robot dogs or real dogs.",
-            "hu": "Mondj egy kutyás vagy robotkutyás viccet.",
-        }
+        prompt_text = config.get_prompt('web_joy', 'handle_event_action_1')
         joke = utils.prompt(prompt_text)
         if config.needs_translation():
             joke = utils.translate(joke, config.get_prompt_language())
@@ -173,12 +170,7 @@ def handle_event(data):
     if data == "what":
         if lastimg is not None:
             utils.play_wav(config.get_ui_language() + "_what_joy")
-            prompt_text = {
-            'hu': 'Írd le, mit látsz ezen a képen, '\
-                'ami egy robotkutyára szerelt első kamera élőképe.',
-            'en': 'Describe what can you see in this image, '\
-                'which is a live view from a front camera mounted on a robot dog. '\
-            }
+            prompt_text = config.get_prompt('web_joy', 'handle_event_action_2')
             text = utils.prompt(prompt_text, images=[lastimg])
             print(f"What: {text}")
             if config.needs_translation():
@@ -192,6 +184,8 @@ def handle_event(data):
             utils.play_wav(wav)
         else:
             print("No image available for 'what' action.")
+    if data == "reload":
+        config.reinit()
     with lock:
         inMotion = False
 

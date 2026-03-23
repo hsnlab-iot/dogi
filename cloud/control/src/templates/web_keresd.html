@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Web Keresd</title>
     <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/keresd.css') }}">
@@ -35,12 +36,12 @@
     
     socket.on('xtext', function(data) {
         console.log(data);
-        document.getElementById('x').innerHTML = data;
+        document.getElementById('x').textContent = data;
     });
 
     socket.on('entext', function(data) {
         console.log(data);
-        document.getElementById('en').innerHTML = data;
+        document.getElementById('en').textContent = data;
     });
 
     socket.on('ball', function() {

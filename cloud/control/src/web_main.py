@@ -14,9 +14,9 @@ socketio.init_app(app, cors_allowed_origins="*")
 session = None
 
 pageconfig = [ \
-    { 'name': 'Keresd!', 'port': 5053, 'page': '/', 'app': 'keresd.py' }, \
-    { 'name': 'Kovesd!', 'port': 5055, 'page': '/', 'app': 'kovesd.py' }, \
-    { 'name': 'Mutasd!', 'port': 5054, 'page': '/', 'app': 'mutasd.py' }, \
+    { 'name': 'Keresd!', 'port': 5053, 'page': '/', 'app': '/app/keresd.py' }, \
+    { 'name': 'Kovesd!', 'port': 5055, 'page': '/', 'app': '/app/kovesd.py' }, \
+    { 'name': 'Mutasd!', 'port': 5054, 'page': '/', 'app': '/app/mutasd.py' }, \
     { 'name': 'system', 'port': 5050, 'page': '/', 'app': '' } \
 ]
 
@@ -50,15 +50,15 @@ def handle_event(data):
     socketio.emit('page_load', page)
 
     if session is not None:
-        session.kill_session()
+        session.kill()
         session = None
 
     if pageconfig[data]['app'] != '':
         server = libtmux.Server()
-        session = server.new_session(session_name='dogi_session', kill_session=True)
+        session = server.new_session(session_name='dogi_session', kill=True)
         window = session.new_window(attach=True)
         pane = window.active_pane
-        pane.send_keys(f'cd; source .yolo/bin/activate && python {pageconfig[data]["app"]}; sleep inf')
+        pane.send_keys(f'cd; source /opt/venv/bin/activate && python {pageconfig[data]["app"]}; sleep inf')
         
     
 @socketio.on_error()  # Handle socketio errors

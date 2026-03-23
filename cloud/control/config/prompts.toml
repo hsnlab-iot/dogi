@@ -1,0 +1,86 @@
+[web_joy.handle_event_action_1]
+en = "Tell me a joke about dogs or robot dogs."
+hu = "Mondj egy kutyás vagy robotkutyás viccet."
+
+[web_joy.handle_event_action_2]
+en = '''
+Describe what you see in the image.
+If there is a person in the image, write about them in more detail.
+Try to figure out which actor or actress they resemble most.
+'''
+hu = '''
+Írd le, mit látsz a képen. Ha van a képen ember,
+akkor róla részletesebben írj. Próbld kitalálni,
+melyik színészre vagy színésznőre hasonlít leginkább.
+'''
+
+[web_voice.test_init_1]
+en = '''
+Say a short wise message.
+Be funny and cute.
+'''
+hu = '''
+Mondj egy rövid, bölcs üzenetet.
+Legyen vicces és aranyos
+'''
+
+[keresd.main_loop_1]
+en = '''
+This is a ball-finding game.
+You are viewing this image through your own camera,
+which is looking straight ahead.
+Make a short description of what you can see in the image!
+Focus on nearby objects, ignore those in the distance!
+If there is a ball in the image, be sure to mention it,
+but only use the word ball if there actually is one in the image.
+'''
+hu = '''
+Ez most egy labdakereső játék.
+Ezt a képet most te magad látod a kameráddal,
+amely egyenesen előre néz.
+Készíts egy rövid leírást, mi látható a képen!
+Koncentrálj a közeli tárgyakra,
+hagyd figyelmen kívül a távoliakat!
+Ha labda lenne a képen, feltétlenül említsd meg,
+de csak akkor használd a labda szót, ha van is a képen.
+'''
+
+[keresd.main_loop_2]
+en = '''
+Answer with a single word, YES or NO !
+Is there any mention of a ball in this description: {description}
+'''
+hu = '''
+Válaszolj egyetlen szóval, IGEN vagy NEM !
+Van-e bármilyen labdáról szó ebben a leírásban: {description}
+'''
+
+[keresd.main_loop_3]
+en = '''
+You are viewing this image through your own camera,
+which is looking straight ahead.
+Describe where you see the ball in the image,
+and what the ball looks like!
+'''
+hu = '''
+Ezt a képet most te magad látod a kameráddal,
+amely egyenesen előre néz.
+Írd le, hogy hol látod a képen a labdát,
+és hogy néz ki a labda!
+'''
+
+[keresd.main_loop_4]
+en = '''
+You are viewing this image through your own camera,
+which is looking straight ahead.
+Answer with a single word, YES or NO !
+Based on the image, is there an obstacle directly in front of you?
+Could this be the edge of a table?
+'''
+hu = '''
+Ezt a képet most te magad látod a kameráddal,
+amely egyenesen előre néz.
+Válaszolj egyetlen szóval, IGEN vagy NEM !
+A kép alapjan van akadály közvetlenül elötted?
+Esetleg ez egy asztal széle?
+'''

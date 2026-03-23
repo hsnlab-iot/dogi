@@ -4,7 +4,11 @@ FROM ubuntu:24.04
 # Set non-interactive mode for APT
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    PYTHONUTF8=1 \
+    PYTHONIOENCODING=UTF-8
 
 # Update and install necessary packages
 RUN apt update && \

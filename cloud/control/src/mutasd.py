@@ -27,7 +27,7 @@ import mediapipe as mp
 
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from mediapipe.framework.formats import landmark_pb2
+from mediapipe.tasks.python.components.containers import landmark as landmark_pb2
 import threading
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils

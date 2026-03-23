@@ -146,20 +146,7 @@ while True:
     ball_found = False
 
     try:
-        prompt_text = {
-            'hu': 'Ez egy robotkutyára szerelt első kamera által készített élő nézet. '\
-                'A robotkutya egyenesen előre és kissé lefelé néz. '\
-                'Készíts egy rövid leírást, mi látható a képen! '\
-                'Koncentrálj a közeli tárgyakra, hagyd figyelmen kívül a távoli tárgyakat! '\
-                'Próbáld meg ezeket a tárgyakat a kép közepéhez viszonyítva leírni! ' \
-                'Ha labda lenne a képen, feltétlenül említsd meg!',
-            'en': 'This is a liveview capture taken by a front camera of a robot dog.' \
-                'The robot dog is looking straight ahead and a bit down.' \
-                'Make a short description, what is on the picture!' \
-                'Focus on the near objects, ignore far away objects!' \
-                'Try to describe these objects relative to the center of the picture!' \
-                'If there is a ball on the picture, be sure to mention it!'
-        }
+        prompt_text = config.get_prompt('keresd', 'main_loop_1')
         text = utils.prompt(prompt_text, images=[img_buffer.tobytes()])
         print(f"Description: {text}")
         sock_web.send(pickle.dumps({'action': 'entext', 'text': text}))
@@ -177,14 +164,7 @@ while True:
         utils.play_wav(wav)
         time.sleep(d)
 
-        prompt_text = {
-            'hu': 'Válaszolj egyetlen szóval, IGEN vagy NEM ! '\
-                'Van-e bármilyen labda ebben a leírásban: ' + \
-                text,
-            'en': 'Answer with a single word, YES or NO ! '\
-                'Are there any balls in this description: ' + \
-                text
-        }
+        prompt_text = config.get_prompt('keresd', 'main_loop_2', description=text)
         ball = utils.prompt(prompt_text)
         print("Ball: ", ball)
 
@@ -200,14 +180,7 @@ while True:
 
             ball_found = True
 
-            prompt_text = {
-                'hu': 'Ez egy robotkutyára szerelt első kamera által készített élő nézet. '\
-                    'Írd le, hogy hol látod a képen a labdát, és hogy néz ki a labda!' \
-                    ,
-                'en': 'This is a liveview capture taken by a front camera of a robot dog.' \
-                    'Describe where you see the ball on the picture, and how does the ball look like' \
-                    ,
-            }
+            prompt_text = config.get_prompt('keresd', 'main_loop_3')
             text = utils.prompt(prompt_text, images=[img_buffer.tobytes()])
             print(f"Ball place: {text}")
             sock_web.send(pickle.dumps({'action': 'entext', 'text': text}))
@@ -232,12 +205,7 @@ while True:
             thread.join()
             break
 
-        prompt_text = {
-            'en': 'Answer with a single word, YES or NO ! ' \
-                'Based on the following image, are there any near obstacles in front of the viewer? ',
-            'hu': 'Válaszolj egyetlen szóval, IGEN vagy NEM ! ' \
-                'A következő kép alapján van akadály köyvetlenül a néző előtt? '
-        }
+        prompt_text = config.get_prompt('keresd', 'main_loop_4')
         obstacles = utils.prompt(prompt_text, images=[img_buffer.tobytes()])
         print("Obstacles: ", obstacles)
         

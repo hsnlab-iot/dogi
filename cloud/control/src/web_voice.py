@@ -54,10 +54,7 @@ def voice_file(filename):
 
 @app.route('/init')
 def test():
-    prompt_text = {
-        "en": "Say a short wise message as a robot dog. It should be funny and cute.",
-        "hu": "Mondj egy rövid, bölcs üzenetet robotkutyaként. Legyen vicces és aranyos."
-    }
+    prompt_text = config.get_prompt('web_voice', 'test_init_1')
     prompt_text = utils.select_text(prompt_text,  config.get_ui_language(), True)
     funny = utils.prompt(prompt_text)
     if config.needs_translation():
@@ -74,21 +71,6 @@ def test():
 
     ft, d = utils.tts_wav(funny)
     socketio.emit('audio_play', ft)
-
-    extra = random.choice([
-            "Mit mondhatnék, kutya bajom.",
-            "Vau. Mindenbe beleugatok.",
-            "Kutyavilág ez ám én mondom.",
-            "Vauvau sőt vau."
-        ])
-        
-    xextra = random.choice([
-            "What can I say, I am a dog.",
-            "I am a dog, I bark. Woof, woof.",
-            "Happiness is a warm puppy.",
-            "It's a dog-eat-dog world.",
-            "Live like someone left the gate open."
-        ])
 
     return "", 200
 
