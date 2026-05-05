@@ -35,25 +35,54 @@ robot_ip = os.getenv('ROBOT_IP', '127.0.0.1')
 
 for mcp_server in toolscfg:
     try:
-        if not isinstance(mcp_server, str) or '@' not in mcp_server:
+        if not isinstance(mcp_server, str) or '!' not in mcp_server:
             print('invalid mcp_server entry:', mcp_server)
             continue
 
-        kind, rest = mcp_server.split('@', 1)
+        kind, rest = mcp_server.split('!', 1)
 
         if kind == 'ssh':
-            # rest is like "user:~/venv/bin/python3:~/test.py"
-            if ':' not in rest:
-                print('ssh entry missing path:', mcp_server)
-                continue
+            # rest is like "user@ip:~/venv/bin/python3:~/test.py"
             user, python_path, script_path = rest.split(':', 2)
+            ip = robot_ip
+            if '@' in user:
+                user, ip = user.split('@', 1)
 
             # RemoteMCPManager is a module; instantiate the class inside it
             rmcp = RemoteMCPManager.RemoteMCPManager()
-            rmcp.connect(robot_ip, user, python_path, script_path)
+            rmcp.connect(user, ip, python_path, script_path)
             mcp_tools = rmcp.get_tools_blocking()
-            print(f"Found tools: {mcp_tools}")
-            tools.append((rmcp, mcp_tools))
+            # Normalize tools: extract `name` and `description` when available
+            parsed_tools = []
+            try:
+                for t in mcp_tools:
+                    name = None
+                    desc = ''
+                    if isinstance(t, dict):
+                        # common keys that may contain the name
+                        for k in ('name', 'tool', 'id', 'title'):
+                            if k in t and t[k]:
+                                name = str(t[k])
+                                break
+                        # common keys for description/help
+                        for k in ('description', 'desc', 'help', 'details', 'long_description'):
+                            if k in t and t[k]:
+                                desc = str(t[k])
+                                break
+                    else:
+                        # if tool is a simple string or object with attributes
+                        try:
+                            name = str(t)
+                        except Exception:
+                            name = None
+
+                    if not name:
+                        name = '<unknown>'
+
+                    parsed_tools.append({'name': name, 'description': desc, 'raw': t})
+            except Exception as e:
+                print('failed to parse mcp_tools list:', e)
+                parsed_tools = [{'name': str(mcp_tools), 'description': ''}]
             
         elif kind == 'sse':
             # rest is like "5000/test" -> port and path
@@ -82,6 +111,12 @@ for mcp_server in toolscfg:
                 print('failed to contact sse tool', mcp_server, e)
         else:
             print('unknown tool kind:', kind)
+            continue
+
+        print(f"Found tools: {mcp_tools}")
+        
+        tools.append((rmcp, mcp_tools))
+
     except Exception as e:
         print('error processing mcp_server', mcp_server, e)
 
