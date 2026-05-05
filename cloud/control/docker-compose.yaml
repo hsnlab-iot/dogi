@@ -2,7 +2,7 @@ services:
 
   dogi-base:
     profiles:
-      - build
+      - base
     build:
       context: .
       dockerfile: Dockerfile.base

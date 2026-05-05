@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Web Prompt</title>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/prompt.css') }}">
+</head>
+<body>
+
+<div class="container">
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <!-- Prompt Input -->
+        <div class="input-section">
+            <label for="prompt-input">Prompt:</label>
+            <div class="prompt-row">
+                <textarea id="prompt-input" placeholder="Enter your prompt here..."></textarea>
+                <button id="prompt-send" class="prompt-button">Parancs</button>
+            </div>
+        </div>
+
+        <!-- Reasoning Response -->
+        <div class="reasoning-section">
+            <label>Reasoning:</label>
+            <textarea id="reasoning-output" readonly placeholder="Reasoning will appear here..."></textarea>
+        </div>
+
+        <!-- Final Response -->
+        <div class="response-section">
+            <label>Response:</label>
+            <div class="response-content">
+                <textarea id="response-textbox"></textarea>
+                <div class="image-container">
+                    <img id="response-image" src="" alt="Response Image">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tool List -->
+    <div class="tool-list-section">
+        <label>Tools:</label>
+        <ul id="tool-list">
+            <!-- Tool list items will appear here -->
+        </ul>
+    </div>
+</div>
+
+<script>
+    var socket = io();
+    
+    socket.on('reponse', function(data) {
+        console.log(data);
+    });
+
+    socket.on('tools', function(data) {
+        console.log(data);
+    });
+
+    // Send prompt text when the Parancs button is clicked
+    document.addEventListener('DOMContentLoaded', function () {
+        var sendBtn = document.getElementById('prompt-send');
+        var promptInput = document.getElementById('prompt-input');
+        sendBtn.addEventListener('click', function () {
+            var text = promptInput.value || '';
+            socket.emit('prompt', { prompt: text });
+        });
+    });
+
+</script>
+
+</body>
+</html>

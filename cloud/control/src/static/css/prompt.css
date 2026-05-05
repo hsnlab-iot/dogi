@@ -1,0 +1,203 @@
+/* Global styles */
+body {
+    font-size: 24px; /* Global font size */
+    background-color: #222; /* Assuming a dark background for contrast */
+    color: white;
+}
+
+/* General container styling: use grid to keep left column stacked vertically */
+.container {
+    display: grid;
+    grid-template-columns: 1fr 300px; /* main column and tools column */
+    gap: 24px; /* space between columns */
+    padding: 12px 8px; /* reduced page horizontal padding */
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Force main-content into the left grid column and tools into the right */
+.main-content {
+    grid-column: 1 / 2;
+}
+.tool-list-section {
+    grid-column: 2 / 3;
+}
+
+/* Main content area (left side) */
+.main-content {
+    display: block; /* stack child sections vertically */
+    padding: 0 12px; /* inner column padding */
+}
+
+/* Debug outlines to help diagnose layout issues (remove when resolved) */
+.main-content {
+    outline: 2px dashed rgba(255,0,0,0.15);
+}
+.main-content > .reasoning-section {
+    outline: 2px dashed rgba(0,255,0,0.12);
+}
+.tool-list-section {
+    outline: 2px dashed rgba(0,0,255,0.08);
+}
+
+/* Tool list area (right side) */
+.tool-list-section {
+    min-width: 220px; /* Ensure tools have enough space */
+}
+
+/* Styling for all labels */
+label {
+    display: block;
+    color: white;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+/* Styling for all input/output boxes */
+.input-section,
+.reasoning-section,
+.response-section,
+.tool-list-section {
+    width: 100%;
+}
+
+/* Ensure each section stacks vertically and fills column width */
+.main-content > .input-section,
+.main-content > .reasoning-section,
+.main-content > .response-section {
+    display: block;
+    width: 100%;
+    margin-bottom: 18px; /* space between stacked sections */
+}
+
+/* Defensive overrides to prevent other styles from floating or positioning sections */
+.main-content > .input-section,
+.main-content > .reasoning-section,
+.main-content > .response-section {
+    float: none !important;
+    clear: both !important;
+}
+
+/* Common styling for textareas and content divs */
+textarea,
+#reasoning-output,
+.response-content {
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    overflow-y: auto; /* All boxes should be scrollable */
+}
+
+/* Ensure textareas are block-level and occupy full width */
+textarea {
+    display: block;
+    width: 100% !important;
+}
+
+/* Ensure textareas and response content fill the left column with inner margin */
+.main-content textarea,
+.main-content .response-content {
+    box-sizing: border-box;
+    width: 100% !important;
+}
+
+/* Responsive: on narrow screens, make grid a single column */
+@media (max-width: 900px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+    .tool-list-section {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Prompt specific styling (2 lines, bigger font) */
+#prompt-input {
+    min-height: 80px; /* Approx 2 lines */
+    height: 80px; /* Locking the height */
+    font-size: 1.1em;
+    resize: none; /* Lock size */
+    overflow-y: auto; /* Scroll if content exceeds locked size */
+}
+
+/* Row containing prompt textarea and the square button */
+.prompt-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.prompt-row textarea#prompt-input {
+    flex: 1 1 auto; /* textarea fills remaining width */
+}
+
+.prompt-button {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 18px;
+    /* make square to match textarea height */
+    width: 80px;
+    height: 80px;
+    padding: 0;
+}
+
+.prompt-button:active { transform: translateY(1px); }
+
+/* Reasoning specific styling (4 lines) */
+/* reasoning is a readonly textarea now */
+#reasoning-output {
+    min-height: 160px; /* Approx 4 lines */
+    height: 160px;
+    resize: none;
+    overflow-y: auto;
+    font-size: 24px; /* match requested text size */
+}
+
+/* Response specific styling (1 line) */
+#response-textbox {
+    min-height: 40px; /* Single-line appearance */
+    height: 40px;
+    resize: none;
+    overflow-y: auto;
+    font-size: 24px; /* match requested text size */
+}
+
+/* Make response content stack vertically (textarea then image) */
+.response-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Image container styling */
+.image-container {
+    margin-top: 10px;
+    text-align: center;
+}
+
+#response-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 10px auto;
+}
+
+/* Tool List styling */
+/* Tools displayed as a simple list */
+#tool-list {
+    list-style-type: disc;
+    padding-left: 20px;
+    margin: 0;
+}
+
+#tool-list li {
+    background: transparent;
+    color: white;
+    padding: 6px 0;
+}

@@ -17,6 +17,7 @@ pageconfig = [ \
     { 'name': 'Keresd!', 'port': 5053, 'page': '/', 'app': '/app/keresd.py' }, \
     { 'name': 'Kovesd!', 'port': 5055, 'page': '/', 'app': '/app/kovesd.py' }, \
     { 'name': 'Mutasd!', 'port': 5054, 'page': '/', 'app': '/app/mutasd.py' }, \
+    { 'name': 'Parancs', 'port': 5056, 'page': '/', 'app': '/app/prompt.py' }, \
     { 'name': 'system', 'port': 5050, 'page': '/', 'app': '' } \
 ]
 
@@ -27,6 +28,7 @@ def index():
         'page1_name': pageconfig[1]['name'],
         'page2_name': pageconfig[2]['name'],
         'page3_name': pageconfig[3]['name'],
+        'page4_name': pageconfig[4]['name'],
     }
     return render_template('web_main.html', **context)
 
