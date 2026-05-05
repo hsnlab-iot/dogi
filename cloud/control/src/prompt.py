@@ -52,37 +52,6 @@ for mcp_server in toolscfg:
             rmcp = RemoteMCPManager.RemoteMCPManager()
             rmcp.connect(user, ip, python_path, script_path)
             mcp_tools = rmcp.get_tools_blocking()
-            # Normalize tools: extract `name` and `description` when available
-            parsed_tools = []
-            try:
-                for t in mcp_tools:
-                    name = None
-                    desc = ''
-                    if isinstance(t, dict):
-                        # common keys that may contain the name
-                        for k in ('name', 'tool', 'id', 'title'):
-                            if k in t and t[k]:
-                                name = str(t[k])
-                                break
-                        # common keys for description/help
-                        for k in ('description', 'desc', 'help', 'details', 'long_description'):
-                            if k in t and t[k]:
-                                desc = str(t[k])
-                                break
-                    else:
-                        # if tool is a simple string or object with attributes
-                        try:
-                            name = str(t)
-                        except Exception:
-                            name = None
-
-                    if not name:
-                        name = '<unknown>'
-
-                    parsed_tools.append({'name': name, 'description': desc, 'raw': t})
-            except Exception as e:
-                print('failed to parse mcp_tools list:', e)
-                parsed_tools = [{'name': str(mcp_tools), 'description': ''}]
             
         elif kind == 'sse':
             # rest is like "5000/test" -> port and path
@@ -113,9 +82,64 @@ for mcp_server in toolscfg:
             print('unknown tool kind:', kind)
             continue
 
+        # Normalize tools: extract `name` and `description` when available
+        parsed_tools = []
+        try:
+            for t in mcp_tools:
+                name = None
+                desc = ''
+                # dict-like
+                if isinstance(t, dict):
+                    for k in ('name', 'tool', 'id', 'title'):
+                        if k in t and t[k]:
+                            name = str(t[k])
+                            break
+                    for k in ('description', 'desc', 'help', 'details', 'long_description'):
+                        if k in t and t[k]:
+                            desc = str(t[k])
+                            break
+                else:
+                    # object with attributes (e.g., Tool instances)
+                    try:
+                        if hasattr(t, 'name') and getattr(t, 'name'):
+                            name = str(getattr(t, 'name'))
+                        elif hasattr(t, 'title') and getattr(t, 'title'):
+                            name = str(getattr(t, 'title'))
+                        elif hasattr(t, 'tool') and getattr(t, 'tool'):
+                            name = str(getattr(t, 'tool'))
+
+                        if hasattr(t, 'description') and getattr(t, 'description'):
+                            desc = str(getattr(t, 'description'))
+                        elif hasattr(t, 'desc') and getattr(t, 'desc'):
+                            desc = str(getattr(t, 'desc'))
+                    except Exception:
+                        pass
+
+                    if not name:
+                        try:
+                            s = str(t)
+                            import re
+                            m = re.search(r"name=['\"]([^'\"]+)['\"]", s)
+                            if m:
+                                name = m.group(1)
+                            else:
+                                name = s.split('(')[0] if '(' in s else s
+                        except Exception:
+                            name = None
+
+                if not name:
+                    name = '<unknown>'
+
+                parsed_tools.append({'name': name, 'description': desc, 'raw': t})
+        except Exception as e:
+            print('failed to parse mcp_tools list:', e)
+            parsed_tools = [{'name': str(mcp_tools), 'description': ''}]
+
+
         print(f"Found tools: {mcp_tools}")
         
-        tools.append((rmcp, mcp_tools))
+        # store parsed tools (name/description) for later use
+        tools.append((rmcp, parsed_tools))
 
     except Exception as e:
         print('error processing mcp_server', mcp_server, e)
