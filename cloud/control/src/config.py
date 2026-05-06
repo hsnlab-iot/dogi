@@ -60,6 +60,7 @@ _tts_protocol = None
 _cache_dir = None
 _soul_language = None
 _soul_content = None
+_tools_list = None
 
 
 def _build_default_config():
@@ -649,3 +650,24 @@ def get_control_socket():
         _control_socket = sock
 
     return _control_socket
+
+def get_tools():
+    """Singleton to read and cache tools config once."""
+    global _tools_list
+
+    if _tools_list is None:
+        tools_section = get_config_data().get('tools', {})
+
+        values = []
+        # If tools section is a mapping, extract its values;
+        if isinstance(tools_section, dict):
+            iterable = tools_section.values()
+        else:
+            iterable = []
+
+        for v in iterable:
+            values.append(str(v))
+
+        _tools_list = values
+
+    return _tools_list

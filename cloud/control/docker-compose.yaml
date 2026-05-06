@@ -16,9 +16,9 @@ services:
     environment:
       #- DEBUG=1  # Fake images in "keresd"
       - DISPLAY=:0
-      #- ROBOT_IP=192.168.1.248
-      - ROBOT_IP=10.100.0.38
-      #- ROBOT_IP=10.20.5.38
+      #- ROBOT_IP=192.168.1.248 # WiFi address
+      #- ROBOT_IP=10.20.5.38  # 5G address
+      - ROBOT_IP=10.100.0.38  # Wireguard address
     ports:
       - "6080:6080"
       - "5050-5059:5050-5059"
@@ -31,6 +31,8 @@ services:
       - ./yolov8m-seg.pt:/root/yolov8m-seg.pt
       - ./config:/config
       - ./src:/app:ro
+      - ./id_ed25519:/root/.ssh/id_ed25519:ro
+      - ./id_ed25519.pub:/root/.ssh/id_ed25519.pub:ro
     deploy:
       resources:
         reservations:

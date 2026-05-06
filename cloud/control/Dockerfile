@@ -11,12 +11,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUTF8=1 \
     PYTHONIOENCODING=UTF-8
 
+RUN \
+  /opt/venv/bin/pip install mcp python-socketio[client]
+
 # Copy the supervisor configuration file
 COPY src/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 COPY src/ /app
-
 # Expose the noVNC port
 EXPOSE 6080
 EXPOSE 5050

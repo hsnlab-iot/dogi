@@ -10,6 +10,10 @@ general = "qwen3.5:9B"
 translation = ""
 vision = ""
 
+[tools]
+1 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
+2 = "sse!http://10.6.6.20:8080/test"
+
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
 api_key = "not-needed"
