@@ -50,12 +50,26 @@
 <script>
     var socket = io();
     
-    socket.on('reponse', function(data) {
+    socket.on('ui_update_reponse', function(data) {
         console.log(data);
     });
 
-    socket.on('tools', function(data) {
-        console.log(data);
+    socket.on('ui_update_tools', function(data) {
+        console.log('tools event', data.data);
+        var list = document.getElementById('tool-list');
+        // clear existing items
+        while (list.firstChild) list.removeChild(list.firstChild);
+        if (!data.data) return;
+        // data is expected to be a list/array of strings (tool names)
+        try {
+            data.data.forEach(function(name) {
+                var li = document.createElement('li');
+                li.textContent = String(name);
+                list.appendChild(li);
+            });
+        } catch (e) {
+            console.error('failed to render tools list', e);
+        }
     });
 
     // Send prompt text when the Parancs button is clicked
