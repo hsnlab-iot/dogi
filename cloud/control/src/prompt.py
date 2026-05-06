@@ -44,13 +44,11 @@ def handle_prompt(data):
     data can be a dict with keys: { prompt: str, tools: [toolName,...] }
     The worker emits status updates via sio.emit('ui_update_reponse', {...}).
     """
-    global worker_thread, worker_stop_event
+    global worker_thread, worker_stop_event, openai_tools
     try:
         prompt_text = data.get('prompt', '') if isinstance(data, dict) else str(data)
-        tools_list = data.get('tools', []) if isinstance(data, dict) else []
     except Exception:
         prompt_text = str(data)
-        tools_list = []
 
     with worker_lock:
         if worker_thread and worker_thread.is_alive():
@@ -60,24 +58,12 @@ def handle_prompt(data):
         # set up stop event for this worker
         worker_stop_event = threading.Event()
 
-        def worker(prompt_text, tools_list, stop_event):
+        def worker(prompt_text, tools, stop_event):
             try:
                 sio.emit('ui_update_reponse', {'status': 'started'})
 
-                # Prepare the prompt to include available tools (for now as text)
-                tools_text = ''
-                if tools_list:
-                    if isinstance(tools_list, dict) and 'data' in tools_list:
-                        # some callers send {data: [...]}
-                        tnames = tools_list.get('data') or []
-                    else:
-                        tnames = tools_list
-                    tools_text = 'Available tools: ' + ', '.join(tnames) + '\n\n'
-
-                prompt_with_tools = tools_text + prompt_text
-
                 # Call the prompt (blocking). In future we can use stream=True to send partial updates.
-                response_text = utils.prompt(prompt_with_tools)
+                response_text = utils.prompt(prompt_text, tools = tools)
 
                 # If stop requested, don't emit final result
                 if stop_event.is_set():
@@ -99,7 +85,7 @@ def handle_prompt(data):
                     except Exception:
                         pass
 
-        worker_thread = threading.Thread(target=worker, args=(prompt_text, tools_list, worker_stop_event), daemon=True)
+        worker_thread = threading.Thread(target=worker, args=(prompt_text, openai_tools, worker_stop_event), daemon=True)
         worker_thread.start()
         sio.emit('ui_update_reponse', {'status': 'spawned'})
 
