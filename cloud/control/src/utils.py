@@ -203,7 +203,7 @@ def translate_opus(text, src_lang, tgt_lang = config.get_ui_language()):
     #print(f"translation: {xtext}")
     return xtext
 
-def prompt(prompt_text, images = None, stream = False):
+def prompt(prompt_text, images = None, stream = False, tools = None):
     def _reasoning_to_text(reasoning_value):
         if not reasoning_value:
             return ""
@@ -378,6 +378,9 @@ def prompt(prompt_text, images = None, stream = False):
 
     if stream:
         request_kwargs["stream"] = True
+
+    if tools is not None:
+        request_kwargs['tools'] = tools
 
     thinking_enabled_config = config.get_openai_enable_thinking()
     if thinking_enabled_config and thinking_enabled_sent:
