@@ -41,3 +41,6 @@ WiP/
 *.exe
 *.out
 *.app
+
+cloud/control/id_ed25519
+cloud/control/id_ed25519.pub
