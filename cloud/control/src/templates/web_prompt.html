@@ -16,7 +16,7 @@
             <label for="prompt-input">Prompt:</label>
             <div class="prompt-row">
                 <textarea id="prompt-input" placeholder="Enter your prompt here..."></textarea>
-                <button id="prompt-send" class="prompt-button">Parancs</button>
+                <button id="prompt-send" class="prompt-button prompt" disabled>Prompt</button>
             </div>
         </div>
 
@@ -26,11 +26,11 @@
             <textarea id="reasoning-output" readonly placeholder="Reasoning will appear here..."></textarea>
         </div>
 
-        <!-- Final Response -->
+        <!-- Tools Response -->
         <div class="response-section">
             <label>Response:</label>
             <div class="response-content">
-                <textarea id="response-textbox"></textarea>
+                <textarea id="response-textbox" readonly placeholder="Tool response will appear here..."></textarea>
                 <div class="image-container">
                     <img id="response-image" src="" alt="Response Image">
                 </div>
@@ -51,7 +51,20 @@
     var socket = io();
     
     socket.on('ui_update_reponse', function(data) {
-        console.log(data);
+        console.log('respose event', data.data);
+        var text = document.getElementById('response-textbox');
+        if (text && data && typeof data.data !== 'undefined') {
+            text.value = data.data;
+        }
+    });
+
+    socket.on('ui_update_reasoning', function(data) {
+        console.log('reasoning event', data.data);
+        var text = document.getElementById('reasoning-output');
+        if (text && data && typeof data.data !== 'undefined') {
+            text.value += '\n';
+            text.value += data.data;
+        }
     });
 
     socket.on('ui_update_tools', function(data) {
@@ -72,14 +85,39 @@
         }
     });
 
-    // Send prompt text when the Parancs button is clicked
-    document.addEventListener('DOMContentLoaded', function () {
+    // Helpers to manage the prompt/abort button states
+    function setToPrompt() {
         var sendBtn = document.getElementById('prompt-send');
         var promptInput = document.getElementById('prompt-input');
-        sendBtn.addEventListener('click', function () {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Prompt';
+        sendBtn.classList.remove('abort');
+        sendBtn.classList.add('prompt');
+        sendBtn.onclick = function () {
             var text = promptInput.value || '';
             socket.emit('prompt', { prompt: text });
-        });
+        };
+    }
+
+    function setToAbort() {
+        var sendBtn = document.getElementById('prompt-send');
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Abort';
+        sendBtn.classList.remove('prompt');
+        sendBtn.classList.add('abort');
+        sendBtn.onclick = function () {
+            socket.emit('abort_prompt');
+        };
+    }
+
+    // Socket events to control button state from server
+    socket.on('ui_update_prompt', function(data) {
+        if (data.data == 'prompt') {
+            setToPrompt();
+        }
+        else if (data.data == 'abort') {
+            setToAbort();
+        }
     });
 
 </script>

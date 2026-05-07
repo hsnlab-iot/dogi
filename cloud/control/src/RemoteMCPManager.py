@@ -21,7 +21,11 @@ class RemoteMCPManager:
 
     def ssh_connect(self, user, host, python_path, script_path):
         """Szinkron csatlakozás: megvárja, amíg kiépül az SSH alagút."""
-        args = ["-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", f"{user}@{host}", f"{python_path}/python3", script_path]
+        args = ["-q",
+                "-o", "BatchMode=yes",
+                "-o", "StrictHostKeyChecking=accept-new",
+                "-o", "ConnectTimeout=5",
+                  f"{user}@{host}", f"{python_path}/python3", script_path]
         params = StdioServerParameters(
             command="ssh",
             args=args

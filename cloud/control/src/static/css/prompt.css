@@ -149,6 +149,11 @@ textarea {
 
 .prompt-button:active { transform: translateY(1px); }
 
+/* State-specific prompt button styles moved from inline HTML */
+.prompt-button.prompt { background: #28a745; color: #fff; border: none; }
+.prompt-button.abort { background: #dc3545; color: #fff; border: none; }
+.prompt-button:disabled { opacity: 0.6; cursor: not-allowed; }
+
 /* Reasoning specific styling (4 lines) */
 /* reasoning is a readonly textarea now */
 #reasoning-output {

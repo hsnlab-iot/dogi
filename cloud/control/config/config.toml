@@ -12,7 +12,8 @@ vision = ""
 
 [tools]
 1 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
-2 = "sse!http://10.6.6.20:8080/test"
+2 = "sse!http://10.100.0.38:8080/sse"
+3 = "ssh!pi:~/kutyus_env/bin:~/mcp_server.py"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"

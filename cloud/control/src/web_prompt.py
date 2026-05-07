@@ -41,9 +41,20 @@ def handle_event(data):
     socketio.emit("client_prompt", data)
     pass
 
-@socketio.on('tools')
+# ui_update is coming from prompt.py
+@socketio.on('ui_update')
 def handle_event(data):
-    socketio.emit('ui_update_tools', data)
+    print(data)
+    if data['type'] == 'tools':
+        socketio.emit('ui_update_tools', data)
+    elif data['type'] == 'reasoning':
+        socketio.emit('ui_update_reasoning', data)
+    elif data['type'] == 'response':
+        socketio.emit('ui_update_response', data)
+    elif data['type'] == 'tool_selection':
+        socketio.emit('ui_update_tool_selection', data)
+    elif data['type'] == 'prompt':
+        socketio.emit('ui_update_prompt', data)
 
 @socketio.on('reload')
 def handle_event(data):

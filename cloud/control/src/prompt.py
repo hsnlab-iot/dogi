@@ -12,6 +12,7 @@ import glob
 import subprocess
 import urllib.request
 import json
+import asyncio
 
 import utils
 import config
@@ -44,7 +45,7 @@ def handle_prompt(data):
     data can be a dict with keys: { prompt: str, tools: [toolName,...] }
     The worker emits status updates via sio.emit('ui_update_reponse', {...}).
     """
-    global worker_thread, worker_stop_event, openai_tools
+    global worker_thread, worker_stop_event, openai_tools, tools
     try:
         prompt_text = data.get('prompt', '') if isinstance(data, dict) else str(data)
     except Exception:
@@ -58,13 +59,42 @@ def handle_prompt(data):
         # set up stop event for this worker
         worker_stop_event = threading.Event()
 
-        def worker(prompt_text, tools, stop_event):
+        def worker(prompt_text, openai_tools, tools, stop_event):
             try:
                 sio.emit('ui_update_reponse', {'status': 'started'})
 
-                # Call the prompt (blocking). In future we can use stream=True to send partial updates.
-                response_text = utils.prompt(prompt_text, tools = tools)
+                tool_calls = True
+                prompt = prompt_text
+                while (tool_calls):
+                    # Call the prompt (blocking). In future we can use stream=True to send partial updates.                    
+                    messages, response = utils.prompt(prompt, tools = openai_tools)
+                    response_message = response.choices[0].message
+                    tool_calls = response_message.tool_calls
 
+                    print("Message content:")
+                    print(response_message.content)
+                    prompt = messages
+                    prompt.append(response_message)
+                    if tool_calls:
+                        for tool_call in tool_calls:
+                            function_name = tool_call.function.name
+                            function_args = json.loads(tool_call.function.arguments)                            
+                            print(f"Calling tool {function_name}")
+
+                            for tool in tools:
+                                if tool[1] == function_name:
+                                    print(tool[0])
+                                    rmcp = tool[0]
+                                    print("Calling the tool")
+                                    result = rmcp.call_tool_blocking(function_name, function_args)
+                                    print(f"Result: {result}")
+                                    prompt.append({
+                                        "tool_call_id": tool_call.id,
+                                        "role": "tool",
+                                        "name": function_name,
+                                        "content": result,
+                                    })
+                        
                 # If stop requested, don't emit final result
                 if stop_event.is_set():
                     sio.emit('ui_update_reponse', {'status': 'stopped'})
@@ -85,7 +115,7 @@ def handle_prompt(data):
                     except Exception:
                         pass
 
-        worker_thread = threading.Thread(target=worker, args=(prompt_text, openai_tools, worker_stop_event), daemon=True)
+        worker_thread = threading.Thread(target=worker, args=(prompt_text, openai_tools, tools, worker_stop_event), daemon=True)
         worker_thread.start()
         sio.emit('ui_update_reponse', {'status': 'spawned'})
 
@@ -114,34 +144,17 @@ def connec_MCP_serves():
 
                 # RemoteMCPManager is a module; instantiate the class inside it
                 rmcp = RemoteMCPManager.RemoteMCPManager()
-                rmcp.connect(user, ip, python_path, script_path)
+                rmcp.ssh_connect(user, ip, python_path, script_path)
                 mcp_tools = rmcp.get_tools_blocking()
                 
             elif kind == 'sse':
-                # rest is like "5000/test" -> port and path
-                if '/' not in rest:
-                    print('sse entry missing path:', mcp_server)
-                    continue
-                port_str, url_path = rest.split('/', 1)
-                port = port_str.strip()
-                path = '/' + url_path.lstrip('/')
-                url = f"http://{robot_ip}:{port}{path}"
-                try:
-                    with urllib.request.urlopen(url, timeout=10) as resp:
-                        body = resp.read().decode('utf-8')
-                    # try parse json with url field, else take body as unique url
-                    unique = None
-                    try:
-                        j = json.loads(body)
-                        unique = j.get('url') or j.get('unique') or j.get('data')
-                    except Exception:
-                        unique = body.strip()
+                # rest is like "http://ip:port/test"
+                url = rest
+                
+                rmcp = RemoteMCPManager.RemoteMCPManager()
+                rmcp.sse_connect(url)
+                mcp_tools = rmcp.get_tools_blocking()
 
-                    toolname = path.rstrip('/').split('/')[-1]
-                    tools.append({'type': 'sse', 'name': toolname, 'port': port, 'path': path, 'url': unique})
-                    print('sse tool registered:', toolname)
-                except Exception as e:
-                    print('failed to contact sse tool', mcp_server, e)
             else:
                 print('unknown tool kind:', kind)
                 continue
@@ -190,8 +203,8 @@ if __name__ == '__main__':
     xtools = [] 
     for tool in tools:
         xtools.append(tool[1])
-    sio.emit('tools', {'data': xtools})
-
+    sio.emit('ui_update', {'type': 'tools', 'data': xtools})
+    sio.emit('ui_update', {'type': 'prompt', 'data': 'prompt'})
     utils.dogy_reset()
     introduction()
 

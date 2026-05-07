@@ -336,6 +336,10 @@ def prompt(prompt_text, images = None, stream = False, tools = None):
     if isinstance(prompt_text, dict):
         prompt_text = select_text(prompt_text, config.get_prompt_language())
 
+    messages = None
+    if isinstance(prompt_text, list):
+        messages = prompt_text
+
     soul_prompt = config.get_soul_content()
 
     model = None
@@ -360,12 +364,13 @@ def prompt(prompt_text, images = None, stream = False, tools = None):
     )
     thinking_enabled_sent = bool(extra_body.get("enable_thinking"))
 
-    messages = [
-        {"role": "system", "content": soul_prompt},
-        {"role": "user", "content": content},
-    ]
-    if not thinking_enabled_sent:
-        messages.append({"role": "assistant", "content": "<think></think>"})
+    if not messages:
+        messages = [
+            {"role": "system", "content": soul_prompt},
+            {"role": "user", "content": content},
+        ]
+        if not thinking_enabled_sent:
+            messages.append({"role": "assistant", "content": "<think></think>"})
 
     request_kwargs = {
         "model": model,
@@ -462,6 +467,8 @@ def prompt(prompt_text, images = None, stream = False, tools = None):
     else:
         try:
             response = openai_client.chat.completions.create(**request_kwargs)
+            debug_openai_response("prompt", response)
+
         except Exception as e:
             if used_binary_images:
                 print(f"Binary image input not supported by model/provider, retrying with base64 image_url payloads: {e}")
@@ -477,9 +484,13 @@ def prompt(prompt_text, images = None, stream = False, tools = None):
                 response = openai_client.chat.completions.create(**request_kwargs)
             else:
                 raise
+
+        if tools is not None:
+            # Return raw response if we use tools
+            return messages, response
+        
         print(f"Finish Reason: {response.choices[0].finish_reason}")
         print(f"Usage: {response.usage}")
-        debug_openai_response("prompt", response)
         reasoning_text = _reasoning_to_text(getattr(response.choices[0].message, "reasoning_content", None))
         if reasoning_text:
             print(f"Reasoning: {reasoning_text}")
