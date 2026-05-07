@@ -19,7 +19,7 @@ body {
 .main-content {
     grid-column: 1 / 2;
 }
-.tool-list-section {
+.tools-list-section {
     grid-column: 2 / 3;
 }
 
@@ -33,15 +33,15 @@ body {
 .main-content {
     outline: 2px dashed rgba(255,0,0,0.15);
 }
-.main-content > .reasoning-section {
+.main-content > .results-section {
     outline: 2px dashed rgba(0,255,0,0.12);
 }
-.tool-list-section {
+.tools-list-section {
     outline: 2px dashed rgba(0,0,255,0.08);
 }
 
 /* Tool list area (right side) */
-.tool-list-section {
+.tools-list-section {
     min-width: 220px; /* Ensure tools have enough space */
 }
 
@@ -55,16 +55,16 @@ label {
 
 /* Styling for all input/output boxes */
 .input-section,
-.reasoning-section,
 .response-section,
-.tool-list-section {
+.tools-response-section,
+.tools-list-section {
     width: 100%;
 }
 
 /* Ensure each section stacks vertically and fills column width */
 .main-content > .input-section,
-.main-content > .reasoning-section,
-.main-content > .response-section {
+.main-content > .response-section,
+.main-content > .tools-response-section {
     display: block;
     width: 100%;
     margin-bottom: 18px; /* space between stacked sections */
@@ -72,15 +72,15 @@ label {
 
 /* Defensive overrides to prevent other styles from floating or positioning sections */
 .main-content > .input-section,
-.main-content > .reasoning-section,
-.main-content > .response-section {
+.main-content > .response-section,
+.main-content > .tools-response-section {
     float: none !important;
     clear: both !important;
 }
 
 /* Common styling for textareas and content divs */
 textarea,
-#reasoning-output,
+#response-output,
 .response-content {
     width: 100%;
     padding: 10px;
@@ -109,7 +109,7 @@ textarea {
     .container {
         grid-template-columns: 1fr;
     }
-    .tool-list-section {
+    .tools-list-section {
         grid-column: 1 / -1;
     }
 }
@@ -156,7 +156,7 @@ textarea {
 
 /* Reasoning specific styling (4 lines) */
 /* reasoning is a readonly textarea now */
-#reasoning-output {
+#response-output {
     min-height: 160px; /* Approx 4 lines */
     height: 160px;
     resize: none;
@@ -164,17 +164,18 @@ textarea {
     font-size: 24px; /* match requested text size */
 }
 
-/* Response specific styling (1 line) */
-#response-textbox {
-    min-height: 40px; /* Single-line appearance */
-    height: 40px;
+/* Response specific styling (3 lines) */
+#tools-response-output {
+    /* approx 3 lines at 24px font-size */
+    min-height: 120px;
+    height: 120px;
     resize: none;
     overflow-y: auto;
     font-size: 24px; /* match requested text size */
 }
 
 /* Make response content stack vertically (textarea then image) */
-.response-content {
+.tools-response-content {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -186,7 +187,7 @@ textarea {
     text-align: center;
 }
 
-#response-image {
+#tools-response-image {
     max-width: 100%;
     height: auto;
     display: block;
@@ -195,13 +196,13 @@ textarea {
 
 /* Tool List styling */
 /* Tools displayed as a simple list */
-#tool-list {
+#tools-list {
     list-style-type: disc;
     padding-left: 20px;
     margin: 0;
 }
 
-#tool-list li {
+#tools-list li {
     background: transparent;
     color: white;
     padding: 6px 0;
