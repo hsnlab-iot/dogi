@@ -1,3 +1,5 @@
+from unittest import result
+
 import cv2
 import numpy as np
 import zmq
@@ -35,6 +37,7 @@ worker_lock = threading.Lock()
 worker_thread = None
 worker_stop_event = None
 
+
 @sio.event
 def connect():
     print("Connected to Flask server!")
@@ -51,9 +54,10 @@ def handle_prompt(data):
     except Exception:
         prompt_text = str(data)
 
+    sio.emit("ui_update", { "type": "prompt", "data": "abort" })
+
     with worker_lock:
         if worker_thread and worker_thread.is_alive():
-            sio.emit('ui_update_reponse', {'status': 'busy'})
             return
 
         # set up stop event for this worker
@@ -61,49 +65,79 @@ def handle_prompt(data):
 
         def worker(prompt_text, openai_tools, tools, stop_event):
             try:
-                sio.emit('ui_update_reponse', {'status': 'started'})
-
                 tool_calls = True
-                prompt = prompt_text
-                while (tool_calls):
+                prompt_next = prompt_text
+                while (tool_calls) and not stop_event.is_set():
                     # Call the prompt (blocking). In future we can use stream=True to send partial updates.                    
-                    messages, response = utils.prompt(prompt, tools = openai_tools)
+                    messages, response = utils.prompt(prompt_next, tools = openai_tools)
                     response_message = response.choices[0].message
                     tool_calls = response_message.tool_calls
 
-                    print("Message content:")
-                    print(response_message.content)
-                    prompt = messages
-                    prompt.append(response_message)
+                    print(f"Response message content: {response_message.content}")
+                    if response_message.content:
+                        sio.emit('ui_update',
+                                 {"type": "response",
+                                  "data": response_message.content})
+
+                    prompt_next = messages
+                    tool_calls_json = []
+                    tool_responses_json = []
                     if tool_calls:
                         for tool_call in tool_calls:
+                            if stop_event.is_set():
+                                break
+                            function_id = tool_call.id
                             function_name = tool_call.function.name
-                            function_args = json.loads(tool_call.function.arguments)                            
+                            function_args = tool_call.function.arguments
+                            tool_calls_json.append({
+                                'id': function_id,
+                                "type": "function",
+                                "function": {
+                                    "name": function_name,
+                                    "arguments": function_args
+                                }
+                            })
                             print(f"Calling tool {function_name}")
 
                             for tool in tools:
                                 if tool[1] == function_name:
-                                    print(tool[0])
                                     rmcp = tool[0]
-                                    print("Calling the tool")
-                                    result = rmcp.call_tool_blocking(function_name, function_args)
-                                    print(f"Result: {result}")
-                                    prompt.append({
-                                        "tool_call_id": tool_call.id,
+                                    result = rmcp.call_tool_blocking(function_name, json.loads(function_args))
+                                    result_text = "\n".join([
+                                        block.text for block in result.content
+                                        if hasattr(block, 'text')
+                                    ])
+                                    print(f"Result: {result_text}")
+                                    tool_responses_json.append({
                                         "role": "tool",
-                                        "name": function_name,
-                                        "content": result,
+                                        "tool_call_id": tool_call.id,
+                                        "content": result_text,
                                     })
+                                    sio.emit('ui_update',
+                                             {'type': 'tools_response',
+                                              'data': result_text})
+                            
+                    print("Tools finished.")
+    
+                    # Create the next prompt
+                    prompt_next.append({
+                        "role": "assistant",
+                        "content": response_message.content or "",
+                        "tool_calls": tool_calls_json})
+                    prompt_next.extend(tool_responses_json)
+                    if not config.get_openai_enable_thinking():
+                        prompt_next.append({
+                            "role": "assistant",
+                            "content": "<think></think>"
+                        })
                         
                 # If stop requested, don't emit final result
                 if stop_event.is_set():
-                    sio.emit('ui_update_reponse', {'status': 'stopped'})
+                    sio.emit("ui_update", { "type": "prompt", "data": "prompt" })
                     return
 
-                sio.emit('ui_update_reponse', {'status': 'done', 'response': response_text})
-
             except Exception as e:
-                sio.emit('ui_update_reponse', {'status': 'error', 'error': str(e)})
+                print(e)
             finally:
                 # clear worker globals
                 with worker_lock:
@@ -115,9 +149,12 @@ def handle_prompt(data):
                     except Exception:
                         pass
 
-        worker_thread = threading.Thread(target=worker, args=(prompt_text, openai_tools, tools, worker_stop_event), daemon=True)
-        worker_thread.start()
-        sio.emit('ui_update_reponse', {'status': 'spawned'})
+                sio.emit("ui_update", { "type": "prompt", "data": "prompt" })
+
+
+        #worker_thread = threading.Thread(target=worker, args=(prompt_text, openai_tools, tools, worker_stop_event), daemon=True)
+        #worker_thread.start()
+        worker_thread = sio.start_background_task(worker, prompt_text, openai_tools, tools, worker_stop_event)
 
 def connec_MCP_serves():    
     # Connect to MCP serves
@@ -218,6 +255,3 @@ def handle_stop(data=None):
     with worker_lock:
         if worker_thread and worker_thread.is_alive() and worker_stop_event:
             worker_stop_event.set()
-            sio.emit('ui_update_reponse', {'status': 'stopping'})
-        else:
-            sio.emit('ui_update_reponse', {'status': 'no_worker'})

@@ -47,10 +47,10 @@ def handle_event(data):
     print(data)
     if data['type'] == 'tools':
         socketio.emit('ui_update_tools', data)
-    elif data['type'] == 'reasoning':
-        socketio.emit('ui_update_reasoning', data)
     elif data['type'] == 'response':
         socketio.emit('ui_update_response', data)
+    elif data['type'] == 'tools_response':
+        socketio.emit('ui_update_tools_response', data)
     elif data['type'] == 'tool_selection':
         socketio.emit('ui_update_tool_selection', data)
     elif data['type'] == 'prompt':

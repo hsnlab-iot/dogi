@@ -21,27 +21,27 @@
         </div>
 
         <!-- Reasoning Response -->
-        <div class="reasoning-section">
-            <label>Reasoning:</label>
-            <textarea id="reasoning-output" readonly placeholder="Reasoning will appear here..."></textarea>
+        <div class="response-section">
+            <label>Response:</label>
+            <textarea id="response-output" readonly placeholder="Response will appear here..."></textarea>
         </div>
 
         <!-- Tools Response -->
-        <div class="response-section">
-            <label>Response:</label>
-            <div class="response-content">
-                <textarea id="response-textbox" readonly placeholder="Tool response will appear here..."></textarea>
+        <div class="tools-response-section">
+            <label>Tools response:</label>
+            <div class="tools-response-content">
+                <textarea id="tools-response-output" readonly placeholder="Tools response will appear here..."></textarea>
                 <div class="image-container">
-                    <img id="response-image" src="" alt="Response Image">
+                    <img id="tools-response-image" src="" alt="Tools response Image">
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Tool List -->
-    <div class="tool-list-section">
+    <div class="tools-list-section">
         <label>Tools:</label>
-        <ul id="tool-list">
+        <ul id="tools-list">
             <!-- Tool list items will appear here -->
         </ul>
     </div>
@@ -50,17 +50,18 @@
 <script>
     var socket = io();
     
-    socket.on('ui_update_reponse', function(data) {
-        console.log('respose event', data.data);
-        var text = document.getElementById('response-textbox');
+    socket.on('ui_update_tools_response', function(data) {
+        console.log('tools_response event', data.data);
+        var text = document.getElementById('tools-response-output');
         if (text && data && typeof data.data !== 'undefined') {
-            text.value = data.data;
+            text.value += '\n';
+            text.value += data.data;
         }
     });
 
-    socket.on('ui_update_reasoning', function(data) {
-        console.log('reasoning event', data.data);
-        var text = document.getElementById('reasoning-output');
+    socket.on('ui_update_response', function(data) {
+        console.log('response event', data.data);
+        var text = document.getElementById('response-output');
         if (text && data && typeof data.data !== 'undefined') {
             text.value += '\n';
             text.value += data.data;
@@ -69,7 +70,7 @@
 
     socket.on('ui_update_tools', function(data) {
         console.log('tools event', data.data);
-        var list = document.getElementById('tool-list');
+        var list = document.getElementById('tools-list');
         // clear existing items
         while (list.firstChild) list.removeChild(list.firstChild);
         if (!data.data) return;
