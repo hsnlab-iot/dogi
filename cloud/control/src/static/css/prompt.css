@@ -194,6 +194,24 @@ textarea {
     margin: 10px auto;
 }
 
+/* Loading indicator for tools list */
+#tools-loading {
+    color: #fff;
+    font-weight: bold;
+    text-align: left;
+    margin: 6px 0 8px 0;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.25; }
+    100% { opacity: 1; }
+}
+
+/* Hide tools list initially until data arrives */
+#tools-list { display: none; }
+
 /* Tool List styling */
 /* Tools displayed as a simple list */
 #tools-list {

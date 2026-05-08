@@ -16,6 +16,9 @@ import urllib.request
 import json
 import asyncio
 
+from typing import List, Dict, Any
+from mcp.types import CallToolResult, ImageContent, TextContent
+
 import utils
 import config
 import RemoteMCPManager
@@ -36,6 +39,44 @@ openai_tools = []
 worker_lock = threading.Lock()
 worker_thread = None
 worker_stop_event = None
+
+
+def mcp_to_openai_multimodal_tool(mcp_result: CallToolResult, tool_call_id: str) -> Dict[str, Any]:
+    """
+    Converts MCP result into a multimodal OpenAI tool message.
+    The image is contained WITHIN the tool response, linking it to the ID.
+    """
+    openai_content = []
+    texts = []
+    image = None
+
+    for item in mcp_result.content:
+        if isinstance(item, TextContent):
+            openai_content.append({
+                "type": "text",
+                "text": item.text
+            })
+            texts.append(item.text)
+        elif isinstance(item, ImageContent):
+            # Ensure the base64 string is correctly prefixed for the Vision encoder
+            openai_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{item.mimeType};base64,{item.data}",
+                    "detail": "high" # Ensures the LLM looks for robotic/technical details
+                }
+            })
+            image = f"data:{item.mimeType};base64,{item.data}"
+
+    # If the MCP server returned nothing, provide a fallback string
+    if not openai_content:
+        openai_content = [{"type": "text", "text": "Tool executed with no return data."}]
+
+    return {
+        "role": "tool",
+        "tool_call_id": tool_call_id,
+        "content": openai_content
+    }, "\n".join(texts), image
 
 
 @sio.event
@@ -103,20 +144,16 @@ def handle_prompt(data):
                                 if tool[1] == function_name:
                                     rmcp = tool[0]
                                     result = rmcp.call_tool_blocking(function_name, json.loads(function_args))
-                                    result_text = "\n".join([
-                                        block.text for block in result.content
-                                        if hasattr(block, 'text')
-                                    ])
-                                    print(f"Result: {result_text}")
-                                    tool_responses_json.append({
-                                        "role": "tool",
-                                        "tool_call_id": tool_call.id,
-                                        "content": result_text,
-                                    })
+                                    tool_response, tool_texts, tool_image = mcp_to_openai_multimodal_tool(result, tool_call.id)
+
+                                    tool_responses_json.append(tool_response)
                                     sio.emit('ui_update',
                                              {'type': 'tools_response',
-                                              'data': result_text})
-                            
+                                              'data': tool_texts})
+                                    sio.emit('ui_update',
+                                             {'type': 'tools_response',
+                                              'data': tool_image})
+
                     print("Tools finished.")
     
                     # Create the next prompt

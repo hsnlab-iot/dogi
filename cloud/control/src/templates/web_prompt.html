@@ -41,6 +41,7 @@
     <!-- Tool List -->
     <div class="tools-list-section">
         <label>Tools:</label>
+        <div id="tools-loading">LOADING...</div>
         <ul id="tools-list">
             <!-- Tool list items will appear here -->
         </ul>
@@ -53,9 +54,22 @@
     socket.on('ui_update_tools_response', function(data) {
         console.log('tools_response event', data.data);
         var text = document.getElementById('tools-response-output');
+        var img = document.getElementById('tools-response-image');
         if (text && data && typeof data.data !== 'undefined') {
-            text.value += '\n';
-            text.value += data.data;
+            var payload = String(data.data || '');
+            // If payload is a data:image URI, show it in the image element
+            if (payload.startsWith('data:image')) {
+                if (img) {
+                    img.src = payload;
+                    img.style.display = 'block';
+                }
+            } else {
+                // regular text response: append to textarea and clear any previous image
+                if (text) {
+                    text.value += '\n';
+                    text.value += payload;
+                }
+            }
         }
     });
 
@@ -70,16 +84,21 @@
 
     socket.on('ui_update_tools', function(data) {
         console.log('tools event', data.data);
-        var list = document.getElementById('tools-list');
+
+        var toolsLoading = document.getElementById('tools-loading');
+        if (toolsLoading) toolsLoading.style.display = 'none';
+        var toolsList = document.getElementById('tools-list');
+        if (toolsList) toolsList.style.display = 'block';
+
         // clear existing items
-        while (list.firstChild) list.removeChild(list.firstChild);
+        while (toolsList.firstChild) toolsList.removeChild(toolsList.firstChild);
         if (!data.data) return;
         // data is expected to be a list/array of strings (tool names)
         try {
             data.data.forEach(function(name) {
                 var li = document.createElement('li');
                 li.textContent = String(name);
-                list.appendChild(li);
+                toolsList.appendChild(li);
             });
         } catch (e) {
             console.error('failed to render tools list', e);
