@@ -12,7 +12,7 @@ import simplejpeg
 logger = logging.getLogger(__name__)
 
 
-Gst.init(None)
+Gst.init([])
 
 
 class Streamer:
