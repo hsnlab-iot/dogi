@@ -23,7 +23,7 @@ WORKDIR /app
 ENV UV_HTTP_TIMEOUT=100
 
 # Copy only the requirements file first for better caching
-COPY src/camera/requirements.txt .
+COPY src/streamer/requirements.txt .
 
 # Create the venv and install dependencies
 # We use --prefix or just a standard .venv folder
