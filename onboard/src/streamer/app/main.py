@@ -23,6 +23,8 @@ def create_app(cfg):
     start_time = time.time()
 
     app.state.streamer = streamer
+    app.state.current_stream_address = None
+    app.state.current_stream_port = None
     app.state.cfg = cfg
 
     mcp = FastMCP("CameraManager")
@@ -54,7 +56,21 @@ def create_app(cfg):
         try:
             address = req.address or cfg.stream.default_address
             port = req.port or cfg.stream.default_port
+            # If streamer already running with different params, stop it first
+            if streamer.is_running():
+                cur_addr = app.state.current_stream_address
+                cur_port = app.state.current_stream_port
+                if cur_addr != address or cur_port != port:
+                    # stop existing streamer before starting with new params
+                    streamer.stop()
+            # If already running with same params, return current state
+            if streamer.is_running():
+                return {"streaming": True, "address": app.state.current_stream_address, "port": app.state.current_stream_port}
+
+            # start streamer with requested params
             streamer.start(address, port, cfg)
+            app.state.current_stream_address = address
+            app.state.current_stream_port = port
             return {"streaming": True, "address": address, "port": port}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -62,6 +78,8 @@ def create_app(cfg):
     @app.post("/stop_stream")
     async def stop_stream():
         streamer.stop()
+        app.state.current_stream_address = None
+        app.state.current_stream_port = None
         return {"streaming": False}
 
     @app.get("/snapshot")

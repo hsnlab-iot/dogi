@@ -58,7 +58,8 @@ voice = "hu_diana_majlinger"
 [ports]
 voice = 5052
 control = 5002
-video = 5100
 
 [streamer]
-url = "http://robot_ip:8000"
+url = "http://192.168.1.100:8000"
+stream_ip = "10.100.0.20"
+stream_port = 5100
