@@ -22,7 +22,7 @@ class Streamer:
         self._running = False
         self._appsink = None
         self._valve = None
-        # cache probe results per device to avoid repeated queries
+        # cache pipeline type per device ('mjpeg' or 'raw') determined by _probe_pipeline_type()
         self._device_probe = {}
         # cache the exact working temporary pipeline launch string per device
         self._device_working_launch = {}
@@ -31,7 +31,63 @@ class Streamer:
         with self._lock:
             return self._running
 
+    def _probe_pipeline_type(self, device: str, cfg) -> str:
+        """Run short test pipelines to determine which source format the device supports.
+
+        Returns 'mjpeg' if the device outputs MJPEG and jpegdec is available, 'raw' otherwise.
+        The result is cached per device so the probe only runs once.
+        """
+        with self._lock:
+            if device in self._device_probe:
+                return self._device_probe[device]
+
+        fps = cfg.camera.fps
+        candidates = [
+            ('mjpeg', f"v4l2src device={device} num-buffers=1 ! image/jpeg ! jpegdec ! fakesink"),
+            ('raw',   f"v4l2src device={device} num-buffers=1 ! videoconvert ! fakesink"),
+        ]
+
+        result = 'raw'  # safe fallback
+        for name, launch in candidates:
+            logger.debug('Probing pipeline type %s: %s', name, launch)
+            tmp = None
+            try:
+                tmp = Gst.parse_launch(launch)
+            except Exception:
+                logger.debug('parse_launch failed for probe %s', name)
+                continue
+            if tmp is None:
+                continue
+            tmp.set_state(Gst.State.PLAYING)
+            bus = tmp.get_bus()
+            msg = bus.timed_pop_filtered(
+                int(3.0 * Gst.SECOND),
+                Gst.MessageType.ERROR | Gst.MessageType.EOS,
+            )
+            tmp.set_state(Gst.State.NULL)
+            if msg is not None and msg.type == Gst.MessageType.EOS:
+                logger.info('Device %s probe success: pipeline type = %s', device, name)
+                result = name
+                break
+            elif msg is not None and msg.type == Gst.MessageType.ERROR:
+                err, debug = msg.parse_error()
+                logger.debug('Probe pipeline %s error: %s | %s', name, err, debug)
+            else:
+                logger.debug('Probe pipeline %s timed out', name)
+
+        with self._lock:
+            self._device_probe[device] = result
+        logger.info('Device %s probe result cached: %s', device, result)
+        return result
+
     def start(self, address: str, port: int, cfg) -> None:
+        with self._lock:
+            if self._running:
+                raise RuntimeError("Streamer already running")
+
+        # Probe the device outside the main lock (probe acquires lock only for cache access)
+        pipeline_type = self._probe_pipeline_type(cfg.camera.device, cfg)
+
         with self._lock:
             if self._running:
                 raise RuntimeError("Streamer already running")
@@ -145,35 +201,17 @@ class Streamer:
 
             logger.debug('Added elements: %s', [el.get_name() for el in elements])
 
-            # Link source to convert. If the device outputs MJPEG (image/jpeg), insert
-            # a jpegdec between src and videoconvert. We attempt to query the src pad
-            # for supported caps to decide.
-            try:
-                src_pad = src.get_static_pad('src')
-                caps_src = None
-                if src_pad:
-                    caps_src = src_pad.query_caps(None)
-                is_jpeg = False
-                if caps_src is not None:
-                    for i in range(caps_src.get_size()):
-                        s = caps_src.get_structure(i)
-                        if s.get_name() == 'image/jpeg':
-                            is_jpeg = True
-                            break
-                if is_jpeg:
-                    jpegdec = Gst.ElementFactory.make('jpegdec', 'jpegdec')
-                    if jpegdec is None:
-                        raise RuntimeError('jpegdec not available; cannot decode MJPEG')
-                    pipeline.add(jpegdec)
-                    if not Gst.Element.link(src, jpegdec):
-                        raise RuntimeError('Failed to link src->jpegdec')
-                    if not Gst.Element.link(jpegdec, convert):
-                        raise RuntimeError('Failed to link jpegdec->convert')
-                else:
-                    if not Gst.Element.link(src, convert):
-                        raise RuntimeError('Failed to link src->convert')
-            except Exception:
-                # fallback: try direct link and let GStreamer surface errors
+            # Link source to convert using probed pipeline type.
+            if pipeline_type == 'mjpeg':
+                jpegdec = Gst.ElementFactory.make('jpegdec', 'jpegdec')
+                if jpegdec is None:
+                    raise RuntimeError('jpegdec not available; cannot decode MJPEG')
+                pipeline.add(jpegdec)
+                if not Gst.Element.link(src, jpegdec):
+                    raise RuntimeError('Failed to link src->jpegdec')
+                if not Gst.Element.link(jpegdec, convert):
+                    raise RuntimeError('Failed to link jpegdec->convert')
+            else:
                 if not Gst.Element.link(src, convert):
                     raise RuntimeError('Failed to link src->convert')
 
@@ -387,42 +425,7 @@ class Streamer:
 
         # not running: use temporary GStreamer pipelines to capture one frame
         logger.debug('Not streaming: using temporary GStreamer pipelines for one-shot snapshot')
-        # Probe device once for MJPEG output and cache result, then choose pipelines accordingly
-        def probe_device_for_mjpeg(dev: str) -> bool:
-            # cached
-            with self._lock:
-                if dev in self._device_probe:
-                    return self._device_probe[dev]
-            logger.debug('Probing device %s for MJPEG output', dev)
-            is_mjpeg = False
-            try:
-                src_probe = Gst.ElementFactory.make('v4l2src', 'probe_src')
-                if src_probe is not None:
-                    try:
-                        src_probe.set_property('device', dev)
-                    except Exception:
-                        pass
-                    src_pad = src_probe.get_static_pad('src')
-                    if src_pad:
-                        try:
-                            caps_src = src_pad.query_caps(None)
-                            if caps_src is not None:
-                                for i in range(caps_src.get_size()):
-                                    s = caps_src.get_structure(i)
-                                    if s.get_name() == 'image/jpeg':
-                                        is_mjpeg = True
-                                        break
-                        except Exception:
-                            logger.exception('Failed querying caps on probe src')
-            except Exception:
-                logger.exception('Device probe failed')
-            with self._lock:
-                self._device_probe[dev] = is_mjpeg
-            logger.debug('Device %s MJPEG=%s', dev, is_mjpeg)
-            return is_mjpeg
-
-        logger.debug('Attempting temporary pipelines based on device probe')
-        device_is_mjpeg = probe_device_for_mjpeg(device)
+        pipeline_type = self._probe_pipeline_type(device, cfg)
         # determine snapshot target size (use configured snapshot size or fall back to camera size)
         snap_w = int(cfg.snapshot.width) if getattr(cfg, 'snapshot', None) and cfg.snapshot.width else width
         snap_h = int(cfg.snapshot.height) if getattr(cfg, 'snapshot', None) and cfg.snapshot.height else height
@@ -444,11 +447,11 @@ class Streamer:
             f"appsink name=tmpappsink emit-signals=false sync=false max-buffers=1 drop=true"
         )
 
-        # order pipelines based on probe result: if MJPEG, try MJPEG first; otherwise try decodebin then raw
-        if device_is_mjpeg:
+        # order pipelines based on probe result
+        if pipeline_type == 'mjpeg':
             default_order = [mjpeg_launch, decode_launch, raw_launch]
         else:
-            default_order = [decode_launch, raw_launch, mjpeg_launch]
+            default_order = [raw_launch, decode_launch, mjpeg_launch]
 
         # if we previously discovered a working launch for this device, try it first
         with self._lock:
@@ -479,6 +482,20 @@ class Streamer:
             tmp.set_state(Gst.State.PLAYING)
             try:
                 timeout_ns = int(timeout_sec * Gst.SECOND)
+
+                # Wait for the bus to report ERROR or EOS before attempting a blocking pull.
+                # This avoids hanging indefinitely when the pipeline fails to produce frames
+                # (e.g. codec mismatch) but the appsink element stays alive.
+                bus = tmp.get_bus()
+                msg = bus.timed_pop_filtered(
+                    timeout_ns,
+                    Gst.MessageType.ERROR | Gst.MessageType.EOS,
+                )
+                if msg is not None and msg.type == Gst.MessageType.ERROR:
+                    err, debug = msg.parse_error()
+                    logger.debug('Temporary pipeline error (skipping): %s | %s', err, debug)
+                    continue
+
                 sample = None
                 sample = _pull_sample_from_appsink(appsink, timeout_ns)
                 logger.debug('tmp appsink pull returned: %s', bool(sample))
