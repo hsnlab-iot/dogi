@@ -13,9 +13,11 @@ vision = ""
 [tools]
 1 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
 2 = "sse!http://10.100.0.38:8080/sse"
-3 = "ssh!pi:~/kutyus_env/bin:~/mcp_server.py"
-4 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
-5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_capture.py"
+3 = "sse!http://10.100.0.38:8000/mcp/sse"
+4 = "ssh!pi:~/kutyus_env/bin:~/mcp_server.py"
+5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
+#5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_capture.py"
+6 = "ssh!pi:~/kutyus_env/bin:~/dogi/onboard/mcp_memory.py"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
@@ -48,11 +50,15 @@ voice = "hu_diana_majlinger"
 #voice = "alloy"
 #model = "tts-1"
 
-#- TTS_VOICE=larynx:eva_k-glow_tts
-#- TTS_VOICE=hu_diana_majlinger
-#- TTS_VOICE=zh_baker
-#- TTS_ENGINE_API=http://10.6.6.20:8124/synthesize/
+#- TTS_VOICE="larynx:eva_k-glow_tts"
+#- TTS_VOICE="hu_diana_majlinger"
+#- TTS_VOICE="zh_baker"
+#- TTS_ENGINE_API="http://10.6.6.20:8124/synthesize/"
 
 [ports]
 voice = 5052
 control = 5002
+video = 5100
+
+[streamer]
+url = "http://robot_ip:8000"
