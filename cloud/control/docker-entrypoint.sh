@@ -7,6 +7,7 @@ export PYTHONIOENCODING=UTF-8
 
 tmux new-session -d -s supervisord "/root/.local/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"
 tmux new-session -d -s video "python3 /app/zmq_videopub.py ; sleep inf"
+tmux new-session -d -s streamer "cd /app && source /opt/venv/bin/activate && python3 /app/streamer_client.py ; sleep inf"
 
 # Wait for the serial port to be available
 while [ ! -e /dev/ttyAMA0 ]; do
