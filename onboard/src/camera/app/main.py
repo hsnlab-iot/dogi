@@ -29,7 +29,7 @@ def create_app(cfg):
     app.mount("/mcp", mcp.http_app(transport="sse"))
 
     @mcp.tool()
-    async def take_snapshot() -> str:
+    async def camera_snapshot() -> str:
         """Takes a real-time photo from the camera and returns it as a base64 string."""
         frame = await asyncio.to_thread(streamer.snapshot, cfg, 2.0)
         if frame is None:
