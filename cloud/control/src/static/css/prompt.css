@@ -176,22 +176,57 @@ textarea {
 
 /* Make response content stack vertically (textarea then image) */
 .tools-response-content {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    overflow: visible;
 }
 
 /* Image container styling */
-.image-container {
-    margin-top: 10px;
-    text-align: center;
+.image-preview-container {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 12px);
+    display: flex;
+    justify-content: center;
+    z-index: 50;
+    pointer-events: none;
+    transform: translateX(-50%);
 }
 
-#tools-response-image {
-    max-width: 100%;
+#tools-response-preview {
+    max-width: 640px;
+    max-height: 480px;
+    width: auto;
     height: auto;
     display: block;
-    margin: 10px auto;
+    object-fit: contain;
+    background: rgba(34, 34, 34, 0.95);
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.image-thumbnails-row {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 2px;
+}
+
+.tools-response-thumb {
+    max-width: 150px;
+    max-height: 200px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    cursor: pointer;
 }
 
 /* Loading indicator for tools list */
@@ -218,10 +253,14 @@ textarea {
     list-style-type: disc;
     padding-left: 20px;
     margin: 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 #tools-list li {
     background: transparent;
     color: white;
-    padding: 6px 0;
+    padding: 2px 0;
+    line-height: 1.1;
 }

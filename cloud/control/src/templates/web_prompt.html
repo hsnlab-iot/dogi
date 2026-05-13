@@ -31,8 +31,10 @@
             <label>Tools response:</label>
             <div class="tools-response-content">
                 <textarea id="tools-response-output" readonly placeholder="Tools response will appear here..."></textarea>
-                <div class="image-container">
-                    <img id="tools-response-image" src="" alt="Tools response Image">
+                <div class="image-preview-container">
+                    <img id="tools-response-preview" src="" alt="Tools response preview">
+                </div>
+                <div id="tools-response-thumbnails" class="image-thumbnails-row" aria-label="Tools response thumbnails">
                 </div>
             </div>
         </div>
@@ -50,19 +52,75 @@
 
 <script>
     var socket = io();
+    var DEFAULT_TOOLS_IMAGE_HISTORY_LIMIT = 5;
+    var toolsImageHistoryLimit = DEFAULT_TOOLS_IMAGE_HISTORY_LIMIT;
+    var toolsImageHistory = [];
+
+    function setToolsImageHistoryLimit(limit) {
+        var parsed = parseInt(limit, 10);
+        if (!Number.isFinite(parsed) || parsed < 1) return;
+        toolsImageHistoryLimit = parsed;
+        if (toolsImageHistory.length > toolsImageHistoryLimit) {
+            toolsImageHistory = toolsImageHistory.slice(toolsImageHistory.length - toolsImageHistoryLimit);
+        }
+        renderToolsImageThumbnails();
+    }
+
+    window.setToolsImageHistoryLimit = setToolsImageHistoryLimit;
+
+    function updateToolsPreview(src) {
+        var preview = document.getElementById('tools-response-preview');
+        if (!preview) return;
+        if (!src) {
+            preview.removeAttribute('src');
+            preview.style.display = 'none';
+            return;
+        }
+        preview.src = src;
+        preview.style.display = 'block';
+    }
+
+    function renderToolsImageThumbnails() {
+        var row = document.getElementById('tools-response-thumbnails');
+        if (!row) return;
+
+        while (row.firstChild) row.removeChild(row.firstChild);
+
+        toolsImageHistory.forEach(function(src) {
+            var thumb = document.createElement('img');
+            thumb.className = 'tools-response-thumb';
+            thumb.src = src;
+            thumb.alt = 'Tools response thumbnail';
+
+            thumb.addEventListener('mouseenter', function() {
+                updateToolsPreview(src);
+            });
+
+            thumb.addEventListener('mouseleave', function() {
+                updateToolsPreview('');
+            });
+
+            row.appendChild(thumb);
+        });
+
+        updateToolsPreview('');
+    }
     
     socket.on('ui_update_tools_response', function(data) {
         console.log('tools_response event', data.data);
         var text = document.getElementById('tools-response-output');
-        var img = document.getElementById('tools-response-image');
+        if (data && typeof data.max_images !== 'undefined') {
+            setToolsImageHistoryLimit(data.max_images);
+        }
         if (text && data && typeof data.data !== 'undefined') {
             var payload = String(data.data || '');
             // If payload is a data:image URI, show it in the image element
             if (payload.startsWith('data:image')) {
-                if (img) {
-                    img.src = payload;
-                    img.style.display = 'block';
+                toolsImageHistory.push(payload);
+                if (toolsImageHistory.length > toolsImageHistoryLimit) {
+                    toolsImageHistory = toolsImageHistory.slice(toolsImageHistory.length - toolsImageHistoryLimit);
                 }
+                renderToolsImageThumbnails();
             } else {
                 // regular text response: append to textarea and clear any previous image
                 if (text) {
