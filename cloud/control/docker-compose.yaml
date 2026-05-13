@@ -19,6 +19,7 @@ services:
       #- ROBOT_IP=192.168.1.248 # WiFi address
       #- ROBOT_IP=10.20.5.38  # 5G address
       - ROBOT_IP=10.100.0.38  # Wireguard address
+      - DOGZILLA_API_BASE=http://10.100.0.38:8001
     ports:
       - "6080:6080"
       - "5050-5059:5050-5059"

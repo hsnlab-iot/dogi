@@ -10,9 +10,9 @@ tmux new-session -d -s video "python3 /app/zmq_videopub.py ; sleep inf"
 tmux new-session -d -s streamer "cd /app && source /opt/venv/bin/activate && python3 /app/streamer_client.py ; sleep inf"
 
 # Wait for the serial port to be available
-while [ ! -e /dev/ttyAMA0 ]; do
-    sleep 1
-done
+#while [ ! -e /dev/ttyAMA0 ]; do
+#    sleep 1
+#done
 
 tmux new-session -d -s data "python3 /app/DOGZILLAProxyServer.py ; sleep inf"
 
@@ -20,6 +20,7 @@ tmux new-session -d -s data "python3 /app/DOGZILLAProxyServer.py ; sleep inf"
 while ! netstat -tuln | grep -q ":5002 "; do
     sleep 1
 done
+
 tmux new-session -d -s webvideo "cd /app && source /opt/venv/bin/activate && python3 web_video.py ; sleep inf"
 tmux new-session -d -s webjoy "cd /app && source /opt/venv/bin/activate && python3 web_joy.py ; sleep inf"
 tmux new-session -d -s webvoice "cd /app && source /opt/venv/bin/activate && python3 web_voice.py ; sleep inf"

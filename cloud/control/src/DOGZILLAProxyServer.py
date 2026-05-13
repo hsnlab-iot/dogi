@@ -1,4 +1,5 @@
-from DOGZILLALib.DOGZILLALib import DOGZILLALib as dog
+#from DOGZILLALib.DOGZILLALib import DOGZILLALib as dog   # serial tunnel version
+from DOGZILLALib.DOGZILLALib import DOGZILLALibClient as dog  # WebAPI version
 import time
 import socket
 import pickle
@@ -6,6 +7,8 @@ import pickle
 def main():
 
     # Create control interface
+    # In the case of WebAPI, the serial port is ignored, however either
+    # set the api base in the function, or set the DOGZILLA_API_BASE env
     dogControl = dog.DOGZILLA("/dev/ttyAMA0")
     time.sleep(1)
 
