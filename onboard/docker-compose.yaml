@@ -6,5 +6,7 @@ services:
       - "/dev/video4:/dev/video4"
       - "/dev/serial0:/dev/serial0"
     network_mode: host        
+    environment:
+      - SERIAL_PORT=/dev/serial0
     volumes:
       - ./src/streamer.cfg:/root/streamer.cfg:ro

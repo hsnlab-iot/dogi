@@ -30,6 +30,14 @@ COPY src/streamer/requirements.txt .
 RUN uv venv .venv && \
     uv pip install -r requirements.txt
 
+# Copy only the requirements file first for better caching
+COPY src/DOGZILLALib/requirements.txt .
+
+# Create the venv and install dependencies
+# We use --prefix or just a standard .venv folder
+RUN uv pip install -r requirements.txt
+
+
 # STAGE 2: Runtime
 FROM ubuntu:${UBUNTU_VERSION}
 

@@ -12,6 +12,7 @@ import base64
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -42,8 +43,9 @@ class SerialManager:
         self.verbose = verbose
         self._dog = None
         self._executor = ThreadPoolExecutor(max_workers=1)
-        self._loop = asyncio.get_event_loop()
-        self._queue: asyncio.Queue = asyncio.Queue()
+        # Do not bind to an event loop at construction time; bind at `start`
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._queue: Optional[asyncio.Queue] = None
         self._worker_task: Optional[asyncio.Task] = None
         self.started_at = time.time()
         self.last_tx_time: Optional[float] = None
@@ -59,7 +61,15 @@ class SerialManager:
         def _make():
             return DOGZILLA(self.port, self.baud, self.verbose)
 
-        self._dog = await self._loop.run_in_executor(self._executor, _make)
+        # bind to the currently running loop so futures and run_in_executor
+        # attach to the same loop the FastAPI/uvicorn runtime uses
+        loop = asyncio.get_running_loop()
+        self._loop = loop
+        # create queue now so it's tied to the running loop
+        self._queue = asyncio.Queue()
+
+        # instantiate DOGZILLA in executor and start worker
+        self._dog = await loop.run_in_executor(self._executor, _make)
         self._running = True
         self._worker_task = asyncio.create_task(self._worker())
 
@@ -125,7 +135,8 @@ class SerialManager:
         if not hasattr(self._dog, method):
             raise AttributeError(f'Method not found: {method}')
 
-        fut = self._loop.create_future()
+        # create future on the running loop (self._loop guaranteed after start)
+        fut = (self._loop.create_future() if self._loop is not None else asyncio.get_running_loop().create_future())
         await self._queue.put((method, args or [], kwargs or {}, fut))
 
         try:
@@ -170,8 +181,29 @@ class SerialManager:
         }
 
 
-app = FastAPI()
 _manager: Optional[SerialManager] = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _manager
+    # On startup: create/start manager if not present
+    if _manager is None:
+        _manager = SerialManager(port='/dev/ttyAMA0', baud=115200, verbose=False)
+        await _manager.start()
+    else:
+        if not _manager._running:
+            await _manager.start()
+
+    try:
+        yield
+    finally:
+        # On shutdown: stop manager if present
+        if _manager:
+            await _manager.stop()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 # Model for method-specific endpoints (no 'method' field)
@@ -218,24 +250,7 @@ def _register_dogzilla_endpoints():
 _register_dogzilla_endpoints()
 
 
-@app.on_event('startup')
-async def startup_event():
-    global _manager
-    if _manager is None:
-        # Default port can be overridden by environment or caller; use default here
-        _manager = SerialManager(port='/dev/ttyAMA0', baud=115200, verbose=False)
-        await _manager.start()
-    else:
-        # If a manager was provided (via CLI), ensure it is started
-        if not _manager._running:
-            await _manager.start()
-
-
-@app.on_event('shutdown')
-async def shutdown_event():
-    global _manager
-    if _manager:
-        await _manager.stop()
+# Lifespan handler registered above handles startup/shutdown
 
 
 def _setup_logging(debug: bool):
