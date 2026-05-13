@@ -60,6 +60,6 @@ voice = 5052
 control = 5002
 
 [streamer]
-url = "http://192.168.1.100:8000"
+url = "http://10.100.0.38:8000"
 stream_ip = "10.100.0.20"
 stream_port = 5100
