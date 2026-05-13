@@ -13,11 +13,14 @@ otherwise from the `api_base` parameter. If neither provided, raises ValueError.
 This class is intended as a compatible replacement for code that uses the
 original `DOGZILLA` class, only the initialization may change.
 """
+import inspect
 from typing import Any
 import os
 import requests
 import base64
 import logging
+
+from DOGZILLALib import DOGZILLALib as OriginalLib
 
 LOG = logging.getLogger('DOGZILLALibClient')
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +42,10 @@ class DOGZILLA:
         self.port = port
         self.baud = int(baud)
         self.verbose = bool(verbose)
+
+        self._remote_methods = [
+            name for name, func in inspect.getmembers(OriginalLib.DOGZILLA, predicate=inspect.isfunction)            if not name.startswith('_')
+        ]        
 
     def _post(self, method: str, args: list = None, kwargs: dict = None, timeout: float = 10.0) -> Any:
         url = f"{self.api_base}/dogzilla/{method}"
@@ -73,10 +80,14 @@ class DOGZILLA:
                 return result
         return result
 
+    def __dir__(self):
+        # Combine standard attributes with the discovered remote methods
+        return sorted(super().__dir__() + self._remote_methods)
+
     def __getattr__(self, name: str):
         # proxy public methods to remote API
-        if name.startswith('_'):
-            raise AttributeError(name)
+        if name.startswith('_') or name not in self._remote_methods:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
         def _method(*args, **kwargs):
             # original methods are synchronous; call remote API synchronously
