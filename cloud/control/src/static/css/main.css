@@ -104,3 +104,30 @@ iframe {
     color: white; /* Title color */
     margin: 0; /* Remove default margin */
 }
+
+.statusbar {
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.55);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 4px 14px;
+    font-size: 13px;
+    color: #ccc;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+}
+
+.statusbar-label {
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.status-value {
+    font-weight: bold;
+    letter-spacing: 0.05em;
+}
+
+.status-on  { color: #33FF57; }
+.status-off { color: #FF5733; }
+.status-unknown { color: #aaa; }

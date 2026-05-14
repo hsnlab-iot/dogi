@@ -7,8 +7,12 @@ import time
 import threading
 import logging
 import socket
+import json
 from collections import deque
 import requests
+import urllib.error
+import urllib.parse
+import urllib.request
 from urllib.parse import urlparse, urljoin
 
 import config
@@ -53,6 +57,53 @@ def _get_stream_ip():
     if ip:
         return str(ip)
     return None
+
+
+def _escape_tag_value(value):
+    """Escape VictoriaMetrics line-protocol tag value."""
+    return str(value).replace("\\", "\\\\").replace(" ", "\\ ").replace(",", "\\,").replace("=", "\\=")
+
+
+def _build_streaming_line_protocol(measurement, streaming_state, details=None):
+    """Build line protocol for streaming state.
+    
+    Args:
+        measurement: metric name (e.g., 'streamer_state')
+        streaming_state: bool indicating if streaming is active
+        details: optional dict with additional fields (uptime_seconds, etc.)
+    
+    Returns:
+        line protocol string
+    """
+    line = f"{measurement} streaming={1 if streaming_state else 0}i"
+    if details and isinstance(details, dict):
+        uptime = details.get('uptime_seconds')
+        if uptime is not None:
+            try:
+                line += f",uptime_seconds={int(uptime)}i"
+            except (TypeError, ValueError):
+                pass
+    return line
+
+
+def _push_to_victoria(victoria_url, line_payload, timeout=10):
+    """Push line protocol to VictoriaMetrics /write endpoint.
+    
+    Returns True on success, False otherwise.
+    """
+    try:
+        req = urllib.request.Request(
+            victoria_url,
+            method="POST",
+            data=line_payload.encode("utf-8"),
+            headers={"Content-Type": "text/plain; charset=utf-8"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            response.read()
+        return True
+    except Exception as exc:
+        LOG.error("Failed to push to VictoriaMetrics: %s", str(exc))
+        return False
 
 
 def _resolve_host_ip(host):
@@ -167,7 +218,7 @@ def check_health(base_url, timeout=3):
 
 
 class StreamerMonitor(threading.Thread):
-    def __init__(self, base_url, video_port, check_interval=10, status_log_interval=60, stream_ip=None):
+    def __init__(self, base_url, video_port, check_interval=10, status_log_interval=60, stream_ip=None, victoria_url=None):
         super().__init__(daemon=True)
         self.base_url = base_url.rstrip('/')
         self.video_port = int(video_port)
@@ -183,6 +234,11 @@ class StreamerMonitor(threading.Thread):
         self.recent_down_events = deque(maxlen=10)
         self.last_status_log = 0
         self.configured_stream_ip = stream_ip
+        # VictoriaMetrics tracking
+        self.victoria_url = victoria_url
+        self.last_victoria_push = 0
+        self.last_victoria_fingerprint = None
+        self.victoria_suppression_seconds = 60
 
     def stop(self):
         self._stop.set()
@@ -269,24 +325,57 @@ class StreamerMonitor(threading.Thread):
                 if started:
                     LOG.info('Start request sent due to remote not streaming')
 
+            # Push streaming state to VictoriaMetrics if configured (with suppression)
+            if self.victoria_url and healthy and streaming_flag is not None:
+                fingerprint = json.dumps({'streaming': streaming_flag, 'uptime': details.get('uptime_seconds') if details else None}, sort_keys=True, separators=(',', ':'))
+                time_since_last_push = now - self.last_victoria_push
+                changed = fingerprint != self.last_victoria_fingerprint
+                heartbeat_due = time_since_last_push >= self.victoria_suppression_seconds
+
+                if changed or heartbeat_due:
+                    line = _build_streaming_line_protocol('streamer_state', streaming_flag, details)
+                    if _push_to_victoria(self.victoria_url, line):
+                        self.last_victoria_push = now
+                        self.last_victoria_fingerprint = fingerprint
+                        LOG.debug('Pushed streaming state to VictoriaMetrics%s', ' (heartbeat)' if not changed else '')
+
             time.sleep(self.check_interval)
 
 
-def start_monitor(check_interval=10):
+def start_monitor(check_interval=10, victoria_url=None):
     base_url = _load_streamer_url()
     port = _get_video_port()
     stream_ip = _get_stream_ip()
-    monitor = StreamerMonitor(base_url, port, check_interval=check_interval, stream_ip=stream_ip)
+    monitor = StreamerMonitor(base_url, port, check_interval=check_interval, stream_ip=stream_ip, victoria_url=victoria_url)
     monitor.start()
     return monitor
 
 
 if __name__ == '__main__':
     # Simple CLI: start monitor and keep running
+    import argparse
+    parser = argparse.ArgumentParser(description='Streamer client: monitor and manage streamer service.')
+    parser.add_argument('--victoria-url', default=None, help='VictoriaMetrics base URL for metrics export (optional; will append /write if missing)')
+    args = parser.parse_args()
+
+    # Determine Victoria URL: env var takes precedence, then CLI arg, then None (disabled)
+    victoria_url = os.environ.get('VICTORIA_BASE_URL') or args.victoria_url
+    if victoria_url:
+        try:
+            parsed = urllib.parse.urlparse(victoria_url)
+            if not parsed.path.endswith("/write"):
+                victoria_url = urllib.parse.urljoin(victoria_url.rstrip("/") + "/", "write")
+            LOG.info('VictoriaMetrics export enabled: %s', victoria_url)
+        except Exception as exc:
+            LOG.warning('Failed to normalize Victoria URL; metrics export disabled: %s', exc)
+            victoria_url = None
+    else:
+        LOG.info('VictoriaMetrics export disabled (set VICTORIA_BASE_URL env var or use --victoria-url)')
+
     LOG.info('Launching streamer client...')
     cfg_url = None
     try:
-        monitor = start_monitor(check_interval=10)
+        monitor = start_monitor(check_interval=10, victoria_url=victoria_url)
         while True:
             time.sleep(1)
     except KeyboardInterrupt:

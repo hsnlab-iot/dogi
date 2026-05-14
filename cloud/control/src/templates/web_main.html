@@ -17,7 +17,7 @@
             <div class="tab tab4" onclick="clickPage(3)">{{ page3_name }}</div>
             <div class="tab tab5" onclick="clickPage(4)">{{ page4_name }}</div>
         </div>
-        <h1 class="title">Robotkutya v26.4.30</h1>
+        <h1 class="title">Robotkutya v26.5b</h1>
     </div>
     
     <div class="content-wrapper">
@@ -41,6 +41,11 @@
         </div>
     </div>
 
+    <div class="statusbar">
+        <span class="statusbar-label">Streamer:</span>
+        <span id="status-streaming" class="status-value status-unknown">...</span>
+    </div>
+
     <script>
         var socket = io();
 
@@ -51,7 +56,32 @@
         socket.on('page_load', function(url) {
             document.getElementById('myIframe').src = url;
         });
-        
+
+        function updateStatus() {
+            fetch('/api/status')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var el = document.getElementById('status-streaming');
+                    if (data.streaming === true) {
+                        el.textContent = 'ON';
+                        el.className = 'status-value status-on';
+                    } else if (data.streaming === false) {
+                        el.textContent = 'OFF';
+                        el.className = 'status-value status-off';
+                    } else {
+                        el.textContent = '–';
+                        el.className = 'status-value status-unknown';
+                    }
+                })
+                .catch(function() {
+                    var el = document.getElementById('status-streaming');
+                    el.textContent = 'ERR';
+                    el.className = 'status-value status-unknown';
+                });
+        }
+
+        updateStatus();
+        setInterval(updateStatus, 1000);
     </script>
 </body>
 </html>

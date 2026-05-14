@@ -1,6 +1,9 @@
-from flask import Flask, render_template, request
+import os
+from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
+import urllib.request
+import urllib.parse
 import libtmux
 import config
 
@@ -31,6 +34,45 @@ def index():
         'page4_name': pageconfig[4]['name'],
     }
     return render_template('web_main.html', **context)
+
+
+def _get_victoria_query_url():
+    """Return the VictoriaMetrics base query URL, or None if not configured."""
+    base = os.environ.get('VICTORIA_BASE_URL', '').strip()
+    if not base:
+        return None
+    return base.rstrip('/')
+
+
+@app.route('/api/status')
+def api_status():
+    """Query VictoriaMetrics for current streaming state and return it as JSON."""
+    victoria_base = _get_victoria_query_url()
+    if not victoria_base:
+        return jsonify({'streaming': None, 'error': 'victoria not configured'})
+
+    try:
+        query = 'streamer_state_streaming'
+        params = urllib.parse.urlencode({'query': query})
+        url = f"{victoria_base}/api/v1/query?{params}"
+        req = urllib.request.Request(url, method='GET')
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            import json
+            data = json.loads(resp.read().decode('utf-8'))
+
+        results = data.get('data', {}).get('result', [])
+        if results:
+            value = results[0].get('value', [None, None])[1]
+            try:
+                streaming = int(float(value)) == 1
+            except (TypeError, ValueError):
+                streaming = None
+        else:
+            streaming = None
+
+        return jsonify({'streaming': streaming})
+    except Exception as exc:
+        return jsonify({'streaming': None, 'error': str(exc)})
 
 
 @app.route('/reload', methods=['POST', 'GET'])
