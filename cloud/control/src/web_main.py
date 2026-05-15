@@ -49,30 +49,98 @@ def api_status():
     """Query VictoriaMetrics for current streaming state and return it as JSON."""
     victoria_base = _get_victoria_query_url()
     if not victoria_base:
-        return jsonify({'streaming': None, 'error': 'victoria not configured'})
+        return jsonify({'status': 'victoria not configured', 'error': 'victoria not configured'})
 
     try:
-        query = 'streamer_state_streaming'
-        params = urllib.parse.urlencode({'query': query})
-        url = f"{victoria_base}/api/v1/query?{params}"
-        req = urllib.request.Request(url, method='GET')
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            import json
-            data = json.loads(resp.read().decode('utf-8'))
+        import json
 
-        results = data.get('data', {}).get('result', [])
-        if results:
-            value = results[0].get('value', [None, None])[1]
-            try:
-                streaming = int(float(value)) == 1
-            except (TypeError, ValueError):
-                streaming = None
-        else:
+        def run_query(query, timeout=3):
+            # Generic instant query with nocache=1
+            params = urllib.parse.urlencode({'query': query, 'nocache': '1'})
+            url = f"{victoria_base}/api/v1/query?{params}"
+            req = urllib.request.Request(url, method='GET')
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode('utf-8')
+                return json.loads(raw), raw
+
+        def build_query(state):
+            return f'last_over_time({state}[90s]) and topk(1, tlast_over_time({state}[90s]))'
+
+        # streaming state: use last_over_time over the last 90s; missing -> OFF
+        streaming = None
+        raw_streaming = None
+        try:
+            data_tlast, raw_streaming = run_query(build_query('streamer_state_streaming'))
+            results = data_tlast.get('data', {}).get('result', [])
+            if results:
+                value = results[0].get('value', [None, None])[1]
+                try:
+                    streaming = int(float(value)) == 1
+                except (TypeError, ValueError):
+                    streaming = None
+            else:
+                streaming = False
+        except Exception:
             streaming = None
 
-        return jsonify({'streaming': streaming})
+        # ollama GPU utilization (may contain multiple models)
+        gpu_parts = []
+        raw_ollama = None
+        try:
+            data_tlast, raw_ollama = run_query(build_query('ollama_state_gpu_utilization'))
+            results = data_tlast.get('data', {}).get('result', [])
+            if results:
+                for r in results:
+                    metric = r.get('metric', {})
+                    model = metric.get('model') or metric.get('name') or metric.get('__name__')
+                    value = r.get('value', [None, None])[1]
+                    if value is None:
+                        pct = 0
+                    else:
+                        try:
+                            pct = int(round(float(value)))
+                        except Exception:
+                            pct = -1
+                    gpu_parts.append((model, pct))
+        except Exception:
+            pass
+
+        def color_span(text, color):
+            return f"<span style=\"color:{color}\">{text}</span>"
+
+        # build streamer text and HTML
+        if streaming:
+            stream_text = 'ON'
+            stream_color = 'green'
+        else:
+            stream_text = 'OFF'
+            stream_color = 'red'
+
+        status_parts = [f"Streamer: {stream_text}"]
+        status_html_parts = ["Streamer: " + color_span(stream_text, stream_color)]
+
+        # ensure at least a default ollama entry
+        if not gpu_parts:
+            gpu_parts = [("none", 0)]
+
+        # append ollama/model parts
+        for model, pct in gpu_parts:
+            model_display = model or 'none'
+            pct_display = pct if pct is not None and pct >= 0 else 0
+            # colors: model green if name exists (not 'none'), else red; gpu green only at 100%
+            gpu_color = 'green' if pct_display == 100 else 'red'
+
+            status_parts.append(f"{model_display} GPU: {pct_display}%")
+            status_html_parts.append(f"{model_display} GPU: {color_span(str(pct_display), gpu_color)}%")
+
+        return jsonify({
+            'status': ' - '.join(status_parts),
+            'statusHTML': ' - '.join(status_html_parts),
+            'streamingResponse': raw_streaming,
+            'ollamaResponse': raw_ollama,
+        })
     except Exception as exc:
-        return jsonify({'streaming': None, 'error': str(exc)})
+        return jsonify({'status': 'Error', 'error': str(exc)})
 
 
 @app.route('/reload', methods=['POST', 'GET'])

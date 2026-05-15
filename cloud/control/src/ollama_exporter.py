@@ -3,6 +3,7 @@
 import argparse
 import json
 import logging
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -26,8 +27,8 @@ def parse_args():
 	)
 	parser.add_argument(
 		"--victoria-url",
-		required=True,
-		help="VictoriaMetrics base URL for line protocol (will append /write if missing)",
+		default=None,
+		help="VictoriaMetrics base URL for line protocol (overrides VICTORIA_BASE_URL env var; will append /write if missing)",
 	)
 	parser.add_argument(
 		"--interval",
@@ -130,7 +131,10 @@ def _normalize_models(ps_payload):
 
 def build_line_protocol(measurement, normalized_models):
 	lines = [f"{measurement} model_count={len(normalized_models)}i"]
-	for entry in normalized_models:
+	entries = normalized_models if normalized_models else [
+		{"model": "none", "gpu_utilization": 0.0, "context_length": 0}
+	]
+	for entry in entries:
 		model_tag = _escape_tag_value(entry["model"])
 		ctx = int(entry.get("context_length") or 0)
 		gpu = float(entry.get("gpu_utilization") or 0.0)
@@ -152,6 +156,9 @@ def fetch_ollama_ps(ollama_base_url):
 
 
 def push_to_victoria(victoria_url, line_payload):
+	if logging.getLogger().isEnabledFor(logging.DEBUG):
+		logging.debug("Sending to VictoriaMetrics %s:\n%s", victoria_url, line_payload)
+
 	req = urllib.request.Request(
 		victoria_url,
 		method="POST",
@@ -159,7 +166,13 @@ def push_to_victoria(victoria_url, line_payload):
 		headers={"Content-Type": "text/plain; charset=utf-8"},
 	)
 	with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_SECONDS) as response:
-		response.read()
+		raw = response.read()
+		if logging.getLogger().isEnabledFor(logging.DEBUG):
+			try:
+				logging.debug("VictoriaMetrics response: %s", raw.decode("utf-8"))
+			except Exception:
+				logging.debug("VictoriaMetrics response (binary): %r", raw)
+		return raw
 
 
 def run_export_loop(ollama_url, victoria_url, interval, measurement):
@@ -222,16 +235,16 @@ def main():
 
 	logging.info("Starting Ollama exporter")
 	logging.info("Ollama URL: %s", args.ollama_url)
-	# Normalize Victoria URL to ensure it targets the /write endpoint used by
-	# VictoriaMetrics line-protocol ingestion. If user already provided a
-	# /write path, leave it alone.
-	victoria_url = args.victoria_url
+	# Priority: CLI arg > VICTORIA_BASE_URL env var
+	victoria_url = args.victoria_url or os.environ.get("VICTORIA_BASE_URL", "").strip() or None
+	if not victoria_url:
+		raise SystemExit("VictoriaMetrics URL is required. Set --victoria-url or VICTORIA_BASE_URL env var.")
 	try:
 		parsed = urllib.parse.urlparse(victoria_url)
 		if not parsed.path.endswith("/write"):
 			victoria_url = urllib.parse.urljoin(victoria_url.rstrip("/") + "/", "write")
 	except Exception:
-		victoria_url = args.victoria_url
+		pass
 
 	logging.info("Victoria URL: %s", victoria_url)
 	logging.info("Polling interval: %.2fs", args.interval)

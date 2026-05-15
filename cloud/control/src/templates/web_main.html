@@ -42,8 +42,8 @@
     </div>
 
     <div class="statusbar">
-        <span class="statusbar-label">Streamer:</span>
-        <span id="status-streaming" class="status-value status-unknown">...</span>
+        <span class="statusbar-label">Status:</span>
+        <span id="status" class="status-value status-unknown">...</span>
     </div>
 
     <script>
@@ -61,22 +61,12 @@
             fetch('/api/status')
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
-                    var el = document.getElementById('status-streaming');
-                    if (data.streaming === true) {
-                        el.textContent = 'ON';
-                        el.className = 'status-value status-on';
-                    } else if (data.streaming === false) {
-                        el.textContent = 'OFF';
-                        el.className = 'status-value status-off';
-                    } else {
-                        el.textContent = '–';
-                        el.className = 'status-value status-unknown';
-                    }
+                    var el = document.getElementById('status');
+                    el.innerHTML = data.statusHTML;
                 })
                 .catch(function() {
-                    var el = document.getElementById('status-streaming');
-                    el.textContent = 'ERR';
-                    el.className = 'status-value status-unknown';
+                    var el = document.getElementById('status');
+                    el.textContent = 'ERROR';
                 });
         }
 
