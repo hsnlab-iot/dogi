@@ -18,6 +18,7 @@ vision = ""
 5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
 #5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_capture.py"
 6 = "ssh!pi:~/kutyus_env/bin:~/dogi/onboard/mcp/mcp_memory.py"
+7 = "sse!http://robot_ip:5000/mcp/sse"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"

@@ -21,6 +21,7 @@ services:
       - ROBOT_IP=10.100.0.38  # Wireguard address
       - DOGZILLA_API_BASE=http://10.100.0.38:8001
       - VICTORIA_BASE_URL=http://dogi-vm:8428
+      - MCP_KEY=${MCP_KEY}
     ports:
       - "6080:6080" # the remote display port
       - "5050-5059:5050-5059"
@@ -61,7 +62,8 @@ services:
   victoriametrics:
     image: victoriametrics/victoria-metrics:latest
     container_name: dogi-vm
-    ports: ["8428:8428"]
+    expose:
+      - 8428
     volumes:
       # PERSISTENCE: This ensures your data survives container restarts/updates
       - ./vmdata:/storage

@@ -1,5 +1,7 @@
 import asyncio
+import os
 import threading
+from urllib.parse import urlsplit, urlunsplit
 
 #from sympy import python
 from mcp import ClientSession, StdioServerParameters
@@ -54,7 +56,28 @@ class RemoteMCPManager:
         return True
 
     async def _sse_establish(self, url):
-        self.transport_ctx = sse_client(url)
+        parsed = urlsplit(url)
+        robot_ip = os.getenv("ROBOT_IP")
+        if parsed.hostname == "robot_ip" and robot_ip:
+            # Keep userinfo and port if present, only replace host.
+            netloc = parsed.netloc
+            if "@" in netloc:
+                userinfo, hostport = netloc.rsplit("@", 1)
+                _, _, port = hostport.partition(":")
+                rebuilt_hostport = f"{robot_ip}:{port}" if port else robot_ip
+                netloc = f"{userinfo}@{rebuilt_hostport}"
+            else:
+                _, _, port = netloc.partition(":")
+                netloc = f"{robot_ip}:{port}" if port else robot_ip
+
+            url = urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+
+        headers = {}
+        mcp_key = os.getenv("MCP_KEY")
+        if mcp_key:
+            headers["Authorization"] = f"Bearer {mcp_key}"
+
+        self.transport_ctx = sse_client(url, headers=headers)
         self.read, self.write = await self.transport_ctx.__aenter__()
         self.session = ClientSession(self.read, self.write)
         await self.session.__aenter__()
@@ -62,7 +85,7 @@ class RemoteMCPManager:
         return True
 
     def get_tools_blocking(self):
-        """Ez a metódus szinkronban blokkol, amíg megjön a lista."""
+        """Blocking call to list tools"""
         if not self.session:
             raise Exception("Nincs kapcsolat!")
         
@@ -70,7 +93,7 @@ class RemoteMCPManager:
         return future.result() # Itt vár (blokkol)
 
     async def call_tool_async(self, tool_name, args):
-        """Ez pedig már marad async, ha így kényelmesebb."""
+        """Async tool call"""
         return await self.session.call_tool(tool_name, arguments=args)
 
     def call_tool_blocking(self, tool_name, args):
