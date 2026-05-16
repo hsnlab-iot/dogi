@@ -56,7 +56,7 @@ def register_tools(mcp):
         return f"Performed {action} with steps={steps}, duration={duration}s, pace={pace}"
 
     @mcp.tool()
-    def attitude_control(action: str, direction: str = "left", amount: int = 8) -> str:
+    def body_control(action: str, direction: str, amount: int = 8) -> str:
         """
         Control the body's attitude. Available actions:
         - twist: Rotate the body around its vertical axis (yaw). Direction can be left or right.
