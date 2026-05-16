@@ -220,6 +220,13 @@ def _connect_one_mcp_server(mcp_server):
         rmcp.sse_connect(url)
         mcp_tools = rmcp.get_tools_blocking()
 
+    elif kind == 'str':
+        # rest is like "http://ip:port/mcp"
+        url = rest
+        rmcp = RemoteMCPManager.RemoteMCPManager()
+        rmcp.str_connect(url)
+        mcp_tools = rmcp.get_tools_blocking()
+
     else:
         print('unknown tool kind:', kind)
         return [], []

@@ -1,17 +1,23 @@
 import asyncio
+import httpx
 import os
 import threading
+import traceback
 from urllib.parse import urlsplit, urlunsplit
 
 #from sympy import python
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
-
+from mcp.client.streamable_http import streamable_http_client
 
 class RemoteMCPManager:
     def __init__(self):
         self.session = None
+        self.transport_ctx = None
+        self.http_client = None
+        self.read = None
+        self.write = None
         self.loop = asyncio.new_event_loop()
         # Elindítjuk az eseményhurkot egy külön szálon
         self.thread = threading.Thread(target=self._run_event_loop, daemon=True)
@@ -42,7 +48,31 @@ class RemoteMCPManager:
         """Blocking connect — waits until SSE connection is established."""
         print(f"Connecting to SSE MCP server at {url}")
         future = asyncio.run_coroutine_threadsafe(self._sse_establish(url), self.loop)
-        return future.result()
+        try:
+            return future.result()
+        except BaseException as e:
+            excs = getattr(e, 'exceptions', None)
+            if excs:
+                print(f"SSE connect failed — {len(excs)} sub-exception(s):")
+                for i, sub in enumerate(excs):
+                    print(f"  [{i}] {type(sub).__name__}: {sub}")
+                    traceback.print_exception(type(sub), sub, sub.__traceback__)
+            raise
+
+    def str_connect(self, url):
+        """Blocking connect for streamable HTTP MCP transport."""
+        print(f"Connecting to Streamable HTTP MCP server at {url}")
+        future = asyncio.run_coroutine_threadsafe(self._str_establish(url), self.loop)
+        try:
+            return future.result()
+        except BaseException as e:
+            excs = getattr(e, 'exceptions', None)
+            if excs:
+                print(f"Streamable HTTP connect failed — {len(excs)} sub-exception(s):")
+                for i, sub in enumerate(excs):
+                    print(f"  [{i}] {type(sub).__name__}: {sub}")
+                    traceback.print_exception(type(sub), sub, sub.__traceback__)
+            raise
 
     async def _ssh_establish(self, params):
         # Megjegyzés: A kontextus kezelőket (ctx managers) itt óvatosan kell használni, 
@@ -55,7 +85,7 @@ class RemoteMCPManager:
         await self.session.initialize()
         return True
 
-    async def _sse_establish(self, url):
+    def _prepare_url_and_headers(self, url):
         parsed = urlsplit(url)
         robot_ip = os.getenv("ROBOT_IP")
         if parsed.hostname == "robot_ip" and robot_ip:
@@ -77,12 +107,62 @@ class RemoteMCPManager:
         if mcp_key:
             headers["Authorization"] = f"Bearer {mcp_key}"
 
+        return url, headers
+
+    async def _sse_establish(self, url):
+        url, headers = self._prepare_url_and_headers(url)
+
+        print(f"SSE connection to {url}")
         self.transport_ctx = sse_client(url, headers=headers)
         self.read, self.write = await self.transport_ctx.__aenter__()
         self.session = ClientSession(self.read, self.write)
         await self.session.__aenter__()
         await self.session.initialize()
         return True
+
+    async def _str_establish(self, url):
+        url, headers = self._prepare_url_and_headers(url)
+
+        print(
+            f"Streamable HTTP connection to {url} "
+            f"(bearer_auth={'enabled' if 'Authorization' in headers else 'disabled'})"
+        )
+        self.http_client = httpx.AsyncClient(headers=headers)
+        self.transport_ctx = streamable_http_client(url, http_client=self.http_client)
+        self.read, self.write, _ = await self.transport_ctx.__aenter__()
+        self.session = ClientSession(self.read, self.write)
+        await self.session.__aenter__()
+        await self.session.initialize()
+        return True
+
+    async def _close_async(self):
+        session = self.session
+        transport_ctx = self.transport_ctx
+        http_client = self.http_client
+
+        self.session = None
+        self.transport_ctx = None
+        self.http_client = None
+        self.read = None
+        self.write = None
+
+        if session is not None:
+            await session.__aexit__(None, None, None)
+
+        if transport_ctx is not None:
+            await transport_ctx.__aexit__(None, None, None)
+
+        if http_client is not None:
+            await http_client.aclose()
+
+    def close(self):
+        """Close the MCP session and transport resources."""
+        future = asyncio.run_coroutine_threadsafe(self._close_async(), self.loop)
+        try:
+            return future.result()
+        finally:
+            self.loop.call_soon_threadsafe(self.loop.stop)
+            self.thread.join(timeout=1)
 
     def get_tools_blocking(self):
         """Blocking call to list tools"""
