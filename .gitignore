@@ -45,3 +45,5 @@ WiP/
 cloud/control/id_ed25519
 cloud/control/id_ed25519.pub
 cloud/control/vmdata
+
+.env

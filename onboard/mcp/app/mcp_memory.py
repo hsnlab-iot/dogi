@@ -1,11 +1,12 @@
 import sys
 import json
 import asyncio
+import os
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Memory")
 
-MEMORY_FILE = "dogi_memory.txt"
+MEMORY_FILE = os.getenv("DOGI_MCP_MEMORY_FILE", "/data/dogi_memory.txt")
 
 @mcp.tool()
 def save_info(info: str):

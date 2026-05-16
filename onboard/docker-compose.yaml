@@ -10,3 +10,17 @@ services:
       - SERIAL_PORT=/dev/serial0
     volumes:
       - ./src/streamer.cfg:/root/streamer.cfg:ro
+
+  onboard-mcp:
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+    container_name: onboard-mcp
+    environment:
+      - SSH_PASSWORD=${SSH_PASSWORD}
+    ports:
+      - "5000:5000"
+      - "2222:22"
+    volumes:
+      - ./mcp/data:/data
+    restart: unless-stopped
