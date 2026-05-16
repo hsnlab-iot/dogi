@@ -6,7 +6,7 @@ ui = "hu"
 prompt = "hu"
 
 [models]
-general = "qwen3.5:9B"
+general = "qwen3.5:4B"
 translation = ""
 vision = ""
 
@@ -17,7 +17,7 @@ vision = ""
 4 = "ssh!pi:~/kutyus_env/bin:~/mcp_server.py"
 5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
 #5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_capture.py"
-6 = "ssh!pi:~/kutyus_env/bin:~/dogi/onboard/mcp_memory.py"
+6 = "ssh!pi:~/kutyus_env/bin:~/dogi/onboard/mcp/mcp_memory.py"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
@@ -29,6 +29,7 @@ max_output_tokens = 1536
 translation_max_output_tokens = 2048
 prompt_temperature = 0.9
 prompt_frequency_penalty = 1.5
+binary_images = false
 
 [tts]
 # TTS protocol: 'opentts' | 'openai' | 'mms'

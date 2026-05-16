@@ -56,7 +56,7 @@ def voice_file(filename):
 def test():
     prompt_text = config.get_prompt('web_voice', 'test_init_1')
     prompt_text = utils.select_text(prompt_text,  config.get_ui_language(), True)
-    funny = utils.prompt(prompt_text)
+    funny, _ = utils.prompt(prompt_text)
     if config.needs_translation():
         funny = utils.translate(funny, config.get_prompt_language())
 

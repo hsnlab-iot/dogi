@@ -147,7 +147,7 @@ while True:
 
     try:
         prompt_text = config.get_prompt('keresd', 'main_loop_1')
-        text = utils.prompt(prompt_text, images=[img_buffer.tobytes()])
+        text, _ = utils.prompt(prompt_text, images=[img_buffer.tobytes()])
         print(f"Description: {text}")
         sock_web.send(pickle.dumps({'action': 'entext', 'text': text}))
 
@@ -165,7 +165,7 @@ while True:
         time.sleep(d)
 
         prompt_text = config.get_prompt('keresd', 'main_loop_2', description=text)
-        ball = utils.prompt(prompt_text)
+        ball, _ = utils.prompt(prompt_text)
         print("Ball: ", ball)
 
         if ball.upper() in ['YES', 'YES!', 'IGEN', 'IGEN!']:
@@ -181,7 +181,7 @@ while True:
             ball_found = True
 
             prompt_text = config.get_prompt('keresd', 'main_loop_3')
-            text = utils.prompt(prompt_text, images=[img_buffer.tobytes()])
+            text, _ = utils.prompt(prompt_text, images=[img_buffer.tobytes()])
             print(f"Ball place: {text}")
             sock_web.send(pickle.dumps({'action': 'entext', 'text': text}))
 
@@ -206,7 +206,7 @@ while True:
             break
 
         prompt_text = config.get_prompt('keresd', 'main_loop_4')
-        obstacles = utils.prompt(prompt_text, images=[img_buffer.tobytes()])
+        obstacles, _ = utils.prompt(prompt_text, images=[img_buffer.tobytes()])
         print("Obstacles: ", obstacles)
         
     except Exception as e:

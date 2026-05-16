@@ -51,10 +51,12 @@ def main():
         print(f"Attaching image: {images[0]}\n")
 
     # Route through utils.prompt so all current request settings/debug apply.
-    response = utils.prompt(prompt_text, images=images, stream=args.stream)
+    response, stats = utils.prompt(prompt_text, images=images, stream=args.stream)
 
     print('Model response:')
     print(response)
+    print('Prompt statistics:')
+    print(stats)
 
     if args.tts:
         if response and str(response).strip():

@@ -1,8 +1,6 @@
 from unittest import result
 
-import cv2
 import numpy as np
-import zmq
 import time
 import socket
 import pickle
@@ -15,6 +13,7 @@ import subprocess
 import urllib.request
 import json
 import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from typing import List, Dict, Any
 from mcp.types import CallToolResult, ImageContent, TextContent
@@ -108,9 +107,13 @@ def handle_prompt(data):
             try:
                 tool_calls = True
                 prompt_next = prompt_text
+                message_history = []
                 while (tool_calls) and not stop_event.is_set():
                     # Call the prompt (blocking). In future we can use stream=True to send partial updates.                    
-                    messages, response = utils.prompt(prompt_next, tools = openai_tools)
+                    response, message_history, stats = utils.prompt_with_tools(
+                        prompt_next, message_history, tools = openai_tools
+                    )
+                    print(f"Prompt statistics: {json.dumps(stats, ensure_ascii=False)}")
                     response_message = response.choices[0].message
                     tool_calls = response_message.tool_calls
 
@@ -120,7 +123,6 @@ def handle_prompt(data):
                                  {"type": "response",
                                   "data": response_message.content})
 
-                    prompt_next = messages
                     tool_calls_json = []
                     tool_responses_json = []
                     if tool_calls:
@@ -156,17 +158,13 @@ def handle_prompt(data):
 
                     print("Tools finished.")
     
+                    prompt_next = []
                     # Create the next prompt
                     prompt_next.append({
                         "role": "assistant",
                         "content": response_message.content or "",
                         "tool_calls": tool_calls_json})
                     prompt_next.extend(tool_responses_json)
-                    if not config.get_openai_enable_thinking():
-                        prompt_next.append({
-                            "role": "assistant",
-                            "content": "<think></think>"
-                        })
                         
                 # If stop requested, don't emit final result
                 if stop_event.is_set():
@@ -193,69 +191,84 @@ def handle_prompt(data):
         #worker_thread.start()
         worker_thread = sio.start_background_task(worker, prompt_text, openai_tools, tools, worker_stop_event)
 
-def connec_MCP_serves():    
-    # Connect to MCP serves
-
+def _connect_one_mcp_server(mcp_server):
     robot_ip = os.getenv('ROBOT_IP', '127.0.0.1')
 
-    for mcp_server in toolscfg:
-        try:
-            if not isinstance(mcp_server, str) or '!' not in mcp_server:
-                print('invalid mcp_server entry:', mcp_server)
-                continue
+    if not isinstance(mcp_server, str) or '!' not in mcp_server:
+        print('invalid mcp_server entry:', mcp_server)
+        return [], []
 
-            kind, rest = mcp_server.split('!', 1)
+    kind, rest = mcp_server.split('!', 1)
+    rmcp = None
+    mcp_tools = None
 
-            rcmp = None
-            mcp_tools = None
+    if kind == 'ssh':
+        # rest is like "user@ip:~/venv/bin/python3:~/test.py"
+        user, python_path, script_path = rest.split(':', 2)
+        ip = robot_ip
+        if '@' in user:
+            user, ip = user.split('@', 1)
 
-            if kind == 'ssh':
-                # rest is like "user@ip:~/venv/bin/python3:~/test.py"
-                user, python_path, script_path = rest.split(':', 2)
-                ip = robot_ip
-                if '@' in user:
-                    user, ip = user.split('@', 1)
+        rmcp = RemoteMCPManager.RemoteMCPManager()
+        rmcp.ssh_connect(user, ip, python_path, script_path)
+        mcp_tools = rmcp.get_tools_blocking()
 
-                # RemoteMCPManager is a module; instantiate the class inside it
-                rmcp = RemoteMCPManager.RemoteMCPManager()
-                rmcp.ssh_connect(user, ip, python_path, script_path)
-                mcp_tools = rmcp.get_tools_blocking()
-                
-            elif kind == 'sse':
-                # rest is like "http://ip:port/test"
-                url = rest
-                
-                rmcp = RemoteMCPManager.RemoteMCPManager()
-                rmcp.sse_connect(url)
-                mcp_tools = rmcp.get_tools_blocking()
+    elif kind == 'sse':
+        # rest is like "http://ip:port/test"
+        url = rest
+        rmcp = RemoteMCPManager.RemoteMCPManager()
+        rmcp.sse_connect(url)
+        mcp_tools = rmcp.get_tools_blocking()
 
-            else:
-                print('unknown tool kind:', kind)
-                continue
+    else:
+        print('unknown tool kind:', kind)
+        return [], []
 
+    local_openai_tools = []
+    local_tools = []
+
+    try:
+        for tool in mcp_tools.tools:
+            print(tool)
+            local_openai_tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.inputSchema,
+                    },
+                }
+            )
+            local_tools.append((rmcp, tool.name, tool.description))
+    except Exception as e:
+        print('failed to parse mcp_tools list:', e)
+
+    return local_openai_tools, local_tools
+
+
+def connect_mcp_servers():
+    # Connect to MCP servers in parallel so one slow server does not block the rest.
+    global openai_tools, tools
+
+    max_workers = max(1, min(32, len(toolscfg) or 1))
+    collected_openai_tools = []
+    collected_tools = []
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_connect_one_mcp_server, mcp_server): mcp_server for mcp_server in toolscfg}
+        for future in as_completed(futures):
+            mcp_server = futures[future]
             try:
-                for tool in mcp_tools.tools:
-                    print(tool)
-                    openai_tools.append(
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": tool.name,
-                                "description": tool.description,
-                                "parameters": tool.inputSchema,
-                            },
-                        }
-                    )
-                    tools.append(
-                        (rmcp, tool.name, tool.description)
-                    )
+                local_openai_tools, local_tools = future.result()
+                collected_openai_tools.extend(local_openai_tools)
+                collected_tools.extend(local_tools)
             except Exception as e:
-                print('failed to parse mcp_tools list:', e)
-            
-        except Exception as e:
-            print('error processing mcp_server', mcp_server, e)
+                print('error processing mcp_server', mcp_server, e)
 
-        print(f"Found tools: {tools}")
+    openai_tools.extend(collected_openai_tools)
+    tools.extend(collected_tools)
+    print(f"Found tools: {tools}")
 
 def introduction():
     text = {
@@ -272,7 +285,7 @@ if __name__ == '__main__':
     # Connect to your Flask-SocketIO address
     sio.connect(f'http://localhost:{PORT}') 
 
-    connec_MCP_serves()
+    connect_mcp_servers()
 
     xtools = [] 
     for tool in tools:

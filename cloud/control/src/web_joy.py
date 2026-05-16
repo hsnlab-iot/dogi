@@ -158,7 +158,7 @@ def handle_event(data):
     if data == "joke":
         utils.play_wav(config.get_ui_language() + "_joke_joy")
         prompt_text = config.get_prompt('web_joy', 'handle_event_action_1')
-        joke = utils.prompt(prompt_text)
+        joke, _ = utils.prompt(prompt_text)
         if config.needs_translation():
             joke = utils.translate(joke, config.get_prompt_language())
         jw, d = utils.tts_wav(joke)
@@ -171,7 +171,7 @@ def handle_event(data):
         if lastimg is not None:
             utils.play_wav(config.get_ui_language() + "_what_joy")
             prompt_text = config.get_prompt('web_joy', 'handle_event_action_2')
-            text = utils.prompt(prompt_text, images=[lastimg])
+            text, _ = utils.prompt(prompt_text, images=[lastimg])
             print(f"What: {text}")
             if config.needs_translation():
                 print("Ask translation" )

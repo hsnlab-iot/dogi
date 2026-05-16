@@ -19,6 +19,7 @@ DEFAULT_OPENAI_MAX_OUTPUT_TOKENS = 512
 DEFAULT_OPENAI_TRANSLATION_MAX_OUTPUT_TOKENS = 1024
 DEFAULT_OPENAI_PROMPT_TEMPERATURE = 0.3
 DEFAULT_OPENAI_PROMPT_FREQUENCY_PENALTY = 1.5
+DEFAULT_OPENAI_BINARY_IMAGES = False
 DEFAULT_TRANSLATION_MODEL = 'opus'
 DEFAULT_VISION_MODEL = ''
 DEFAULT_TTS_API_BASE = ''
@@ -53,6 +54,7 @@ _openai_max_output_tokens = None
 _openai_translation_max_output_tokens = None
 _openai_prompt_temperature = None
 _openai_prompt_frequency_penalty = None
+_openai_binary_images = None
 _tts_api_base = None
 _tts_voice = None
 _tts_model = None
@@ -244,6 +246,7 @@ def reinit():
     global _openai_translation_max_output_tokens
     global _openai_prompt_temperature
     global _openai_prompt_frequency_penalty
+    global _openai_binary_images
     global _tts_api_base
     global _tts_voice
     global _tts_model
@@ -272,6 +275,7 @@ def reinit():
     _openai_translation_max_output_tokens = None
     _openai_prompt_temperature = None
     _openai_prompt_frequency_penalty = None
+    _openai_binary_images = None
     _tts_api_base = None
     _tts_voice = None
     _tts_model = None
@@ -520,6 +524,27 @@ def get_openai_general_extra_body(num_predict=None):
 
     return extra_body
 
+
+def get_openai_binary_images():
+    """Singleton to ensure OpenAI-compatible binary image setting stays in memory."""
+    global _openai_binary_images
+
+    if _openai_binary_images is None:
+        raw_value = _get_config_value(
+            'openai',
+            'binary_images',
+            False,
+        )
+        if isinstance(raw_value, bool):
+            _openai_binary_images = raw_value
+        elif isinstance(raw_value, str):
+            _openai_binary_images = raw_value.strip().lower() in ('1', 'true', 'yes', 'on')
+        else:
+            _openai_binary_images = bool(raw_value)
+
+        print(f'Using OpenAI binary_images: {_openai_binary_images}')
+
+    return _openai_binary_images
 
 def get_translation_model():
     """Singleton to ensure translation model stays in memory."""
