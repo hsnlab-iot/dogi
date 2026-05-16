@@ -6,6 +6,7 @@ Web servers (using flask):
 5053: (web_keresd.py) Keresd app
 5054: (web_mutasd.py) Mutasd app
 5055: (web_kovesd.py) Kovesd app
+5056: (web_prompt.py) Prompt app
 
 6080: (noVNC)         X desktop for development
 
