@@ -39,8 +39,8 @@ class DOGZILLA:
             raise ValueError('API base URL must be provided via api_base argument or DOGZILLA_API_BASE env var')
 
         # keep compatibility with original constructor signature
-        self.port = port
-        self.baud = int(baud)
+        #self.port = port
+        #self.baud = int(baud)
         self.verbose = bool(verbose)
 
         self._remote_methods = [
