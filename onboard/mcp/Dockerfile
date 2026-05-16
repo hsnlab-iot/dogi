@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     openssh-server \
+    tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv from the official image.

@@ -10,6 +10,8 @@ services:
       - SERIAL_PORT=/dev/serial0
     volumes:
       - ./src/streamer.cfg:/root/streamer.cfg:ro
+    expose:
+      - "8001"
 
   onboard-mcp:
     build:
@@ -17,10 +19,12 @@ services:
       dockerfile: mcp/Dockerfile
     container_name: onboard-mcp
     environment:
-      - SSH_PASSWORD=${SSH_PASSWORD}
+      - MCP_SSH_PASSWORD=${MCP_SSH_PASSWORD}
+      - MCP_KEY=${MCP_KEY}
+      - DOGZILLA_API_BASE=http://onboard:8001
     ports:
       - "5000:5000"
-      - "2222:22"
+      #- "2222:22"
     volumes:
       - ./mcp/data:/data
     restart: unless-stopped
