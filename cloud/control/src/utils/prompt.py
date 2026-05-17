@@ -4,6 +4,7 @@ import base64
 import mimetypes
 import io
 import time
+import datetime
 import re
 
 import config
@@ -220,6 +221,73 @@ def _debug_openai_response(tag, response):
     print(f"[DEBUG][OpenAI][{tag}] response:\n{serialized}")
 
 
+def _sanitize_for_json(value):
+    # Handle common binary types
+    if value is None:
+        return None
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        try:
+            b = bytes(value)
+            return {"__bytes_base64__": base64.b64encode(b).decode('ascii')}
+        except Exception:
+            return str(value)
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            try:
+                key = str(k)
+            except Exception:
+                key = repr(k)
+            out[key] = _sanitize_for_json(v)
+        return out
+    if isinstance(value, (list, tuple, set)):
+        return [_sanitize_for_json(v) for v in value]
+
+    # Fallback to structured conversions
+    try:
+        j = _to_jsonable(value)
+        # If _to_jsonable returned something complex, sanitize it too
+        if isinstance(j, (dict, list, tuple, set)):
+            return _sanitize_for_json(j)
+        return j
+    except Exception:
+        pass
+
+    try:
+        return str(value)
+    except Exception:
+        return None
+
+
+def _maybe_write_log(kind, payload):
+    """Write payload to log directory if configured.
+
+    kind: 'request' or 'response' (used in filename)
+    payload: object to serialize
+    """
+    try:
+        log_dir = config.get_log_dir()
+    except Exception:
+        log_dir = None
+
+    if not log_dir:
+        return
+
+    # Build timestamp YYYYmmddHHMMSSmmm
+    now = datetime.datetime.utcnow()
+    ts = now.strftime('%Y%m%d%H%M%S') + f"{int(now.microsecond/1000):03d}"
+    filename = os.path.join(log_dir, f"{ts}_{kind}.json")
+
+    safe = _sanitize_for_json(payload)
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(safe, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Warning: failed to write OpenAI {kind} log to {filename}: {e}")
+
+
 def response_filter(response):
     # Remove any leading/trailing whitespace and unwanted characters
     response = response.strip()
@@ -332,9 +400,11 @@ def prompt_with_tools(prompt, message_history=None, tools=None, images=None):
     now = time.time()
     
     _debug_openai_request("prompt", request_kwargs)
+    _maybe_write_log('request', request_kwargs)
     response = openai_client.chat.completions.create(**request_kwargs)
     usage = getattr(response, "usage", None)
     _debug_openai_response("prompt", response)
+    _maybe_write_log('response', response)
 
     elapsed = time.time() - now
     
@@ -390,6 +460,7 @@ def prompt(prompt_text, images=None, stream=False):
         request_kwargs["stream"] = True
 
     _debug_openai_request("prompt", request_kwargs)
+    _maybe_write_log('request', request_kwargs)
 
     if stream:
         usage = None
@@ -442,14 +513,24 @@ def prompt(prompt_text, images=None, stream=False):
             print(f"Reasoning: {''.join(full_reasoning_parts)}")
         elapsed = time.time() - now
         print(f"OpenAI ({model}) prompt stream time: {elapsed}")
-
         filtered_response = response_filter(''.join(full_response_parts))
+        # Write assembled streaming response to log if configured
+        try:
+            resp_payload = {
+                'full_response': ''.join(full_response_parts),
+                'reasoning': ''.join(full_reasoning_parts),
+                'usage': _sanitize_for_json(usage),
+            }
+            _maybe_write_log('response', resp_payload)
+        except Exception:
+            pass
         statistics = _build_statistics(request_kwargs, usage, elapsed, images, stream, model)
 
     else:
         usage = None
         response = openai_client.chat.completions.create(**request_kwargs)
         _debug_openai_response("prompt", response)
+        _maybe_write_log('response', response)
         usage = getattr(response, "usage", None)
 
         elapsed = time.time() - now

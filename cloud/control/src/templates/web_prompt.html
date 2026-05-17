@@ -16,6 +16,7 @@
             <label for="prompt-input">Prompt:</label>
             <div class="prompt-row">
                 <textarea id="prompt-input" placeholder="Enter your prompt here..."></textarea>
+                <button id="prompt-new" class="prompt-button new">NEW</button>
                 <button id="prompt-send" class="prompt-button prompt" disabled>Prompt</button>
             </div>
         </div>
@@ -40,13 +41,37 @@
         </div>
     </div>
 
-    <!-- Tool List -->
-    <div class="tools-list-section">
-        <label>Tools:</label>
-        <div id="tools-loading">LOADING...</div>
-        <ul id="tools-list">
-            <!-- Tool list items will appear here -->
-        </ul>
+    <!-- Sidebar -->
+    <div class="sidebar-column">
+        <div class="tools-list-section">
+            <label>Tools:</label>
+            <div id="tools-loading">LOADING...</div>
+            <ul id="tools-list">
+                <!-- Tool list items will appear here -->
+            </ul>
+        </div>
+
+        <div class="stats-section">
+            <label>Prompt Stats:</label>
+            <div id="prompt-stats" class="stats-grid">
+                <div class="stats-item">
+                    <span class="stats-name">Context window size</span>
+                    <span id="stats-context-window" class="stats-value">-</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-name">Bytes</span>
+                    <span id="stats-bytes" class="stats-value">-</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-name">Tokens</span>
+                    <span id="stats-tokens" class="stats-value">-</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-name">Response time</span>
+                    <span id="stats-response-time" class="stats-value">-</span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -105,6 +130,55 @@
 
         updateToolsPreview('');
     }
+
+    function resetPromptStats() {
+        setStatsValue('stats-context-window', '-');
+        setStatsValue('stats-bytes', '-');
+        setStatsValue('stats-tokens', '-');
+        setStatsValue('stats-response-time', '-');
+    }
+
+    function resetPromptView() {
+        var promptInput = document.getElementById('prompt-input');
+        var responseOutput = document.getElementById('response-output');
+        var toolsResponseOutput = document.getElementById('tools-response-output');
+
+        if (promptInput) promptInput.value = '';
+        if (responseOutput) responseOutput.value = '';
+        if (toolsResponseOutput) toolsResponseOutput.value = '';
+
+        toolsImageHistory = [];
+        renderToolsImageThumbnails();
+        resetPromptStats();
+    }
+
+    function setStatsValue(id, value) {
+        var element = document.getElementById(id);
+        if (!element) return;
+        element.textContent = value;
+    }
+
+    function formatInteger(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+        return value.toLocaleString();
+    }
+
+    function formatSeconds(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+        return value.toFixed(2) + ' s';
+    }
+
+    function updatePromptStats(stats) {
+        var contextWindow = stats && stats.prompt_tokens;
+        var bytes = stats && stats.prompt_size_bytes;
+        var totalTokens = stats && stats.total_tokens;
+        var elapsedSeconds = stats && stats.elapsed_seconds;
+
+        setStatsValue('stats-context-window', formatInteger(contextWindow));
+        setStatsValue('stats-bytes', formatInteger(bytes));
+        setStatsValue('stats-tokens', formatInteger(totalTokens));
+        setStatsValue('stats-response-time', formatSeconds(elapsedSeconds));
+    }
     
     socket.on('ui_update_tools_response', function(data) {
         console.log('tools_response event', data.data);
@@ -140,6 +214,13 @@
         }
     });
 
+    socket.on('ui_update_stats', function(data) {
+        console.log('stats event', data && data.data);
+        if (data && data.data) {
+            updatePromptStats(data.data);
+        }
+    });
+
     socket.on('ui_update_tools', function(data) {
         console.log('tools event', data.data);
 
@@ -164,6 +245,15 @@
     });
 
     // Helpers to manage the prompt/abort button states
+    function bindNewButton() {
+        var newBtn = document.getElementById('prompt-new');
+        if (!newBtn) return;
+        newBtn.onclick = function () {
+            resetPromptView();
+            socket.emit('new');
+        };
+    }
+
     function setToPrompt() {
         var sendBtn = document.getElementById('prompt-send');
         var promptInput = document.getElementById('prompt-input');
@@ -197,6 +287,9 @@
             setToAbort();
         }
     });
+
+    bindNewButton();
+    resetPromptStats();
 
 </script>
 

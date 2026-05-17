@@ -1,5 +1,6 @@
 [general]
 cache = "~/.cache"
+log = "~/log"
 
 [language]
 ui = "hu"
@@ -14,14 +15,13 @@ vision = ""
 # ssh for stdio MCP servers
 # sse for SSE MCP servers
 # str for Streamable HTTP MCP servers
-1 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
-#2 = "sse!http://10.100.0.38:8080/sse"
-#3 = "sse!http://10.100.0.38:8000/mcp/sse"
+highfive = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
+capture = "sse!http://robot_ip:8000/mcp/sse"
+dice = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
+body = "str!http://robot_ip:5000/mcp"
 #4 = "ssh!pi:~/kutyus_env/bin:~/mcp_server.py"
-5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
-##5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_capture.py"
+#5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_capture.py"
 #6 = "ssh!pi:~/kutyus_env/bin:~/dogi/onboard/mcp/mcp_memory.py"
-7 = "str!http://robot_ip:5000/mcp"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"

@@ -22,6 +22,7 @@ services:
       - DOGZILLA_API_BASE=http://10.100.0.38:8001
       - VICTORIA_BASE_URL=http://dogi-vm:8428
       - MCP_KEY=${MCP_KEY}
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006
     ports:
       - "6080:6080" # the remote display port
       - "5050-5059:5050-5059"
@@ -36,6 +37,7 @@ services:
       - ./src:/app:ro
       - ./id_ed25519:/root/.ssh/id_ed25519:ro
       - ./id_ed25519.pub:/root/.ssh/id_ed25519.pub:ro
+      - ./log:/root/log
     deploy:
       resources:
         reservations:
@@ -70,3 +72,9 @@ services:
     command:
       - "--storageDataPath=/storage"
     restart: unless-stopped
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"  # UI and OTLP HTTP collector
+      - "4317:4317"  # OTLP gRPC collector

@@ -39,6 +39,8 @@ worker_lock = threading.Lock()
 worker_thread = None
 worker_stop_event = None
 
+# History context
+message_history = []
 
 def mcp_to_openai_multimodal_tool(mcp_result: CallToolResult, tool_call_id: str) -> Dict[str, Any]:
     """
@@ -82,6 +84,11 @@ def mcp_to_openai_multimodal_tool(mcp_result: CallToolResult, tool_call_id: str)
 def connect():
     print("Connected to Flask server!")
 
+@sio.on('client_new')
+def handle_new():
+    global message_history
+    message_history = []
+
 @sio.on('client_prompt')
 def handle_prompt(data):
     """Start a background worker to call the OpenAI-compatible server with the prompt.
@@ -107,13 +114,20 @@ def handle_prompt(data):
             try:
                 tool_calls = True
                 prompt_next = prompt_text
-                message_history = []
+                global message_history
                 while (tool_calls) and not stop_event.is_set():
-                    # Call the prompt (blocking). In future we can use stream=True to send partial updates.                    
+                    # Call the prompt (blocking). In future we
+                    # can use stream=True to send partial updates.
+                    sio.emit('ui_update',
+                            {"type": "response",
+                            "data": "Waiting for my brain..."})
                     response, message_history, stats = utils.prompt_with_tools(
                         prompt_next, message_history, tools = openai_tools
                     )
                     print(f"Prompt statistics: {json.dumps(stats, ensure_ascii=False)}")
+                    sio.emit('ui_update',
+                             {"type": "stats",
+                              "data": stats})
                     response_message = response.choices[0].message
                     tool_calls = response_message.tool_calls
 
@@ -122,6 +136,9 @@ def handle_prompt(data):
                         sio.emit('ui_update',
                                  {"type": "response",
                                   "data": response_message.content})
+                        sio.emit('ui_update',
+                                 {"type": "response",
+                                  "data": f'[{round(stats["elapsed_seconds"],1)}s]'})
 
                     tool_calls_json = []
                     tool_responses_json = []
@@ -141,6 +158,12 @@ def handle_prompt(data):
                                 }
                             })
                             print(f"Calling tool {function_name}")
+                            sio.emit('ui_update',
+                                    {"type": "response",
+                                    "data": f"Calling tool {function_name}"})
+                            sio.emit('ui_update',
+                                    {"type": "response",
+                                    "data": f'[{round(stats["elapsed_seconds"],1)}s]'})
 
                             for tool in tools:
                                 if tool[1] == function_name:
@@ -156,7 +179,10 @@ def handle_prompt(data):
                                              {'type': 'tools_response',
                                               'data': tool_image})
 
-                    print("Tools finished.")
+                        print("Tools finished.")
+                        sio.emit('ui_update',
+                                {"type": "response",
+                                "data": "Tools finished."})
     
                     prompt_next = []
                     # Create the next prompt
@@ -165,7 +191,7 @@ def handle_prompt(data):
                         "content": response_message.content or "",
                         "tool_calls": tool_calls_json})
                     prompt_next.extend(tool_responses_json)
-                        
+                    
                 # If stop requested, don't emit final result
                 if stop_event.is_set():
                     sio.emit("ui_update", { "type": "prompt", "data": "prompt" })

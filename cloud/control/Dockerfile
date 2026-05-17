@@ -12,7 +12,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONIOENCODING=UTF-8
 
 RUN \
-  /opt/venv/bin/pip install mcp python-socketio[client]
+  /opt/venv/bin/pip install mcp python-socketio[client] && \
+  /opt/venv/bin/pip install arize-phoenix-otel openinference-instrumentation-openai openai
 
 # Copy the supervisor configuration file
 COPY src/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

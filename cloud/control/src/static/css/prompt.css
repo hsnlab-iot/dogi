@@ -1,5 +1,11 @@
 /* Global styles */
+html,
 body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
     font-size: 24px; /* Global font size */
     background-color: #222; /* Assuming a dark background for contrast */
     color: white;
@@ -11,15 +17,18 @@ body {
     grid-template-columns: 1fr 300px; /* main column and tools column */
     gap: 24px; /* space between columns */
     padding: 12px 8px; /* reduced page horizontal padding */
+    box-sizing: border-box;
     max-width: 1200px;
     margin: 0 auto;
+    min-height: 100vh;
+    min-height: 100dvh;
 }
 
 /* Force main-content into the left grid column and tools into the right */
 .main-content {
     grid-column: 1 / 2;
 }
-.tools-list-section {
+.sidebar-column {
     grid-column: 2 / 3;
 }
 
@@ -36,11 +45,19 @@ body {
 .main-content > .results-section {
     outline: 2px dashed rgba(0,255,0,0.12);
 }
-.tools-list-section {
+.sidebar-column {
     outline: 2px dashed rgba(0,0,255,0.08);
 }
 
-/* Tool list area (right side) */
+/* Sidebar area (right side) */
+.sidebar-column {
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 100%;
+}
+
 .tools-list-section {
     min-width: 220px; /* Ensure tools have enough space */
 }
@@ -57,7 +74,8 @@ label {
 .input-section,
 .response-section,
 .tools-response-section,
-.tools-list-section {
+.tools-list-section,
+.stats-section {
     width: 100%;
 }
 
@@ -109,7 +127,7 @@ textarea {
     .container {
         grid-template-columns: 1fr;
     }
-    .tools-list-section {
+    .sidebar-column {
         grid-column: 1 / -1;
     }
 }
@@ -151,6 +169,7 @@ textarea {
 
 /* State-specific prompt button styles moved from inline HTML */
 .prompt-button.prompt { background: #28a745; color: #fff; border: none; }
+.prompt-button.new { background: #d97a1d; color: #fff; border: none; }
 .prompt-button.abort { background: #dc3545; color: #fff; border: none; }
 .prompt-button:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -263,4 +282,44 @@ textarea {
     color: white;
     padding: 2px 0;
     line-height: 1.1;
+}
+
+.stats-section {
+    margin-top: auto;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.stats-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stats-item:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.stats-name {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.stats-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    text-align: right;
 }

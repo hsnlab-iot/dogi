@@ -63,6 +63,7 @@ _cache_dir = None
 _soul_language = None
 _soul_content = None
 _tools_list = None
+_log_dir = None
 
 
 def _build_default_config():
@@ -254,6 +255,7 @@ def reinit():
     global _cache_dir
     global _soul_language
     global _soul_content
+    global _log_dir
 
     _close_socket(_voice_socket)
     _close_socket(_control_socket)
@@ -283,6 +285,7 @@ def reinit():
     _cache_dir = None
     _soul_language = None
     _soul_content = None
+    _log_dir = None
 
     init()
 
@@ -580,6 +583,17 @@ def get_openai_client():
         if not api_base:
             raise ValueError(f'openai.api_base is not set in {CONFIG_PATH}')
         try:
+            from phoenix.otel import register
+            tracer_provider = register(
+                project_name="dogi-llm-agent-debugging",
+                auto_instrument=True # Automatically hooks into installed OpenInference packages
+            )
+        except ModuleNotFoundError as exc:
+            error_message = 'The phoenix.otel package is required to debug the OpenAI client'
+            print(error_message)
+            pass
+
+        try:
             OpenAI = importlib.import_module('openai').OpenAI
         except ModuleNotFoundError as exc:
             error_message = 'The openai package is required to initialize the OpenAI client'
@@ -649,6 +663,29 @@ def get_cache_dir():
         print(f'Using cache directory: {_cache_dir}')
 
     return _cache_dir
+
+
+def get_log_dir():
+    """Return configured log directory from [general].log or None if not set.
+
+    If present, expands `~` and ensures the directory exists (like get_cache_dir).
+    """
+    global _log_dir
+
+    if _log_dir is None:
+        log_dir = _get_config_value('general', 'log', None)
+        if not log_dir:
+            _log_dir = None
+        else:
+            _log_dir = os.path.expanduser(str(log_dir))
+            try:
+                os.makedirs(_log_dir, exist_ok=True)
+            except Exception:
+                # If directory creation fails, still return the expanded path
+                pass
+            print(f'Using log directory: {_log_dir}')
+
+    return _log_dir
 
 
 def get_voice_socket():
