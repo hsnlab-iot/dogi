@@ -18,10 +18,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-COPY mcp/requirements.txt /app/mcp/requirements.txt
-RUN uv venv /opt/venv && uv pip install -r /app/mcp/requirements.txt
-
 COPY mcp/app /app
+RUN \
+    uv venv /opt/venv && \
+    uv pip install -r /app/DOGZILLALib/requirements.txt && \
+    uv pip install -r /app/requirements.txt
 
 # Configure OpenSSH for password login.
 RUN sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config && \

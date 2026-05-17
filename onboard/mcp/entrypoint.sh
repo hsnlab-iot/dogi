@@ -21,10 +21,10 @@ MEMORY_MCP_PORT="${MCP_MEMORY_PORT:-5001}"
 tmux kill-session -t "${SESSION_NAME}" 2>/dev/null || true
 
 tmux new-session -d -s "${SESSION_NAME}" -n body \
-  "python3 /app/body_mcp_server.py"
+  "uv run python /app/body_mcp_server.py; sleep inf"
 
 tmux new-window -t "${SESSION_NAME}" -n memory \
-  "fastmcp run /app/mcp_memory.py:mcp --transport streamable-http --host 0.0.0.0 --port ${MEMORY_MCP_PORT}"
+  "uv run fastmcp run /app/mcp_memory.py:mcp --transport streamable-http --host 0.0.0.0 --port ${MEMORY_MCP_PORT}; sleep inf"
 
 echo "Started tmux session '${SESSION_NAME}' with windows: body(:${BODY_MCP_PORT}), memory(:${MEMORY_MCP_PORT})"
 
