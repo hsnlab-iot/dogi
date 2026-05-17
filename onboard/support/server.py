@@ -26,6 +26,8 @@ COMMAND_SCRIPTS = {
     "WIFIAP": os.path.join(os.path.dirname(__file__), "cmd_wifiap.sh"),
     "USEWIFI": os.path.join(os.path.dirname(__file__), "cmd_usewifi.sh"),
     "USE5G": os.path.join(os.path.dirname(__file__), "cmd_use5g.sh"),
+    "RESTART": os.path.join(os.path.dirname(__file__), "cmd_restart.sh"),
+    "SHUTDOWN": os.path.join(os.path.dirname(__file__), "cmd_shutdown.sh"),
 }
 
 def normalize_pin(pin_raw: str) -> str:
