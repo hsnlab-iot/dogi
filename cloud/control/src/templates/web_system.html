@@ -43,7 +43,7 @@
 
 <div class="container">
     <div class="video-container">
-        <img src="http://{{ host }}:5051/mjpeg" alt="MJPEG Video" />
+        <img src="/video/mjpeg" alt="MJPEG Video" />
     </div>
 
     <div>
@@ -65,7 +65,9 @@
 </div>
 
 <script>
-    var socket = io();
+    var socket = io({
+        path: '/apps/system/socket.io/'
+    });
     socket.on('connect', function() {
         socket.emit('my event', {data: 'I\'m connected!'});
     });
@@ -108,7 +110,7 @@
     });
     document.querySelector('#button_what').addEventListener('click', function() {
         // Fetch the current JPEG frame from the video source
-        fetch('http://{{ host }}:5051/jpeg')
+        fetch('/video/jpeg')
             .then(response => response.blob())
             .then(blob => {
             const reader = new FileReader();

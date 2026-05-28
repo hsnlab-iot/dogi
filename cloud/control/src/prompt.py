@@ -316,7 +316,7 @@ def introduction():
 
 if __name__ == '__main__':
     # Connect to your Flask-SocketIO address
-    sio.connect(f'http://localhost:{PORT}') 
+    sio.connect(f'http://localhost:{PORT}', socketio_path='/socket.io/') 
 
     connect_mcp_servers()
 

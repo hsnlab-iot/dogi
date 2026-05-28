@@ -1,6 +1,7 @@
 import os
 
 from flask import Flask, render_template, request
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_socketio import SocketIO, emit
 import pickle
 import socket
@@ -18,10 +19,14 @@ PORT = 5056
 
 config.init()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='./static')
 #app.config['SECRET_KEY'] = 'secret_key'
 socketio = SocketIO(app)
-socketio.init_app(app, cors_allowed_origins="*")
+socketio.init_app(app, cors_allowed_origins="*", socketio_path='/socket.io/')
+
+# This tells Flask it is behind exactly 1 reverse proxy and 
+# forces it to generate correct URLs automatically
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 @app.route('/')
 def index():

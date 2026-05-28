@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pupality Selector</title>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pupality.css') }}">
+</head>
+<body>
+
+<div class="container">
+    <header class="header">
+        <h1>Pupality Deck</h1>
+        <p>Select the active personality profile for your robot dog.</p>
+    </header>
+
+    <main id="pupality-grid" class="pupality-grid" aria-live="polite" aria-label="Pupality cards"></main>
+
+    <div id="empty-state" class="empty-state">
+        Waiting for pupalities event...
+    </div>
+</div>
+
+<script>
+    var socket = io({
+        path: '/apps/pupality/socket.io/'
+    });
+
+    var pupalities = [];
+    var selectedPupalityName = '';
+
+    function normalizePupalities(payload) {
+        if (Array.isArray(payload)) return payload;
+        if (payload && Array.isArray(payload.data)) return payload.data;
+        return [];
+    }
+
+    function safeImageSource(value) {
+        if (typeof value !== 'string') return '';
+        var trimmed = value.trim();
+        if (!trimmed || !trimmed.startsWith('data:image/')) return '';
+        
+        return trimmed;
+    }
+
+    function createMetaItem(label, value) {
+        var row = document.createElement('div');
+        row.className = 'meta-row';
+
+        var key = document.createElement('span');
+        key.className = 'meta-key';
+        key.textContent = label;
+
+        var content = document.createElement('span');
+        content.className = 'meta-value';
+        content.textContent = value || '-';
+
+        row.appendChild(key);
+        row.appendChild(content);
+        return row;
+    }
+
+    function buildCard(item) {
+        var card = document.createElement('article');
+        card.className = 'pupality-card';
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+
+        var itemName = item && item.name ? String(item.name) : '';
+        if (itemName && itemName === selectedPupalityName) {
+            card.classList.add('is-selected');
+        }
+
+        var imageWrap = document.createElement('div');
+        imageWrap.className = 'card-image-wrap';
+
+        var image = document.createElement('img');
+        image.className = 'card-image';
+        image.alt = (item && item.name ? String(item.name) : 'Dog') + ' personality image';
+
+        var imageSrc = safeImageSource(item && item.image);
+        if (imageSrc) {
+            image.src = imageSrc;
+        } else {
+            image.classList.add('placeholder-image');
+        }
+
+        imageWrap.appendChild(image);
+
+        var body = document.createElement('div');
+        body.className = 'card-body';
+
+        var titleRow = document.createElement('div');
+        titleRow.className = 'title-row';
+
+        var title = document.createElement('h2');
+        title.className = 'card-title';
+        title.textContent = item && item.name ? String(item.name) : 'Unnamed Pupality';
+
+        var lang = document.createElement('span');
+        lang.className = 'lang-chip';
+        lang.textContent = (item && item.language ? String(item.language) : '--').toUpperCase();
+
+        titleRow.appendChild(title);
+        titleRow.appendChild(lang);
+
+        body.appendChild(titleRow);
+        body.appendChild(createMetaItem('LLM', item && item.llm_model ? String(item.llm_model) : '-'));
+        body.appendChild(createMetaItem('TTS', item && item.tts ? String(item.tts) : '-'));
+
+        card.appendChild(imageWrap);
+        card.appendChild(body);
+
+        function emitSelection() {
+            selectedPupalityName = itemName;
+            renderPupalities(pupalities);
+
+            var selected = {
+                name: itemName,
+            };
+            socket.emit('pupality_select', selected);
+        }
+
+        card.addEventListener('click', emitSelection);
+        card.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                emitSelection();
+            }
+        });
+
+        return card;
+    }
+
+    function renderPupalities(list) {
+        var grid = document.getElementById('pupality-grid');
+        var emptyState = document.getElementById('empty-state');
+        if (!grid || !emptyState) return;
+
+        while (grid.firstChild) grid.removeChild(grid.firstChild);
+
+        if (!list.length) {
+            emptyState.style.display = 'block';
+            grid.style.display = 'none';
+            return;
+        }
+
+        emptyState.style.display = 'none';
+        grid.style.display = 'grid';
+        list.forEach(function(item) {
+            grid.appendChild(buildCard(item));
+        });
+    }
+
+    socket.on('connect', function() {
+        console.log('Connected to pupality socket');
+    });
+
+    socket.on('pupalities', function(payload) {
+        pupalities = normalizePupalities(payload);
+        renderPupalities(pupalities);
+    });
+
+    renderPupalities([]);
+
+</script>
+
+</body>
+</html>

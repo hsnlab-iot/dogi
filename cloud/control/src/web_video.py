@@ -3,8 +3,11 @@ import numpy as np
 import zmq
 import cv2
 from flask import Flask, Response, make_response
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from threading import Thread, Lock
+
+PORT=5051
 
 # Subscribe to video
 zmqcontext = zmq.Context()
@@ -38,7 +41,11 @@ lock_keresd = Lock()
 lock_kovesd = Lock()
 lock_mutasd = Lock()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='./static')
+# This tells Flask it is behind exactly 1 reverse proxy and 
+# forces it to generate correct URLs automatically
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 CORS(app)
 
 def gen_mjpeg():
@@ -218,5 +225,5 @@ if __name__ == '__main__':
     thread4 = Thread(target=get_frames_mutasd)
     thread4.start()
 
-    app.run(host='0.0.0.0', port=5051, threaded=True)
+    app.run(host='0.0.0.0', port=PORT, threaded=True)
 

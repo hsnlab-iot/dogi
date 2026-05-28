@@ -1,3 +1,8 @@
+[pupcard]
+language = "HUN"
+model = "Qwen3.6"
+tts = "TTS:HUN Diana"
+
 [general]
 cache = "~/.cache"
 log = "~/log"

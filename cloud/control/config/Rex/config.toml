@@ -1,3 +1,8 @@
+[pupcard]
+language = "GER"
+model = "Qwen3.6"
+tts = "Meta GER"
+
 [general]
 cache = "~/.cache"
 log = "~/log"

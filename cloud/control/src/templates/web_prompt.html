@@ -76,7 +76,9 @@
 </div>
 
 <script>
-    var socket = io();
+    var socket = io({
+        path: '/apps/prompt/socket.io/'
+    });
     var DEFAULT_TOOLS_IMAGE_HISTORY_LIMIT = 5;
     var toolsImageHistoryLimit = DEFAULT_TOOLS_IMAGE_HISTORY_LIMIT;
     var toolsImageHistory = [];

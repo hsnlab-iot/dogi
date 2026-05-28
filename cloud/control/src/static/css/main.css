@@ -49,6 +49,7 @@ body {
 .tab3 { background-color: #3357FF; } /* Blue */
 .tab4 { background-color: #F1C40F; } /* Yellow */
 .tab5 { background-color: #9B59B6; } /* Purple */
+.tab6 { background-color: #17A2B8; } /* Teal */
 
 .content-wrapper {
     display: flex;

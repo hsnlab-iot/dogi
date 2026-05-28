@@ -1,0 +1,222 @@
+@font-face {
+    font-family: "Jedth";
+    src: url("/static/css/jedth.ttf") format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+:root {
+    --bg-top: #f3efe5;
+    --bg-bottom: #d9ecff;
+    --ink: #182126;
+    --muted: #4d616b;
+    --card: #fffdf8;
+    --card-border: #d5cab4;
+    --shadow: rgba(24, 33, 38, 0.14);
+    --accent: #de5d38;
+    --chip-bg: #182126;
+    --chip-ink: #f9f7f2;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    color: var(--ink);
+    font-family: "Avenir Next", "Ubuntu", "Noto Sans", sans-serif;
+    background:
+        radial-gradient(circle at 15% 10%, rgba(222, 93, 56, 0.18), transparent 35%),
+        radial-gradient(circle at 85% 90%, rgba(42, 124, 171, 0.2), transparent 40%),
+        linear-gradient(165deg, var(--bg-top), var(--bg-bottom));
+}
+
+.container {
+    height: 100vh;
+    height: 100dvh;
+    box-sizing: border-box;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+}
+
+.header {
+    background: rgba(255, 253, 248, 0.72);
+    border: 1px solid rgba(77, 97, 107, 0.28);
+    border-radius: 14px;
+    padding: 12px 14px;
+    backdrop-filter: blur(3px);
+}
+
+.header h1 {
+    margin: 0;
+    font-family: "Jedth", "Trebuchet MS", sans-serif;
+    font-size: clamp(20px, 2.6vw, 34px);
+    line-height: 1;
+    letter-spacing: 0.02em;
+}
+
+.header p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: clamp(12px, 1.2vw, 16px);
+}
+
+.pupality-grid {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 300px);
+    justify-content: center;
+    align-content: start;
+    gap: 14px;
+    padding: 2px;
+}
+
+.pupality-card {
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    min-width: 300px;
+    max-width: 300px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    box-shadow: 0 8px 16px -12px var(--shadow);
+    overflow: hidden;
+    transform: translateY(8px);
+    opacity: 0;
+    animation: card-in 280ms ease-out forwards;
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.pupality-card:hover {
+    transform: translateY(-1px);
+}
+
+.pupality-card.is-selected {
+    border-color: #ff3b30;
+    box-shadow:
+        0 0 0 2px rgba(255, 59, 48, 0.5),
+        0 0 18px rgba(255, 59, 48, 0.55),
+        0 10px 22px -12px rgba(255, 59, 48, 0.6);
+}
+
+.pupality-card:focus-visible {
+    outline: none;
+    border-color: #ff6b62;
+    box-shadow:
+        0 0 0 2px rgba(255, 107, 98, 0.45),
+        0 0 14px rgba(255, 107, 98, 0.45),
+        0 8px 16px -12px var(--shadow);
+}
+
+.card-image-wrap {
+    width: 300px;
+    height: 300px;
+    max-width: 100%;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card);
+}
+
+.card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.placeholder-image {
+    filter: grayscale(1) opacity(0.55);
+}
+
+.card-body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.card-title {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.15;
+}
+
+.lang-chip {
+    flex-shrink: 0;
+    background: var(--chip-bg);
+    color: var(--chip-ink);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+}
+
+.meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    border-top: 1px dashed rgba(77, 97, 107, 0.3);
+    padding-top: 6px;
+}
+
+.meta-key {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.meta-value {
+    font-size: 13px;
+    font-weight: 700;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.empty-state {
+    display: block;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.65);
+    border: 1px dashed rgba(77, 97, 107, 0.5);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+@keyframes card-in {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 700px) {
+    .container {
+        padding: 10px;
+    }
+
+    .card-title {
+        font-size: 18px;
+    }
+}

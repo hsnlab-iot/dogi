@@ -17,13 +17,15 @@ while ! netstat -tuln | grep -q ":5002 "; do
     sleep 1
 done
 
+tmux new-session -d -s webmain "cd /app && source /opt/venv/bin/activate && python3 web_main.py ; sleep inf"
 tmux new-session -d -s webvideo "cd /app && source /opt/venv/bin/activate && python3 web_video.py ; sleep inf"
-tmux new-session -d -s webjoy "cd /app && source /opt/venv/bin/activate && python3 web_joy.py ; sleep inf"
 tmux new-session -d -s webvoice "cd /app && source /opt/venv/bin/activate && python3 web_voice.py ; sleep inf"
+
+tmux new-session -d -s websystem "cd /app && source /opt/venv/bin/activate && python3 web_system.py ; sleep inf"
 tmux new-session -d -s webkeresd "cd /app && source /opt/venv/bin/activate && python3 web_keresd.py ; sleep inf"
 tmux new-session -d -s webkovesd "cd /app && source /opt/venv/bin/activate && python3 web_kovesd.py ; sleep inf"
 tmux new-session -d -s webmutasd "cd /app && source /opt/venv/bin/activate && python3 web_mutasd.py ; sleep inf"
 tmux new-session -d -s webprompt "cd /app && source /opt/venv/bin/activate && python3 web_prompt.py ; sleep inf"
-tmux new-session -d -s webmain "cd /app && source /opt/venv/bin/activate && python3 web_main.py ; sleep inf"
+tmux new-session -d -s webpupality "cd /app && source /opt/venv/bin/activate && python3 web_pupality.py ; sleep inf"
 
 tail -f /dev/null

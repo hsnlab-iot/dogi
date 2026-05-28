@@ -17,11 +17,12 @@ socketio.init_app(app, cors_allowed_origins="*")
 session = None
 
 pageconfig = [ \
-    { 'name': 'Keresd!', 'port': 5053, 'page': '/', 'app': '/app/keresd.py' }, \
-    { 'name': 'Kovesd!', 'port': 5055, 'page': '/', 'app': '/app/kovesd.py' }, \
-    { 'name': 'Mutasd!', 'port': 5054, 'page': '/', 'app': '/app/mutasd.py' }, \
-    { 'name': 'Parancs', 'port': 5056, 'page': '/', 'app': '/app/prompt.py' }, \
-    { 'name': 'system', 'port': 5050, 'page': '/', 'app': '' } \
+    { 'name': 'Fetch', 'port': 5053, 'page': '/', 'app': '/app/keresd.py' }, \
+    { 'name': 'Follow', 'port': 5055, 'page': '/', 'app': '/app/kovesd.py' }, \
+    { 'name': 'Show', 'port': 5054, 'page': '/', 'app': '/app/mutasd.py' }, \
+    { 'name': 'Prompt', 'port': 5059, 'page': '/apps/prompt/', 'app': '/app/prompt.py' }, \
+    { 'name': 'Pupality', 'port': 5059, 'page': '/apps/pupality/', 'app': '' }, \
+    { 'name': 'System', 'port': 5059, 'page': '/apps/system/', 'app': '' } \
 ]
 
 @app.route('/')
@@ -32,6 +33,7 @@ def index():
         'page2_name': pageconfig[2]['name'],
         'page3_name': pageconfig[3]['name'],
         'page4_name': pageconfig[4]['name'],
+        'page5_name': pageconfig[5]['name'],
     }
     return render_template('web_main.html', **context)
 

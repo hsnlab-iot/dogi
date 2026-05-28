@@ -1,0 +1,51 @@
+:5059 {
+    # Main Web UI Router
+    handle /* {
+        reverse_proxy dogi:5059
+    }
+
+    handle_path /apps/prompt/socket.io/* {
+        rewrite * /socket.io{uri}
+        reverse_proxy dogi:5056 {
+            header_up X-Forwarded-Prefix /apps/prompt/socket.io
+        }
+    }
+    handle_path /apps/prompt/* {
+        reverse_proxy dogi:5056 {
+            header_up X-Forwarded-Prefix /apps/prompt
+        }
+    }
+
+
+    # Route for Flask App
+    handle_path /apps/pupality/socket.io/* {
+        rewrite * /socket.io{uri}
+        reverse_proxy dogi:5057 {
+            header_up X-Forwarded-Prefix /apps/pupality/socket.io
+        }
+    }
+    handle_path /apps/pupality/* {
+        reverse_proxy dogi:5057 {
+            header_up X-Forwarded-Prefix /apps/pupality
+        }
+    }
+
+    handle_path /apps/system/socket.io/* {
+        rewrite * /socket.io{uri}
+        reverse_proxy dogi:5050 {
+            header_up X-Forwarded-Prefix /apps/system/socket.io
+        }
+    }
+    handle_path /apps/system/* {
+        reverse_proxy dogi:5050 {
+            header_up X-Forwarded-Prefix /apps/system
+        }
+    }
+
+    handle_path /video/* {
+        reverse_proxy dogi:5051 {
+            header_up X-Forwarded-Prefix /video
+        }
+    }
+
+}

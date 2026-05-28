@@ -1,6 +1,7 @@
 import os
 
 from flask import Flask, render_template, request
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_socketio import SocketIO, emit
 import pickle
 import socket
@@ -14,15 +15,21 @@ import base64
 from io import BytesIO
 from PIL import Image
 
+PORT = 5050
+
 config.init()
 
 inMotion = False
 lock = threading.Lock()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='./static')
 #app.config['SECRET_KEY'] = 'secret_key'
 socketio = SocketIO(app)
-socketio.init_app(app, cors_allowed_origins="*")
+socketio.init_app(app, cors_allowed_origins="*", socketio_path='/socket.io/')
+
+# This tells Flask it is behind exactly 1 reverse proxy and 
+# forces it to generate correct URLs automatically
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.connect(('localhost', 5002))
@@ -54,7 +61,7 @@ voice_thread.start()
 @app.route('/')
 def index():
     host = urlparse(request.url_root).hostname
-    return render_template('web_joy.html', host=host)
+    return render_template('web_system.html', host=host)
 
 @socketio.on('connect')
 def handle_connect():
@@ -194,4 +201,4 @@ def handle_error(e):
     print('SocketIO Error:', e)
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5050)
+    socketio.run(app, host='0.0.0.0', port=PORT)
