@@ -21,12 +21,12 @@ config.init()
 
 app = Flask(__name__, static_folder='./static')
 #app.config['SECRET_KEY'] = 'secret_key'
-socketio = SocketIO(app)
-socketio.init_app(app, cors_allowed_origins="*", socketio_path='/socket.io/')
-
 # This tells Flask it is behind exactly 1 reverse proxy and 
 # forces it to generate correct URLs automatically
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+socketio = SocketIO(app)
+socketio.init_app(app, cors_allowed_origins="*", socketio_path='/socket.io/')
 
 @app.route('/')
 def index():

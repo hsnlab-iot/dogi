@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_socketio import SocketIO, emit
 import pickle
 import socket
@@ -9,10 +10,11 @@ import socket
 
 PORT = 5053
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='./static')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 socketio = SocketIO(app)
-socketio.init_app(app, cors_allowed_origins="*")
+socketio.init_app(app, cors_allowed_origins="*", socketio_path='/socket.io/')
 
 # Open UDP socket on port 5053 to receive action events
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

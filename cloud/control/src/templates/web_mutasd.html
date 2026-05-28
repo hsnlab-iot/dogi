@@ -1,55 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Web Mutasd</title>
+    <title>Web Show</title>
     <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
-    <style>
-        .container {
-            display: flex;
-            height: 100vh; /* Full viewport height */
-            overflow-y: hidden; /* Prevent vertical scrolling */
-        }
-        .video-container {
-            width: 896px;
-            height: 672px;
-            border: 2px solid black;
-            margin-right: 20px; /* Space between video and table */
-            flex-shrink: 0; /* Prevent shrinking */
-        }
-        .video-container img {
-            width: 100%;
-            height: 100%;
-        }
-        .table-container {
-            display: flex;
-            flex-wrap: wrap;
-            max-width: 400px; /* 2 columns, 200px each */
-            height: 480px; /* Keep height same as video */
-            gap: 10px;
-        }
-        .table-cell {
-            flex: 1 1 150px; /* Allow cells to grow, but set a max width of 200px */
-            max-width: 150px;
-            height: calc(33.33% - 10px); /* Each cell takes 1/3rd of the height minus the gap */
-            border: 2px solid black;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            background-color: white;
-        }
-        .table-cell img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover; /* Ensures the image covers the entire box without distortion */
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/show.css') }}">
 </head>
 <body>
 
 <div class="container">
     <div class="video-container">
-        <img src="http://{{ host }}:5051/mjpeg_mutasd" alt="MJPEG Video" />
+        <img src="/video/mjpeg_mutasd" alt="MJPEG Video" />
     </div>
     <div class="table-container">
         <div class="table-cell" id="action1">
@@ -74,14 +34,17 @@
 </div>
 
 <script>
-    var socket = io();
+    var socket = io({
+        path: '/apps/show/socket.io/'
+    });
     
     socket.on('action', function(data) {
         console.log(data);
         var actionBox = document.querySelector(`#action${data}`);
-        actionBox.style.backgroundColor = 'green';
+        if (!actionBox) return;
+        actionBox.classList.add('is-active');
         setTimeout(function() {
-            actionBox.style.backgroundColor = '';
+            actionBox.classList.remove('is-active');
         }, 3000);
     });
 

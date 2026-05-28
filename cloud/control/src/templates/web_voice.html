@@ -10,7 +10,9 @@
 
 <script>
     var context;
-    socket = io();
+    var socket = io({
+        path: '/apps/voice/socket.io/'
+    });
 
     window.onload = function() {
         context = new AudioContext();

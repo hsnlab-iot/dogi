@@ -1,0 +1,70 @@
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #fff;
+}
+
+.container {
+    display: flex;
+    height: 100vh;
+    overflow-y: hidden;
+    box-sizing: border-box;
+}
+
+.video-container {
+    width: 896px;
+    height: 672px;
+    border: 2px solid #000;
+    margin-right: 20px;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: #000;
+}
+
+.video-container img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.table-container {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 400px;
+    height: 480px;
+    gap: 10px;
+}
+
+.table-cell {
+    flex: 1 1 150px;
+    max-width: 150px;
+    height: calc(33.33% - 10px);
+    border: 2px solid #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    background-color: #fff;
+    transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.table-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.table-cell.is-active {
+    background-color: #1fbf4a;
+    box-shadow: 0 0 0 2px rgba(31, 191, 74, 0.45), 0 0 18px rgba(31, 191, 74, 0.55);
+    transform: translateY(-1px);
+}

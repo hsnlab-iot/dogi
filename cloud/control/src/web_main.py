@@ -17,12 +17,12 @@ socketio.init_app(app, cors_allowed_origins="*")
 session = None
 
 pageconfig = [ \
-    { 'name': 'Fetch', 'port': 5053, 'page': '/', 'app': '/app/keresd.py' }, \
-    { 'name': 'Follow', 'port': 5055, 'page': '/', 'app': '/app/kovesd.py' }, \
-    { 'name': 'Show', 'port': 5054, 'page': '/', 'app': '/app/mutasd.py' }, \
-    { 'name': 'Prompt', 'port': 5059, 'page': '/apps/prompt/', 'app': '/app/prompt.py' }, \
-    { 'name': 'Pupality', 'port': 5059, 'page': '/apps/pupality/', 'app': '' }, \
-    { 'name': 'System', 'port': 5059, 'page': '/apps/system/', 'app': '' } \
+    { 'name': 'Search', 'port': PORT, 'page': '/apps/search/', 'app': '/app/keresd.py' }, \
+    { 'name': 'Follow', 'port': PORT, 'page': '/apps/follow/', 'app': '/app/kovesd.py' }, \
+    { 'name': 'Show', 'port': PORT, 'page': '/apps/show/', 'app': '/app/mutasd.py' }, \
+    { 'name': 'Prompt', 'port': PORT, 'page': '/apps/prompt/', 'app': '/app/prompt.py' }, \
+    { 'name': 'Pupality', 'port': PORT, 'page': '/apps/pupality/', 'app': '' }, \
+    { 'name': 'System', 'port': PORT, 'page': '/apps/system/', 'app': '' } \
 ]
 
 @app.route('/')
