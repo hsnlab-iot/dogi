@@ -11,7 +11,7 @@
 <script>
     var context;
     var socket = io({
-        path: '/apps/voice/socket.io/'
+        path: '/voice/socket.io/'
     });
 
     window.onload = function() {
@@ -24,7 +24,7 @@
             console.log('Playback resumed successfully');
         });
 
-        fetch('/init', {
+        fetch('/voice/init', {
             method: 'GET',
         });
     });
@@ -37,7 +37,7 @@
 
     socket.on('audio_play', function(data) {
         console.log('Received request:', data);
-        var audio = new Audio('/voice/' + encodeURIComponent(data));
+        var audio = new Audio('/voice/voice/' + encodeURIComponent(data));
         audio.play();
     });
 </script>

@@ -24,15 +24,15 @@
         }
     }
 
-    handle_path /apps/voice/socket.io/* {
+    handle_path /voice/socket.io/* {
         rewrite * /socket.io{uri}
         reverse_proxy dogi:5052 {
-            header_up X-Forwarded-Prefix /apps/voice/socket.io
+            header_up X-Forwarded-Prefix /voice/socket.io
         }
     }
-    handle_path /apps/voide/* {
+    handle_path /voice/* {
         reverse_proxy dogi:5052 {
-            header_up X-Forwarded-Prefix /apps/voice
+            header_up X-Forwarded-Prefix /voice
         }
     }
 
