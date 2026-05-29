@@ -1,21 +1,18 @@
 [pupcard]
 language = "ENG"
-model = "Qwen3.6"
+model = "Gemma4"
 tts = "Meta ENG"
 
 [general]
-cache = "~/.cache"
-log = "~/log"
+cache = "~/.cache/arthur"
+log = "~/log/arthur"
 
 [language]
-ui = "hu"
-prompt = "hu"
-#ui = "en"
-#prompt = "en"
+ui = "en"
+prompt = "en"
 
 [models]
-general = "qwen3.5:9B"
-#general = "gemma4:e4b"
+general = "gemma4:e4b"
 translation = ""
 vision = ""
 
@@ -27,9 +24,6 @@ highfive = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
 capture = "sse!http://robot_ip:8000/mcp/sse"
 dice = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
 body = "str!http://robot_ip:5000/mcp"
-#4 = "ssh!pi:~/kutyus_env/bin:~/mcp_server.py"
-#5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_capture.py"
-#6 = "ssh!pi:~/kutyus_env/bin:~/dogi/onboard/mcp/mcp_memory.py"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
@@ -49,14 +43,9 @@ binary_images = false
 # openai:  uses model + voice
 # mms:     uses model
 
-# Diana
-protocol = "opentts"
-api_base = "http://opentts:5500/api/tts"
-voice = "hu_diana_majlinger"
-
 # Facebook english
-#protocol = "mms"
-#model = "facebook/mms-tts-eng"
+protocol = "mms"
+model = "facebook/mms-tts-eng"
 
 #protocol = "openai"
 #api_base = "http://10.6.6.20:8880/v1"

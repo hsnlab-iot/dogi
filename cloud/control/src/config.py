@@ -7,99 +7,79 @@ try:
 except ModuleNotFoundError:
     tomllib = importlib.import_module('tomli')
 
-DEFAULT_MODEL = 'qwen3.5'
-DEFAULT_UI_LANG = 'en'
-DEFAULT_PROMPT_LANG = 'en'
-DEFAULT_OPENAI_API_BASE = 'http://localhost:11434/v1'
-DEFAULT_OPENAI_API_KEY = 'not-needed'
-DEFAULT_OPENAI_KEEP_ALIVE = '30m'
-DEFAULT_OPENAI_ENABLE_THINKING = True
-DEFAULT_OPENAI_THINKING_BUDGET = 500
-DEFAULT_OPENAI_MAX_OUTPUT_TOKENS = 512
-DEFAULT_OPENAI_TRANSLATION_MAX_OUTPUT_TOKENS = 1024
-DEFAULT_OPENAI_PROMPT_TEMPERATURE = 0.3
-DEFAULT_OPENAI_PROMPT_FREQUENCY_PENALTY = 1.5
-DEFAULT_OPENAI_BINARY_IMAGES = False
-DEFAULT_TRANSLATION_MODEL = 'opus'
-DEFAULT_VISION_MODEL = ''
-DEFAULT_TTS_API_BASE = ''
-DEFAULT_TTS_VOICE = ''
-DEFAULT_TTS_MODEL = ''
-DEFAULT_TTS_PROTOCOL = 'mms'  # 'opentts' | 'openai' | 'mms'
-DEFAULT_CACHE_DIR = '~/.cache/'
-
-DEFAULT_VOICE_PORT = 5052
-DEFAULT_CONTROL_PORT = 5002
-
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 CONTROL_DIR = os.path.dirname(SRC_DIR)
 CONFIG_DIR = os.path.join(CONTROL_DIR, 'config')
-CONFIG_PATH = os.path.join(CONFIG_DIR, 'config.toml')
-PROMPTS_PATH = os.path.join(CONFIG_DIR, 'prompts.toml')
 
-_config_data = None
-_prompts_data = None
-_openai_client = None
-_voice_socket = None
-_control_socket = None
-_ui_language = None
-_prompt_language = None
-_general_model = None
-_translation_model = None
-_vision_model = None
-_openai_keep_alive = None
-_openai_enable_thinking = None
-_openai_thinking_budget = None
-_openai_max_output_tokens = None
-_openai_translation_max_output_tokens = None
-_openai_prompt_temperature = None
-_openai_prompt_frequency_penalty = None
-_openai_binary_images = None
-_tts_api_base = None
-_tts_voice = None
-_tts_model = None
-_tts_protocol = None
-_cache_dir = None
-_soul_language = None
-_soul_content = None
-_tools_list = None
-_log_dir = None
+def _build_runtime_state():
+    return {
+        'config_data': None,
+        'prompts_data': None,
+        'openai_client': None,
+        'voice_port': None,
+        'control_socket': None,
+        'ui_language': None,
+        'prompt_language': None,
+        'general_model': None,
+        'translation_model': None,
+        'vision_model': None,
+        'openai_keep_alive': None,
+        'openai_enable_thinking': None,
+        'openai_thinking_budget': None,
+        'openai_max_output_tokens': None,
+        'openai_translation_max_output_tokens': None,
+        'openai_prompt_temperature': None,
+        'openai_prompt_frequency_penalty': None,
+        'openai_binary_images': None,
+        'tts_api_base': None,
+        'tts_voice': None,
+        'tts_model': None,
+        'tts_protocol': None,
+        'cache_dir': None,
+        'soul_content': None,
+        'tools_list': None,
+        'log_dir': None,
+    }
+
+
+_state = _build_runtime_state()
 
 
 def _build_default_config():
     return {
         'general': {
-            'cache_dir': DEFAULT_CACHE_DIR,
+            'cache_dir': '~/.cache/',
         },
         'language': {
-            'ui': DEFAULT_UI_LANG,
-            'prompt': DEFAULT_PROMPT_LANG,
+            'ui': 'en',
+            'prompt': 'en',
         },
         'models': {
-            'general': DEFAULT_MODEL,
-            'vision': DEFAULT_VISION_MODEL,
-            'translation': DEFAULT_TRANSLATION_MODEL,
+            'general': 'qwen3.5:4b',
+            'vision': '',
+            'translation': 'opus',
         },
         'openai': {
-            'api_base': DEFAULT_OPENAI_API_BASE,
-            'api_key': DEFAULT_OPENAI_API_KEY,
-            'keep_alive': DEFAULT_OPENAI_KEEP_ALIVE,
-            'enable_thinking': DEFAULT_OPENAI_ENABLE_THINKING,
-            'thinking_budget': DEFAULT_OPENAI_THINKING_BUDGET,
-            'max_output_tokens': DEFAULT_OPENAI_MAX_OUTPUT_TOKENS,
-            'translation_max_output_tokens': DEFAULT_OPENAI_TRANSLATION_MAX_OUTPUT_TOKENS,
-            'prompt_temperature': DEFAULT_OPENAI_PROMPT_TEMPERATURE,
-            'prompt_frequency_penalty': DEFAULT_OPENAI_PROMPT_FREQUENCY_PENALTY,
+            'api_base': 'http://localhost:11434/v1',
+            'api_key': 'not-needed',
+            'keep_alive': '30m',
+            'enable_thinking': False,
+            'thinking_budget': 500,
+            'max_output_tokens': 512,
+            'translation_max_output_tokens': 1024,
+            'prompt_temperature': 0.3,
+            'prompt_frequency_penalty': 1.5,
+            'binary_images': False,
         },
         'tts': {
-            'api_base': DEFAULT_TTS_API_BASE,
-            'voice': DEFAULT_TTS_VOICE,
-            'model': DEFAULT_TTS_MODEL,
-            'protocol': DEFAULT_TTS_PROTOCOL,
+            'api_base': '',
+            'voice': '',
+            'model': '',
+            'protocol': 'mms',  # 'opentts' | 'openai' | 'mms'
         },
         'ports': {
-            'voice': DEFAULT_VOICE_PORT,
-            'control': DEFAULT_CONTROL_PORT,
+            'voice': 5059,
+            'control': 5002,
         },
     }
 
@@ -123,44 +103,53 @@ def _normalize_lang(raw_lang, fallback):
     return normalized[:2]
 
 
-def _load_config_file():
-    defaults = _build_default_config()
-    with open(CONFIG_PATH, 'rb') as f:
-        loaded = tomllib.load(f)
-    return _merge_dict(defaults, loaded)
+def _load_config_file(folder = ''):
+    defaults = _build_default_config()    
+    config_path = os.path.join(CONFIG_DIR, folder, 'config.toml')
 
+    if not os.path.exists(config_path):
+        print(f'Warning: config file does not exist: {config_path}. Using defaults.')
+        return defaults
 
-def _load_prompts_file():
-    if not os.path.exists(PROMPTS_PATH):
-        print(f'Warning: prompts file does not exist: {PROMPTS_PATH}')
-        return {}
-
-    with open(PROMPTS_PATH, 'rb') as f:
+    with open(config_path, 'rb') as f:
         loaded = tomllib.load(f)
 
     if not isinstance(loaded, dict):
-        print(f'Warning: prompts file has invalid structure: {PROMPTS_PATH}')
+        print(f'Warning: config file has invalid structure: {config_path}')
+        return defaults
+
+    print(f"Config file loaded: {config_path}")
+    return _merge_dict(defaults, loaded)
+
+
+def _load_prompts_file(folder = ''):
+    prompts_path = os.path.join(CONFIG_DIR, folder, 'prompts.toml')
+    if not os.path.exists(prompts_path):
+        print(f'Warning: prompts file does not exist: {prompts_path}')
+        return {}
+
+    with open(prompts_path, 'rb') as f:
+        loaded = tomllib.load(f)
+
+    if not isinstance(loaded, dict):
+        print(f'Warning: prompts file has invalid structure: {prompts_path}')
         return {}
 
     return loaded
 
 
-def get_config_data():
-    global _config_data
+def get_config_data(folder = ''):
+    if _state['config_data'] is None:
+        _state['config_data'] = _load_config_file(folder)
 
-    if _config_data is None:
-        _config_data = _load_config_file()
-
-    return _config_data
+    return _state['config_data']
 
 
-def get_prompts_data():
-    global _prompts_data
+def get_prompts_data(folder = ''):
+    if _state['prompts_data'] is None:
+        _state['prompts_data'] = _load_prompts_file(folder)
 
-    if _prompts_data is None:
-        _prompts_data = _load_prompts_file()
-
-    return _prompts_data
+    return _state['prompts_data']
 
 
 def _format_prompt_entry(prompt_entry, format_kwargs):
@@ -215,9 +204,13 @@ def _close_socket(sock):
         pass
 
 
-def init():
+def init(folder = ''):
     """Initialize configuration by loading config and priming singletons."""
-    get_config_data()
+    if _state['config_data'] is not None:
+        return
+    get_config_data(folder)
+    
+    """
     get_ui_language()
     get_prompt_language()
     get_translation_model()
@@ -226,75 +219,26 @@ def init():
     get_tts_parameters()
     get_voice_socket()
     get_control_socket()
+    """
 
-
-def reinit():
+def reinit(folder = ''):
     """Reload configuration from disk and rebuild cached clients and sockets."""
-    global _config_data
-    global _prompts_data
-    global _openai_client
-    global _voice_socket
-    global _control_socket
-    global _ui_language
-    global _prompt_language
-    global _general_model
-    global _translation_model
-    global _vision_model
-    global _openai_keep_alive
-    global _openai_enable_thinking
-    global _openai_thinking_budget
-    global _openai_max_output_tokens
-    global _openai_translation_max_output_tokens
-    global _openai_prompt_temperature
-    global _openai_prompt_frequency_penalty
-    global _openai_binary_images
-    global _tts_api_base
-    global _tts_voice
-    global _tts_model
-    global _tts_protocol
-    global _cache_dir
-    global _soul_language
-    global _soul_content
-    global _log_dir
+    _close_socket(_state['voice_socket'])
+    _close_socket(_state['control_socket'])
 
-    _close_socket(_voice_socket)
-    _close_socket(_control_socket)
+    _state.update(_build_runtime_state())
 
-    _config_data = None
-    _prompts_data = None
-    _openai_client = None
-    _voice_socket = None
-    _control_socket = None
-    _ui_language = None
-    _prompt_language = None
-    _general_model = None
-    _translation_model = None
-    _vision_model = None
-    _openai_keep_alive = None
-    _openai_enable_thinking = None
-    _openai_thinking_budget = None
-    _openai_max_output_tokens = None
-    _openai_translation_max_output_tokens = None
-    _openai_prompt_temperature = None
-    _openai_prompt_frequency_penalty = None
-    _openai_binary_images = None
-    _tts_api_base = None
-    _tts_voice = None
-    _tts_model = None
-    _tts_protocol = None
-    _cache_dir = None
-    _soul_language = None
-    _soul_content = None
-    _log_dir = None
+    if (folder):
+        print(f"Reinit with {folder}")
+    else:
+        print("Reinit")
 
-    init()
+    init(folder)
 
 
 def get_soul_content():
     """Singleton to read and cache SOUL content once."""
-    global _soul_content
-
-    if _soul_content is None:
+    if _state['soul_content'] is None:
         soul_path = os.path.join(CONFIG_DIR, f'SOUL.{get_ui_language()}.md')
         fallback_path = os.path.join(CONFIG_DIR, 'SOUL.en.md')
 
@@ -302,11 +246,11 @@ def get_soul_content():
         # if not found, fallback to English version
         try:
             with open(soul_path, 'r', encoding='utf-8') as f:
-                _soul_content = f.read().strip()
+                _state['soul_content'] = f.read().strip()
                 print(f'Loaded SOUL content from {soul_path}')
         except FileNotFoundError:
             with open(fallback_path, 'r', encoding='utf-8') as f:
-                _soul_content = f.read().strip()
+                _state['soul_content'] = f.read().strip()
                 print(f'Loaded SOUL content from {fallback_path}')
 
             # If the fallback was used, and prompt is not in English,
@@ -315,33 +259,37 @@ def get_soul_content():
                 import utils
 
                 print(f'Translating SOUL content to {get_ui_language()}...')
-                _soul_content = utils.translate(_soul_content, 'en', get_ui_language())
+                _state['soul_content'] = utils.translate(
+                    _state['soul_content'],
+                    'en',
+                    get_ui_language(),
+                )
 
-    return _soul_content
+    return _state['soul_content']
 
+
+# When prompt and ui languages are different then translation is needed,
+# but if prompt language is not set, we assume it's the same as
+# ui language and skip translation.
 
 def get_ui_language():
     """Singleton to ensure UI language stays in memory."""
-    global _ui_language
+    if _state['ui_language'] is None:
+        language = str(_get_config_value('language', 'ui'))
+        _state['ui_language'] = _normalize_lang(language, 'en')
+        print(f"Using UI language: {_state['ui_language']}")
 
-    if _ui_language is None:
-        language = str(_get_config_value('language', 'ui', DEFAULT_UI_LANG))
-        _ui_language = _normalize_lang(language, DEFAULT_UI_LANG)
-        print(f'Using UI language: {_ui_language}')
-
-    return _ui_language
+    return _state['ui_language']
 
 
 def get_prompt_language():
     """Singleton to ensure prompt language stays in memory."""
-    global _prompt_language
+    if _state['prompt_language'] is None:
+        prompt_language = _get_config_value('language', 'prompt')
+        _state['prompt_language'] = _normalize_lang(prompt_language, 'en')
+        print(f"Using prompt language: {_state['prompt_language']}")
 
-    if _prompt_language is None:
-        prompt_language = _get_config_value('language', 'prompt', DEFAULT_PROMPT_LANG)
-        _prompt_language = _normalize_lang(prompt_language, DEFAULT_PROMPT_LANG)
-        print(f'Using prompt language: {_prompt_language}')
-
-    return _prompt_language
+    return _state['prompt_language']
 
 
 def needs_translation():
@@ -353,18 +301,16 @@ def needs_translation():
 
 def get_general_model():
     """Singleton to ensure general model stays in memory."""
-    global _general_model
-
-    if _general_model is None:
-        _general_model = _get_config_value('models', 'general', DEFAULT_MODEL)
-        print(f'Using general model: {_general_model}')
+    if _state['general_model'] is None:
+        _state['general_model'] = _get_config_value('models', 'general')
+        print(f"Using general model: {_state['general_model']}")
 
         # Warm-load the selected model through OpenAI-compatible API once.
         # This is best-effort and should not block startup on transient backend issues.
         try:
             client = get_openai_client()
             client.chat.completions.create(
-                model=_general_model,
+                model=_state['general_model'],
                 messages=[{'role': 'user', 'content': 'ping'}],
                 max_tokens=1,
                 temperature=0,
@@ -372,137 +318,120 @@ def get_general_model():
             )
             print(f'General model warm-loaded with keep_alive={get_openai_keep_alive()}')
         except Exception as exc:
-            print(f'Warning: unable to warm-load general model {_general_model}: {exc}')
+            print(f"Warning: unable to warm-load general model {_state['general_model']}: {exc}")
 
-    return _general_model
+    return _state['general_model']
 
 
 def get_openai_keep_alive():
     """Singleton to ensure OpenAI-compatible keep_alive stays in memory."""
-    global _openai_keep_alive
+    if _state['openai_keep_alive'] is None:
+        keep_alive = _get_config_value('openai', 'keep_alive', '30m')
+        _state['openai_keep_alive'] = str(keep_alive or '30m').strip()
+        print(f"Using OpenAI keep_alive: {_state['openai_keep_alive']}")
 
-    if _openai_keep_alive is None:
-        keep_alive = _get_config_value('openai', 'keep_alive', DEFAULT_OPENAI_KEEP_ALIVE)
-        _openai_keep_alive = str(keep_alive or DEFAULT_OPENAI_KEEP_ALIVE).strip()
-        print(f'Using OpenAI keep_alive: {_openai_keep_alive}')
-
-    return _openai_keep_alive
+    return _state['openai_keep_alive']
 
 
 def get_openai_enable_thinking():
     """Singleton to ensure OpenAI-compatible enable_thinking stays in memory."""
-    global _openai_enable_thinking
-
-    if _openai_enable_thinking is None:
-        raw_value = _get_config_value('openai', 'enable_thinking', DEFAULT_OPENAI_ENABLE_THINKING)
+    if _state['openai_enable_thinking'] is None:
+        raw_value = _get_config_value('openai', 'enable_thinking')
         if isinstance(raw_value, bool):
-            _openai_enable_thinking = raw_value
+            _state['openai_enable_thinking'] = raw_value
         elif isinstance(raw_value, str):
-            _openai_enable_thinking = raw_value.strip().lower() in ('1', 'true', 'yes', 'on')
+            _state['openai_enable_thinking'] = raw_value.strip().lower() in ('1', 'true', 'yes', 'on')
         else:
-            _openai_enable_thinking = bool(raw_value)
+            _state['openai_enable_thinking'] = bool(raw_value)
 
-        print(f'Using OpenAI enable_thinking: {_openai_enable_thinking}')
+        print(f"Using OpenAI enable_thinking: {_state['openai_enable_thinking']}")
 
-    return _openai_enable_thinking
+    return _state['openai_enable_thinking']
 
 
 def get_openai_thinking_budget():
     """Singleton to ensure OpenAI-compatible thinking_budget stays in memory."""
-    global _openai_thinking_budget
-
-    if _openai_thinking_budget is None:
-        raw_value = _get_config_value('openai', 'thinking_budget', DEFAULT_OPENAI_THINKING_BUDGET)
+    if _state['openai_thinking_budget'] is None:
+        raw_value = _get_config_value('openai', 'thinking_budget')
         try:
-            _openai_thinking_budget = max(0, int(raw_value))
+            _state['openai_thinking_budget'] = max(0, int(raw_value))
         except (TypeError, ValueError):
-            _openai_thinking_budget = DEFAULT_OPENAI_THINKING_BUDGET
+            _state['openai_thinking_budget'] = 500
 
-        print(f'Using OpenAI thinking_budget: {_openai_thinking_budget}')
+        print(f"Using OpenAI thinking_budget: {_state['openai_thinking_budget']}")
 
-    return _openai_thinking_budget
+    return _state['openai_thinking_budget']
 
 
 def get_openai_max_output_tokens():
     """Singleton to ensure max output token limit stays in memory."""
-    global _openai_max_output_tokens
-
-    if _openai_max_output_tokens is None:
-        raw_value = _get_config_value('openai', 'max_output_tokens', DEFAULT_OPENAI_MAX_OUTPUT_TOKENS)
+    if _state['openai_max_output_tokens'] is None:
+        raw_value = _get_config_value('openai', 'max_output_tokens')
         try:
-            _openai_max_output_tokens = max(1, int(raw_value))
+            _state['openai_max_output_tokens'] = max(1, int(raw_value))
         except (TypeError, ValueError):
-            _openai_max_output_tokens = DEFAULT_OPENAI_MAX_OUTPUT_TOKENS
+            _state['openai_max_output_tokens'] = 512
 
-        print(f'Using OpenAI max_output_tokens: {_openai_max_output_tokens}')
+        print(f"Using OpenAI max_output_tokens: {_state['openai_max_output_tokens']}")
 
-    return _openai_max_output_tokens
+    return _state['openai_max_output_tokens']
 
 
 def get_openai_translation_max_output_tokens():
     """Singleton to ensure translation output token limit stays in memory."""
-    global _openai_translation_max_output_tokens
-
-    if _openai_translation_max_output_tokens is None:
+    if _state['openai_translation_max_output_tokens'] is None:
         raw_value = _get_config_value(
             'openai',
-            'translation_max_output_tokens',
-            DEFAULT_OPENAI_TRANSLATION_MAX_OUTPUT_TOKENS,
+            'translation_max_output_tokens'
         )
         try:
-            _openai_translation_max_output_tokens = max(1, int(raw_value))
+            _state['openai_translation_max_output_tokens'] = max(1, int(raw_value))
         except (TypeError, ValueError):
-            _openai_translation_max_output_tokens = DEFAULT_OPENAI_TRANSLATION_MAX_OUTPUT_TOKENS
+            _state['openai_translation_max_output_tokens'] = 1024
 
         print(
             f'Using OpenAI translation_max_output_tokens: '
-            f'{_openai_translation_max_output_tokens}'
+            f"{_state['openai_translation_max_output_tokens']}"
         )
 
-    return _openai_translation_max_output_tokens
+    return _state['openai_translation_max_output_tokens']
 
 
 def get_openai_prompt_temperature():
     """Singleton to ensure prompt temperature stays in memory."""
-    global _openai_prompt_temperature
-
-    if _openai_prompt_temperature is None:
+    if _state['openai_prompt_temperature'] is None:
         raw_value = _get_config_value(
             'openai',
-            'prompt_temperature',
-            DEFAULT_OPENAI_PROMPT_TEMPERATURE,
+            'prompt_temperature'
         )
         try:
-            _openai_prompt_temperature = float(raw_value)
+            _state['openai_prompt_temperature'] = float(raw_value)
         except (TypeError, ValueError):
-            _openai_prompt_temperature = DEFAULT_OPENAI_PROMPT_TEMPERATURE
+            _state['openai_prompt_temperature'] = 0.3
 
-        print(f'Using OpenAI prompt_temperature: {_openai_prompt_temperature}')
+        print(f"Using OpenAI prompt_temperature: {_state['openai_prompt_temperature']}")
 
-    return _openai_prompt_temperature
+    return _state['openai_prompt_temperature']
 
 
 def get_openai_prompt_frequency_penalty():
     """Singleton to ensure prompt frequency penalty stays in memory."""
-    global _openai_prompt_frequency_penalty
-
-    if _openai_prompt_frequency_penalty is None:
+    if _state['openai_prompt_frequency_penalty'] is None:
         raw_value = _get_config_value(
             'openai',
-            'prompt_frequency_penalty',
-            DEFAULT_OPENAI_PROMPT_FREQUENCY_PENALTY,
+            'prompt_frequency_penalty'
         )
         try:
-            _openai_prompt_frequency_penalty = float(raw_value)
+            _state['openai_prompt_frequency_penalty'] = float(raw_value)
         except (TypeError, ValueError):
-            _openai_prompt_frequency_penalty = DEFAULT_OPENAI_PROMPT_FREQUENCY_PENALTY
+            _state['openai_prompt_frequency_penalty'] = 1.5
 
         print(
             f'Using OpenAI prompt_frequency_penalty: '
-            f'{_openai_prompt_frequency_penalty}'
+            f"{_state['openai_prompt_frequency_penalty']}"
         )
 
-    return _openai_prompt_frequency_penalty
+    return _state['openai_prompt_frequency_penalty']
 
 
 def get_openai_general_extra_body(num_predict=None):
@@ -530,56 +459,47 @@ def get_openai_general_extra_body(num_predict=None):
 
 def get_openai_binary_images():
     """Singleton to ensure OpenAI-compatible binary image setting stays in memory."""
-    global _openai_binary_images
-
-    if _openai_binary_images is None:
+    if _state['openai_binary_images'] is None:
         raw_value = _get_config_value(
             'openai',
             'binary_images',
-            False,
-        )
+            )
         if isinstance(raw_value, bool):
-            _openai_binary_images = raw_value
+            _state['openai_binary_images'] = raw_value
         elif isinstance(raw_value, str):
-            _openai_binary_images = raw_value.strip().lower() in ('1', 'true', 'yes', 'on')
+            _state['openai_binary_images'] = raw_value.strip().lower() in ('1', 'true', 'yes', 'on')
         else:
-            _openai_binary_images = bool(raw_value)
+            _state['openai_binary_images'] = bool(raw_value)
 
-        print(f'Using OpenAI binary_images: {_openai_binary_images}')
+        print(f"Using OpenAI binary_images: {_state['openai_binary_images']}")
 
-    return _openai_binary_images
+    return _state['openai_binary_images']
 
 def get_translation_model():
     """Singleton to ensure translation model stays in memory."""
-    global _translation_model
-
-    if _translation_model is None:
+    if _state['translation_model'] is None:
         translation_model = _get_config_value('models', 'translation', get_general_model())
-        _translation_model = translation_model or get_general_model()
-        print(f'Using translation model: {_translation_model}')
+        _state['translation_model'] = translation_model or get_general_model()
+        print(f"Using translation model: {_state['translation_model']}")
 
-    return _translation_model
+    return _state['translation_model']
 
 
 def get_vision_model():
     """Singleton to ensure vision model stays in memory."""
-    global _vision_model
-
-    if _vision_model is None:
+    if _state['vision_model'] is None:
         vision_model = _get_config_value('models', 'vision', get_general_model())
-        _vision_model = vision_model or get_general_model()
-        print(f'Using vision model: {_vision_model}')
+        _state['vision_model'] = vision_model or get_general_model()
+        print(f"Using vision model: {_state['vision_model']}")
 
-    return _vision_model
+    return _state['vision_model']
 
 
 def get_openai_client():
     """Singleton to ensure openai client stays in memory."""
-    global _openai_client
-
-    if _openai_client is None:
+    if _state['openai_client'] is None:
         api_base = _get_config_value('openai', 'api_base')
-        api_key = _get_config_value('openai', 'api_key', DEFAULT_OPENAI_API_KEY)
+        api_key = _get_config_value('openai', 'api_key')
         if not api_base:
             raise ValueError(f'openai.api_base is not set in {CONFIG_PATH}')
         try:
@@ -610,11 +530,11 @@ def get_openai_client():
             print(error_message)
             raise RuntimeError(error_message) from exc
 
-        _openai_client = client
+        _state['openai_client'] = client
         print(f'Initialized OpenAI client with base URL: {api_base}')
         print(f'Available OpenAI models: {available_models}')
 
-    return _openai_client
+    return _state['openai_client']
 
 
 def get_tts_parameters():
@@ -626,43 +546,46 @@ def get_tts_parameters():
         'openai'  – OpenAI-compatible TTS API (uses model + voice)
         'mms'     – MMS built-in TTS engine (uses model)
     """
-    global _tts_api_base
-    global _tts_voice
-    global _tts_model
-    global _tts_protocol
-
-    if _tts_api_base is None or _tts_voice is None or _tts_model is None or _tts_protocol is None:
-        _tts_api_base = _get_config_value('tts', 'api_base', '')
-        _tts_voice = _get_config_value('tts', 'voice', '')
-        _tts_model = _get_config_value('tts', 'model', '')
-        _tts_protocol = str(
-            _get_config_value('tts', 'protocol', DEFAULT_TTS_PROTOCOL) or DEFAULT_TTS_PROTOCOL
+    if (
+        _state['tts_api_base'] is None
+        or _state['tts_voice'] is None
+        or _state['tts_model'] is None
+        or _state['tts_protocol'] is None
+    ):
+        _state['tts_api_base'] = _get_config_value('tts', 'api_base')
+        _state['tts_voice'] = _get_config_value('tts', 'voice')
+        _state['tts_model'] = _get_config_value('tts', 'model')
+        _state['tts_protocol'] = str(
+            _get_config_value('tts', 'protocol') or 'mms'
         ).strip().lower()
 
-        if _tts_protocol == "openai":        
+        if _state['tts_protocol'] == 'openai':
             # Accept either a full speech endpoint or a generic OpenAI-compatible base URL.
-            if _tts_api_base.endswith('/audio/speech'):
+            if _state['tts_api_base'].endswith('/audio/speech'):
                 # remove ending
-                _tts_api_base = _tts_api_base[:-len('/audio/speech')]
+                _state['tts_api_base'] = _state['tts_api_base'][:-len('/audio/speech')]
         print(
-            f'Using TTS protocol: {_tts_protocol}, api_base: {_tts_api_base}, '
-            f'voice: {_tts_voice}, model: {_tts_model}'
+            f"Using TTS protocol: {_state['tts_protocol']}, api_base: {_state['tts_api_base']}, "
+            f"voice: {_state['tts_voice']}, model: {_state['tts_model']}"
         )
 
-    return _tts_api_base, _tts_voice, _tts_model, _tts_protocol
+    return (
+        _state['tts_api_base'],
+        _state['tts_voice'],
+        _state['tts_model'],
+        _state['tts_protocol'],
+    )
 
 
 def get_cache_dir():
     """Singleton to ensure the voice cache directory exists and stays in memory."""
-    global _cache_dir
+    if _state['cache_dir'] is None:
+        cache_dir = _get_config_value('general', 'cache_dir')
+        _state['cache_dir'] = os.path.expanduser(str(cache_dir or '~/.cache/'))
+        os.makedirs(_state['cache_dir'], exist_ok=True)
+        print(f"Using cache directory: {_state['cache_dir']}")
 
-    if _cache_dir is None:
-        cache_dir = _get_config_value('general', 'cache_dir', DEFAULT_CACHE_DIR)
-        _cache_dir = os.path.expanduser(str(cache_dir or DEFAULT_CACHE_DIR))
-        os.makedirs(_cache_dir, exist_ok=True)
-        print(f'Using cache directory: {_cache_dir}')
-
-    return _cache_dir
+    return _state['cache_dir']
 
 
 def get_log_dir():
@@ -670,54 +593,42 @@ def get_log_dir():
 
     If present, expands `~` and ensures the directory exists (like get_cache_dir).
     """
-    global _log_dir
-
-    if _log_dir is None:
-        log_dir = _get_config_value('general', 'log', None)
+    if _state['log_dir'] is None:
+        log_dir = _get_config_value('general', 'log')
         if not log_dir:
-            _log_dir = None
+            _state['log_dir'] = None
         else:
-            _log_dir = os.path.expanduser(str(log_dir))
+            _state['log_dir'] = os.path.expanduser(str(log_dir))
             try:
-                os.makedirs(_log_dir, exist_ok=True)
+                os.makedirs(_state['log_dir'], exist_ok=True)
             except Exception:
                 # If directory creation fails, still return the expanded path
                 pass
-            print(f'Using log directory: {_log_dir}')
+            print(f"Using log directory: {_state['log_dir']}")
 
-    return _log_dir
+    return _state['log_dir']
 
 
-def get_voice_socket():
-    """Singleton to ensure voice socket stays in memory."""
-    global _voice_socket
-
-    if _voice_socket is None:
-        voice_port = int(_get_config_value('ports', 'voice', DEFAULT_VOICE_PORT))
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.connect(('localhost', voice_port))
-        _voice_socket = sock
-
-    return _voice_socket
+def get_voice_port():
+    """Singleton to ensure voice port stays in memory."""
+    if _state['voice_port'] is None:
+        _state['voice_port'] = int(_get_config_value('ports', 'voice'))
+    return _state['voice_port']
 
 
 def get_control_socket():
     """Singleton to ensure control socket stays in memory."""
-    global _control_socket
-
-    if _control_socket is None:
-        control_port = int(_get_config_value('ports', 'control', DEFAULT_CONTROL_PORT))
+    if _state['control_socket'] is None:
+        control_port = int(_get_config_value('ports', 'control'))
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.connect(('localhost', control_port))
-        _control_socket = sock
+        _state['control_socket'] = sock
 
-    return _control_socket
+    return _state['control_socket']
 
 def get_tools():
     """Singleton to read and cache tools config once."""
-    global _tools_list
-
-    if _tools_list is None:
+    if _state['tools_list'] is None:
         tools_section = get_config_data().get('tools', {})
 
         values = []
@@ -730,6 +641,6 @@ def get_tools():
         for v in iterable:
             values.append(str(v))
 
-        _tools_list = values
+        _state['tools_list'] = values
 
-    return _tools_list
+    return _state['tools_list']

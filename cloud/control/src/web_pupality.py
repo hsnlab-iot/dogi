@@ -148,6 +148,7 @@ def handle_pupality_select(payload):
     print(
         'Selected pupality:', selected_name
     )
+    config.reinit(selected_name)
 
 
 @socketio.on_error()  # Handle socketio errors

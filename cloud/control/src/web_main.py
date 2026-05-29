@@ -1,13 +1,19 @@
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 from urllib.parse import urlparse, urljoin
 import urllib.request
 import urllib.parse
 import libtmux
 import config
+import time
+
+import utils
+import config
 
 PORT = 5059
+
+config.init()
 
 app = Flask(__name__)
 
@@ -174,7 +180,40 @@ def handle_event(data):
         pane = window.active_pane
         pane.send_keys(f'cd; source /opt/venv/bin/activate && python {pageconfig[data]["app"]}; sleep inf')
         
-    
+@app.route('/voice/<path:filename>')
+def voice_file(filename):
+    filepath = os.path.join(config.get_cache_dir(), 'voice')
+    os.makedirs(filepath, exist_ok=True)
+    return send_from_directory(filepath, filename)
+
+@app.route('/voice/init')
+def voiceinit():
+    prompt_text = config.get_prompt('web_voice', 'test_init_1')
+    prompt_text = utils.select_text(prompt_text,  config.get_ui_language(), True)
+    funny, _ = utils.prompt(prompt_text)
+    if config.needs_translation():
+        funny = utils.translate(funny, config.get_prompt_language())
+
+    welcome_text = {
+        "en": "Hello. I am Dogi, a robot dog from BME.",
+        "hu": "Szia. Dogi vagyok, egy robotkutya a BME-ről."
+    }
+    welcome_text = utils.select_text(welcome_text, config.get_ui_language(), True)
+    wt, d = utils.tts_wav(welcome_text)
+    socketio.emit('audio_play', wt)
+    time.sleep(d)
+
+    ft, d = utils.tts_wav(funny)
+    socketio.emit('audio_play', ft)
+
+    return "", 200
+
+@socketio.on('audio_play_proxy')
+def audio_play(data):
+    print('Request for audio play')
+    socketio.emit('audio_play', data)
+
+
 @socketio.on_error()  # Handle socketio errors
 def handle_error(e):
     print('SocketIO Error:', e)

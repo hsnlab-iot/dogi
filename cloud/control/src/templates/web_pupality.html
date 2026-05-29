@@ -11,8 +11,13 @@
 
 <div class="container">
     <header class="header">
-        <h1>Pupality Deck</h1>
-        <p>Select the active personality profile for your robot dog.</p>
+        <div class="header-text">
+            <h1>Pupality Deck</h1>
+            <p>Select the active personality profile for your robot dog.</p>
+        </div>
+        <button id="btn-refresh" class="refresh-button" title="Reload pupalities from config">
+            &#x21bb;
+        </button>
     </header>
 
     <main id="pupality-grid" class="pupality-grid" aria-live="polite" aria-label="Pupality cards"></main>
@@ -152,6 +157,10 @@
             grid.appendChild(buildCard(item));
         });
     }
+
+    document.getElementById('btn-refresh').addEventListener('click', function() {
+        socket.emit('refresh_pupalities');
+    });
 
     socket.on('connect', function() {
         console.log('Connected to pupality socket');

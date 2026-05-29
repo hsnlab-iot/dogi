@@ -50,6 +50,39 @@ body {
     border-radius: 14px;
     padding: 12px 14px;
     backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.header-text {
+    flex: 1;
+}
+
+.refresh-button {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: var(--card);
+    color: var(--ink);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 180ms ease, transform 300ms ease;
+}
+
+.refresh-button:hover {
+    background: rgba(222, 93, 56, 0.12);
+}
+
+.refresh-button:active {
+    transform: rotate(360deg);
 }
 
 .header h1 {

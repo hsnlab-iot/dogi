@@ -23,19 +23,7 @@
             header_up X-Forwarded-Prefix /video
         }
     }
-
-    handle_path /voice/socket.io/* {
-        rewrite * /socket.io{uri}
-        reverse_proxy dogi:5052 {
-            header_up X-Forwarded-Prefix /voice/socket.io
-        }
-    }
-    handle_path /voice/* {
-        reverse_proxy dogi:5052 {
-            header_up X-Forwarded-Prefix /voice
-        }
-    }
-
+    
 
     handle_path /apps/search/socket.io/* {
         rewrite * /socket.io{uri}

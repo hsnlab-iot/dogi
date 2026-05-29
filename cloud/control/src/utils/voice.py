@@ -3,10 +3,10 @@ import requests
 import random
 import string
 import wave
-import pickle
 import time
 import re
 import io
+import socketio
 
 from transformers import VitsModel, AutoTokenizer
 import torch
@@ -14,6 +14,7 @@ import scipy
 
 import config
 
+import logging
 
 def get_voice_file_path(filename):
     return os.path.join(config.get_cache_dir(), 'voice', filename)
@@ -165,7 +166,21 @@ def tts_wav(text, filename=None):
 
 
 def play_wav(filename):
+
+    # Set up standard python logging to print to console
+    logging.basicConfig(level=logging.DEBUG)
+
     if not filename.lower().endswith('.wav'):
         filename += '.wav'
-    sock = config.get_voice_socket()
-    sock.send(pickle.dumps({'action': 'play', 'data': filename}))
+
+    voice_port = config.get_voice_port()
+    #sio = socketio.Client()
+    sio = socketio.Client(logger=True, engineio_logger=True)
+    try:
+        sio.connect(f'http://localhost:{voice_port}')
+        sio.emit('audio_play_proxy', filename)
+        sio.sleep(0.2)
+    except Exception as e:
+        print(f'Cannot cretae socketio: {e}')
+    finally:
+        sio.disconnect()

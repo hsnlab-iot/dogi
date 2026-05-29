@@ -30,6 +30,8 @@ body {
 .tabs {
     display: flex;
     justify-content: flex-start; /* Align tabs to the left */
+    align-items: center;
+    flex: 1;
 }
 
 .tab {
@@ -50,6 +52,22 @@ body {
 .tab4 { background-color: #F1C40F; } /* Yellow */
 .tab5 { background-color: #9B59B6; } /* Purple */
 .tab6 { background-color: #17A2B8; } /* Teal */
+
+.tab-voice {
+    margin-left: auto;
+    margin-right: 0;
+    min-width: 44px;
+    text-align: center;
+    border: none;
+    color: white;
+    background-color: #C0392B;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.tab-voice.active {
+    background-color: #27AE60;
+}
 
 .content-wrapper {
     display: flex;

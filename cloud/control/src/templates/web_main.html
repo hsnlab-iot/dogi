@@ -17,6 +17,9 @@
             <div class="tab tab4" onclick="clickPage(3)">{{ page3_name }}</div>
             <div class="tab tab5" onclick="clickPage(4)">{{ page4_name }}</div>
             <div class="tab tab6" onclick="clickPage(5)">{{ page5_name }}</div>
+            <button id="voiceToggle" class="tab tab-voice" type="button" title="Enable voice" aria-label="Enable voice">
+                &#128266;
+            </button>
         </div>
         <h1 class="title">Robotkutya v26.6a</h1>
     </div>
@@ -48,14 +51,61 @@
     </div>
 
     <script>
+        var audioContext;
         var socket = io();
 
         function clickPage(page) {
             socket.emit('page_change', page);
         }
+
+        function setVoiceEnabled(enabled) {
+            var voiceBtn = document.getElementById('voiceToggle');
+            if (!voiceBtn) {
+                return;
+            }
+
+            if (enabled) {
+                voiceBtn.classList.add('active');
+            } else {
+                voiceBtn.classList.remove('active');
+            }
+        }
+
+        function enableVoice() {
+            if (audioContext && audioContext.state !== 'running') {
+                audioContext.resume().then(function() {
+                    console.log('Playback resumed successfully');
+                });
+            }
+
+            fetch('/voice/init', {
+                method: 'GET'
+            });
+
+            setVoiceEnabled(true);
+        }
+
+        window.onload = function() {
+            audioContext = new AudioContext();
+
+            var voiceBtn = document.getElementById('voiceToggle');
+            if (voiceBtn) {
+                voiceBtn.addEventListener('click', enableVoice);
+            }
+        };
  
         socket.on('page_load', function(url) {
             document.getElementById('myIframe').src = url;
+        });
+
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+
+        socket.on('audio_play', function(data) {
+            console.log('Received request:', data);
+            var audio = new Audio('/voice/' + encodeURIComponent(data));
+            audio.play();
         });
 
         function updateStatus() {
