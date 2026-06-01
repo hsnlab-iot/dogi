@@ -21,9 +21,10 @@ vision = ""
 # sse for SSE MCP servers
 # str for Streamable HTTP MCP servers
 highfive = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
-capture = "sse!http://robot_ip:8000/mcp/sse"
+#capture = "sse!http://robot_ip:8000/mcp/sse"
 dice = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
 body = "str!http://robot_ip:5000/mcp"
+visionprompt = "str!http://dogi-mcp:5000/mcp"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
