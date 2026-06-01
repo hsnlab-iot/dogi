@@ -5,13 +5,17 @@ services:
     devices:
       - "/dev/video4:/dev/video4"
       - "/dev/serial0:/dev/serial0"
-    network_mode: host        
+    #network_mode: host        
     environment:
       - SERIAL_PORT=/dev/serial0
     volumes:
       - ./src/streamer.cfg:/root/streamer.cfg:ro
     expose:
+      - "8000"
       - "8001"
+    ports:
+      - "8000:8000"
+      - "8001:8001"
 
   onboard-mcp:
     build:
