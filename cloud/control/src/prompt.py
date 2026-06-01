@@ -310,7 +310,7 @@ def introduction():
     }
     xtext = utils.select_text(text, config.get_ui_language(), True)
     print(xtext)
-    wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_intro_keresd")
+    wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_intro_prompt")
     utils.play_wav(wav)
     time.sleep(d)
 

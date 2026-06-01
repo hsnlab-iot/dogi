@@ -13,7 +13,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN \
   /opt/venv/bin/pip install mcp python-socketio[client] && \
-  /opt/venv/bin/pip install arize-phoenix-otel openinference-instrumentation-openai openai
+  /opt/venv/bin/pip install arize-phoenix-otel openinference-instrumentation-openai openai && \
+  /opt/venv/bin/pip install boltons gevent gevent-websocket ujson websockets wsproto
 
 # Copy the supervisor configuration file
 COPY src/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

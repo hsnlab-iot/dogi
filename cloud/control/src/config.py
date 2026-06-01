@@ -1,11 +1,12 @@
 import os
 import socket
 import importlib
-
+from boltons.fileutils import atomic_save
 try:
     tomllib = importlib.import_module('tomllib')
 except ModuleNotFoundError:
     tomllib = importlib.import_module('tomli')
+
 
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 CONTROL_DIR = os.path.dirname(SRC_DIR)
@@ -43,7 +44,7 @@ def _build_runtime_state():
 
 
 _state = _build_runtime_state()
-
+_folder = ''
 
 def _build_default_config():
     return {
@@ -140,13 +141,18 @@ def _load_prompts_file(folder = ''):
 
 def get_config_data(folder = ''):
     if _state['config_data'] is None:
-        _state['config_data'] = _load_config_file(folder)
+        if not folder:
+            folder = _folder
+        #_state['config_data'] = _load_config_file(folder)
+        init(folder)
 
     return _state['config_data']
 
 
 def get_prompts_data(folder = ''):
     if _state['prompts_data'] is None:
+        if not folder:
+            folder = _folder
         _state['prompts_data'] = _load_prompts_file(folder)
 
     return _state['prompts_data']
@@ -207,8 +213,31 @@ def _close_socket(sock):
 def init(folder = ''):
     """Initialize configuration by loading config and priming singletons."""
     if _state['config_data'] is not None:
+        print("Config alredy initialized")
         return
-    get_config_data(folder)
+
+    if not folder:
+        # Check selected file for selection
+        selected_file = os.path.join(CONFIG_DIR, 'selected')
+        if os.path.exists(selected_file):
+            try:
+                with open(selected_file, 'r', encoding='utf-8') as f:
+                    folder = f.read().strip()
+                # Validate that the selected folder exists
+                selected_folder_path = os.path.join(CONFIG_DIR, folder)
+                if not os.path.isdir(selected_folder_path):
+                    print(f'Error: selected folder does not exist: {selected_folder_path}')
+                    folder = ''
+                else:
+                    print(f'Loaded selected folder from file: {folder}')
+            except Exception as e:
+                print(f'Error reading selected file: {e}')
+                folder = ''
+        else:
+            print("There is no selected pupality")
+
+    print(f"init debug: {folder}")
+    _state['config_data'] = _load_config_file(folder)
     
     """
     get_ui_language()
@@ -217,13 +246,11 @@ def init(folder = ''):
     get_openai_client()
     get_soul_content()
     get_tts_parameters()
-    get_voice_socket()
     get_control_socket()
     """
 
 def reinit(folder = ''):
     """Reload configuration from disk and rebuild cached clients and sockets."""
-    _close_socket(_state['voice_socket'])
     _close_socket(_state['control_socket'])
 
     _state.update(_build_runtime_state())
@@ -232,6 +259,15 @@ def reinit(folder = ''):
         print(f"Reinit with {folder}")
     else:
         print("Reinit")
+   
+    # Save selected folder to file using bolton for atomic writes
+    selected_file = os.path.join(CONFIG_DIR, 'selected')
+    try:
+        with atomic_save(selected_file, text_mode=True) as f:
+            f.write(folder)
+        print(f"Saved selected folder to {selected_file}: '{folder}'")
+    except Exception as e:
+        print(f'Error saving selected folder: {e}')
 
     init(folder)
 

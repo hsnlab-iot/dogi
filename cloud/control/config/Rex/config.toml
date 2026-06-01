@@ -69,7 +69,7 @@ voice = "hu_diana_majlinger"
 #- TTS_ENGINE_API="http://10.6.6.20:8124/synthesize/"
 
 [ports]
-voice = 5052
+voice = 5059
 control = 5002
 
 [streamer]

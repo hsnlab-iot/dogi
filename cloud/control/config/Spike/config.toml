@@ -1,21 +1,18 @@
 [pupcard]
 language = "ENG"
-model = "Qwen3.6"
+model = "Nemotron 3"
 tts = "Meta ENG"
 
 [general]
-cache = "~/.cache"
-log = "~/log"
+cache = "~/.cache/spike"
+log = "~/log/spike"
 
 [language]
-ui = "hu"
-prompt = "hu"
-#ui = "en"
-#prompt = "en"
+ui = "en"
+prompt = "en"
 
 [models]
-general = "qwen3.5:9B"
-#general = "gemma4:e4b"
+general = "nemotron-3-nano:4b"
 translation = ""
 vision = ""
 
@@ -49,14 +46,9 @@ binary_images = false
 # openai:  uses model + voice
 # mms:     uses model
 
-# Diana
-protocol = "opentts"
-api_base = "http://opentts:5500/api/tts"
-voice = "hu_diana_majlinger"
-
 # Facebook english
-#protocol = "mms"
-#model = "facebook/mms-tts-eng"
+protocol = "mms"
+model = "facebook/mms-tts-eng"
 
 #protocol = "openai"
 #api_base = "http://10.6.6.20:8880/v1"
@@ -69,7 +61,7 @@ voice = "hu_diana_majlinger"
 #- TTS_ENGINE_API="http://10.6.6.20:8124/synthesize/"
 
 [ports]
-voice = 5052
+voice = 5059
 control = 5002
 
 [streamer]

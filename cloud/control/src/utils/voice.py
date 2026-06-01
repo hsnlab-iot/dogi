@@ -167,20 +167,16 @@ def tts_wav(text, filename=None):
 
 def play_wav(filename):
 
-    # Set up standard python logging to print to console
-    logging.basicConfig(level=logging.DEBUG)
-
     if not filename.lower().endswith('.wav'):
         filename += '.wav'
 
     voice_port = config.get_voice_port()
-    #sio = socketio.Client()
-    sio = socketio.Client(logger=True, engineio_logger=True)
+    sio = socketio.Client()
     try:
         sio.connect(f'http://localhost:{voice_port}')
         sio.emit('audio_play_proxy', filename)
         sio.sleep(0.2)
     except Exception as e:
-        print(f'Cannot cretae socketio: {e}')
+        print(f'Cannot use socketio: {e}')
     finally:
         sio.disconnect()
