@@ -54,14 +54,11 @@ services:
     container_name: dogi-mcp
     environment:
       - MCP_KEY=${MCP_KEY}
-      - SNAPSHOT_URL=http://dogi:5051/jpeg
-      - OPENAI_BASE_URL=http://10.6.6.20:11434/v1
-      #- OPENAI_MODEL=qwen3.5:4b
-      - OPENAI_MODEL=qwen3-vl:4b
-      - OPENAI_IMAGE_INPUT_MODE=base64
-      - OPENAI_ENABLE_THINKING=false
+      - VP_CONFIG=/config/vp_config.toml
     ports:
       - "5000:5000"
+    volumes:
+      - ./mcp/vp_config.toml:/config/vp_config.toml:ro
     restart: unless-stopped
 
   opentts:

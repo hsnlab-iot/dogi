@@ -1,0 +1,51 @@
+# Vision Prompt MCP Server Configuration
+
+[server]
+# Server host and port
+host = "0.0.0.0"
+port = 5000
+# HTTP timeout for requests
+http_timeout_seconds = 15
+
+[logging]
+# Log level: ERROR, WARNING, INFO, or DEBUG
+#level = "INFO"
+level = "DEBUG"
+
+[snapshot]
+# URL where snapshots are fetched from
+url = "http://dogi:5051/jpeg"
+
+[openai]
+# OpenAI base URL (e.g., for local LLM servers like Ollama)
+base_url = "http://10.6.6.20:11434/v1"
+# Model name to use
+model = "qwen3-vl:4b"
+# API key for OpenAI is an environment variable
+# Timeout for OpenAI API calls in seconds
+timeout_seconds = 30
+# How to send images: "url" or "base64"
+image_input_mode = "base64"
+# Image detail level for vision: "low", "high", or "auto"
+image_detail = "auto"
+# Maximum tokens for response
+max_tokens = 2048
+# Temperature for generation (0.0 = deterministic, 1.0 = creative)
+temperature = 0.0
+# Enable thinking/reasoning in response (for models that support it)
+enable_thinking = false
+
+[answer_lengths]
+# Token counts for each answer length preference
+short = 256
+medium = 512
+long = 2048
+
+# Optional: SocketIO configuration for sending snapshots
+# Remove or comment out this section to disable snapshot sending
+[socketio]
+# SocketIO server URL (e.g., "http://localhost:3000")
+# Leave empty to disable snapshot sending
+url = "http://dogi:5056"
+# Event name to emit snapshots on
+event = "snapshot"

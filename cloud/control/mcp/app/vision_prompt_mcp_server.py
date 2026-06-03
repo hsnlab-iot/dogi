@@ -6,56 +6,86 @@ import time
 import threading
 from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 from contextlib import contextmanager
+from typing import Optional, Dict, Any
+import socketio
+import asyncio
 
 import requests
 import uvicorn
 from fastmcp import FastMCP
 from openai import OpenAI
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
-HOST = os.getenv("MCP_HOST", "0.0.0.0")
-PORT = int(os.getenv("MCP_PORT", 5000))
-HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "15"))
-OPENAI_TIMEOUT_SECONDS = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30"))
 
-# Log level configuration
+# Configuration loading
+config_path = os.getenv("VP_CONFIG")
+EXPECTED_KEY = os.getenv("MCP_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_KEY", "not-needed")
+
+if not config_path:
+    raise RuntimeError("VP_CONFIG environment variable must be set")
+
+if not os.path.exists(config_path):
+    raise RuntimeError(f"Config file not found: {config_path}")
+
+with open(config_path, "rb") as f:
+    CONFIG = tomllib.load(f)
+
+# Server configuration
+SERVER_CONFIG = CONFIG.get("server", {})
+HOST = SERVER_CONFIG.get("host", "0.0.0.0")
+PORT = SERVER_CONFIG.get("port", 5000)
+HTTP_TIMEOUT_SECONDS = float(SERVER_CONFIG.get("http_timeout_seconds", 15))
+if not EXPECTED_KEY:
+    raise RuntimeError("'server.api_key' must be set in config file")
+
+# Logging configuration
 LOG_LEVELS = {"ERROR": 0, "WARNING": 1, "INFO": 2, "DEBUG": 3}
-DEBUG_LEVEL = LOG_LEVELS.get(os.getenv("DEBUG_LEVEL", "INFO").upper(), 2)
+LOG_CONFIG = CONFIG.get("logging", {})
+DEBUG_LEVEL = LOG_LEVELS.get(LOG_CONFIG.get("level", "INFO").upper(), 2)
+
+# Snapshot configuration
+SNAPSHOT_CONFIG = CONFIG.get("snapshot", {})
+SNAPSHOT_URL = SNAPSHOT_CONFIG.get("url")
+if not SNAPSHOT_URL:
+    raise RuntimeError("'snapshot.url' must be set in config file")
+
+# SocketIO configuration (optional)
+SOCKETIO_CONFIG = CONFIG.get("socketio", {})
+SOCKETIO_URL = SOCKETIO_CONFIG.get("url")
+SOCKETIO_EVENT = SOCKETIO_CONFIG.get("event", "snapshot")
+
+# OpenAI configuration
+OPENAI_CONFIG = CONFIG.get("openai", {})
+OPENAI_BASE_URL = OPENAI_CONFIG.get("base_url")
+OPENAI_MODEL = OPENAI_CONFIG.get("model")
+OPENAI_TIMEOUT_SECONDS = float(OPENAI_CONFIG.get("timeout_seconds", 30))
+OPENAI_IMAGE_INPUT_MODE = OPENAI_CONFIG.get("image_input_mode", "url").strip().lower()
+OPENAI_IMAGE_DETAIL = OPENAI_CONFIG.get("image_detail", "auto")
+OPENAI_MAX_TOKENS = int(OPENAI_CONFIG.get("max_tokens", 1024))
+OPENAI_TEMPERATURE = float(OPENAI_CONFIG.get("temperature", 0.0))
+OPENAI_ENABLE_THINKING = str(OPENAI_CONFIG.get("enable_thinking", False)).lower() in {
+    "1", "true", "yes", "on"
+}
+
+if not OPENAI_BASE_URL:
+    raise RuntimeError("'openai.base_url' must be set in config file")
+if not OPENAI_MODEL:
+    raise RuntimeError("'openai.model' must be set in config file")
+if OPENAI_IMAGE_INPUT_MODE not in {"url", "base64"}:
+    raise RuntimeError("'openai.image_input_mode' must be 'url' or 'base64'")
 
 # Answer length configuration (maps to max tokens)
+ANSWER_CONFIG = CONFIG.get("answer_lengths", {})
 ANSWER_LENGTH_TOKENS = {
-    "short": 256,
-    "medium": 512,
-    "long": 2048,
+    "short": int(ANSWER_CONFIG.get("short", 256)),
+    "medium": int(ANSWER_CONFIG.get("medium", 512)),
+    "long": int(ANSWER_CONFIG.get("long", 2048)),
 }
-
-EXPECTED_KEY = os.getenv("MCP_KEY")
-if not EXPECTED_KEY:
-    raise RuntimeError("MCP_KEY environment variable must be set")
-
-SNAPSHOT_URL = os.getenv("SNAPSHOT_URL")
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "not-needed")
-OPENAI_IMAGE_INPUT_MODE = os.getenv("OPENAI_IMAGE_INPUT_MODE", "url").strip().lower()
-OPENAI_IMAGE_DETAIL = os.getenv("OPENAI_IMAGE_DETAIL", "auto")
-OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "1024"))
-OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.0"))
-OPENAI_ENABLE_THINKING = os.getenv("OPENAI_ENABLE_THINKING", "false").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
-
-if not SNAPSHOT_URL:
-    raise RuntimeError("SNAPSHOT_URL environment variable must be set")
-if not OPENAI_BASE_URL:
-    raise RuntimeError("OPENAI_BASE_URL environment variable must be set")
-if not OPENAI_MODEL:
-    raise RuntimeError("OPENAI_MODEL environment variable must be set")
-if OPENAI_IMAGE_INPUT_MODE not in {"url", "base64"}:
-    raise RuntimeError("OPENAI_IMAGE_INPUT_MODE must be 'url' or 'base64'")
 
 openai_client = OpenAI(
     api_key=OPENAI_API_KEY,
@@ -63,13 +93,29 @@ openai_client = OpenAI(
     timeout=OPENAI_TIMEOUT_SECONDS,
 )
 
-
 def _log(level: str, msg: str):
     """Log message with level filtering based on DEBUG_LEVEL."""
     level_num = LOG_LEVELS.get(level.upper(), 2)
     if level_num <= DEBUG_LEVEL:
         print(f"[vision_prompt][{level.lower()}] {msg}", flush=True)
         sys.stdout.flush()
+
+
+def _send_snapshot_via_socketio(image: str):
+    """Send snapshot to socketio server if configured."""
+    global sio
+
+    if not SOCKETIO_URL or sio is None:
+        return
+
+    try:
+        payload = {
+            "data": image
+        }
+        sio.emit(SOCKETIO_EVENT, payload)
+        _log("DEBUG", f"Snapshot sent to {SOCKETIO_URL} via event '{SOCKETIO_EVENT}'")
+    except Exception as e:
+        _log("WARNING", f"Failed to send snapshot via socketio: {type(e).__name__}: {str(e)}")
 
 def _extract_api_key(headers: list[tuple[bytes, bytes]]) -> str | None:
     for key, value in headers:
@@ -348,11 +394,16 @@ def vision_prompt(prompt: str, answer_length: str = "short") -> str:
             )
         else:
             image_bytes, mime_type = _snapshot_binary(snapshot_url)
+            image_url = _to_data_url(image_bytes, mime_type)
+
+            if SOCKETIO_URL:
+                _send_snapshot_via_socketio(image_url)
+
             content_parts.append(
                 {
                     "type": "image_url",
                     "image_url": {
-                        "url": _to_data_url(image_bytes, mime_type),
+                        "url": image_url,
                         "detail": OPENAI_IMAGE_DETAIL,
                     },
                 }
@@ -382,17 +433,28 @@ def vision_prompt(prompt: str, answer_length: str = "short") -> str:
 
 mcp_app = mcp.http_app(transport="streamable-http")
 app = APIKeyProtectedApp(mcp_app)
-
+sio = None
 
 if __name__ == "__main__":
     print(f"Vision MCP Server starting on http://{HOST}:{PORT}/mcp (streamable-http)", flush=True)
+    print(f"Config file: {config_path}", flush=True)
     print(f"Using snapshot URL: {SNAPSHOT_URL}", flush=True)
     print(f"Using OpenAI base URL: {OPENAI_BASE_URL}", flush=True)
     print(f"Using model: {OPENAI_MODEL}", flush=True)
     print(f"Using image input mode: {OPENAI_IMAGE_INPUT_MODE}", flush=True)
     print(f"Using thinking mode: {OPENAI_ENABLE_THINKING}", flush=True)
     print(f"HTTP timeout: {HTTP_TIMEOUT_SECONDS}s", flush=True)
-    print(f"Debug level: {list(LOG_LEVELS.keys())[DEBUG_LEVEL]} (set DEBUG_LEVEL env var to change)", flush=True)
+    print(f"Debug level: {list(LOG_LEVELS.keys())[DEBUG_LEVEL]}", flush=True)
     print(f"Available answer lengths: {list(ANSWER_LENGTH_TOKENS.keys())}", flush=True)
+    if SOCKETIO_URL:
+        print(f"SocketIO snapshot support enabled: {SOCKETIO_URL} (event: '{SOCKETIO_EVENT}')", flush=True)
+    else:
+        print("SocketIO snapshot support: disabled", flush=True)
     sys.stdout.flush()
+
+    if SOCKETIO_URL:
+        sio = socketio.Client()
+        sio.connect(SOCKETIO_URL)
+        _log("DEBUG", f"SocketIO connected to {SOCKETIO_URL}")
+
     uvicorn.run(app, host=HOST, port=PORT)

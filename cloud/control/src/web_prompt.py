@@ -72,6 +72,11 @@ def handle_event(data):
 def handle_event(data):
     pass
 
+@socketio.on('snapshot')
+def handle_snapshot(data):
+    print(f'Snapshot received: {data}')
+    socketio.emit('ui_update_tools_response', data)
+
 @socketio.on_error()  # Handle socketio errors
 def handle_error(e):
     print('SocketIO Error:', e)
