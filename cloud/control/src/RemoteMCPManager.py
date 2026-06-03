@@ -11,6 +11,10 @@ from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
 from mcp.client.streamable_http import streamable_http_client
 
+MCP_HTTP_CONNECT_TIMEOUT_SECONDS = float(os.getenv("MCP_HTTP_CONNECT_TIMEOUT_SECONDS", "10"))
+MCP_HTTP_READ_TIMEOUT_SECONDS = float(os.getenv("MCP_HTTP_READ_TIMEOUT_SECONDS", "30"))
+MCP_TOOL_CALL_TIMEOUT_SECONDS = float(os.getenv("MCP_TOOL_CALL_TIMEOUT_SECONDS", "60"))
+
 class RemoteMCPManager:
     def __init__(self):
         self.session = None
@@ -127,7 +131,13 @@ class RemoteMCPManager:
             f"Streamable HTTP connection to {url} "
             f"(bearer_auth={'enabled' if 'Authorization' in headers else 'disabled'})"
         )
-        self.http_client = httpx.AsyncClient(headers=headers)
+        timeout = httpx.Timeout(
+            connect=MCP_HTTP_CONNECT_TIMEOUT_SECONDS,
+            read=MCP_HTTP_READ_TIMEOUT_SECONDS,
+            write=MCP_HTTP_READ_TIMEOUT_SECONDS,
+            pool=MCP_HTTP_CONNECT_TIMEOUT_SECONDS,
+        )
+        self.http_client = httpx.AsyncClient(headers=headers, timeout=timeout)
         self.transport_ctx = streamable_http_client(url, http_client=self.http_client)
         self.read, self.write, _ = await self.transport_ctx.__aenter__()
         self.session = ClientSession(self.read, self.write)
@@ -167,7 +177,7 @@ class RemoteMCPManager:
     def get_tools_blocking(self):
         """Blocking call to list tools"""
         if not self.session:
-            raise Exception("Nincs kapcsolat!")
+            raise Exception("No connection!")
         
         future = asyncio.run_coroutine_threadsafe(self.session.list_tools(), self.loop)
         return future.result() # Itt vár (blokkol)
@@ -176,9 +186,10 @@ class RemoteMCPManager:
         """Async tool call"""
         return await self.session.call_tool(tool_name, arguments=args)
 
-    def call_tool_blocking(self, tool_name, args):
+    def call_tool_blocking(self, tool_name, args, timeout_seconds: float | None = None):
         """Blocking tool call — for use outside async context."""
         future = asyncio.run_coroutine_threadsafe(
             self.call_tool_async(tool_name, args), self.loop
         )
-        return future.result()
+        wait_timeout = MCP_TOOL_CALL_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
+        return future.result(timeout=wait_timeout)

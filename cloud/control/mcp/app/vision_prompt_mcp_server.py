@@ -1,8 +1,11 @@
 import base64
 import json
 import os
+import sys
 import time
+import threading
 from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
+from contextlib import contextmanager
 
 import requests
 import uvicorn
@@ -13,6 +16,18 @@ from openai import OpenAI
 HOST = os.getenv("MCP_HOST", "0.0.0.0")
 PORT = int(os.getenv("MCP_PORT", 5000))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "15"))
+OPENAI_TIMEOUT_SECONDS = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30"))
+
+# Log level configuration
+LOG_LEVELS = {"ERROR": 0, "WARNING": 1, "INFO": 2, "DEBUG": 3}
+DEBUG_LEVEL = LOG_LEVELS.get(os.getenv("DEBUG_LEVEL", "INFO").upper(), 2)
+
+# Answer length configuration (maps to max tokens)
+ANSWER_LENGTH_TOKENS = {
+    "short": 256,
+    "medium": 512,
+    "long": 2048,
+}
 
 EXPECTED_KEY = os.getenv("MCP_KEY")
 if not EXPECTED_KEY:
@@ -45,8 +60,16 @@ if OPENAI_IMAGE_INPUT_MODE not in {"url", "base64"}:
 openai_client = OpenAI(
     api_key=OPENAI_API_KEY,
     base_url=OPENAI_BASE_URL,
-    timeout=HTTP_TIMEOUT_SECONDS,
+    timeout=OPENAI_TIMEOUT_SECONDS,
 )
+
+
+def _log(level: str, msg: str):
+    """Log message with level filtering based on DEBUG_LEVEL."""
+    level_num = LOG_LEVELS.get(level.upper(), 2)
+    if level_num <= DEBUG_LEVEL:
+        print(f"[vision_prompt][{level.lower()}] {msg}", flush=True)
+        sys.stdout.flush()
 
 def _extract_api_key(headers: list[tuple[bytes, bytes]]) -> str | None:
     for key, value in headers:
@@ -66,39 +89,62 @@ class APIKeyProtectedApp:
         self.api_path = api_path
 
     async def __call__(self, scope, receive, send):
-        if scope.get("type") == "http" and scope.get("path", "").startswith(self.api_path):
+        request_path = scope.get("path", "")
+        is_api = request_path.startswith(self.api_path)
+
+        async def wrapped_receive():
+            message = await receive()
+            if is_api and message.get("type") == "http.disconnect":
+                _log("DEBUG", f"ASGI receive: http.disconnect on {request_path}")
+            return message
+
+        async def wrapped_send(message):
+            if is_api:
+                msg_type = message.get("type", "")
+                if msg_type == "http.response.start":
+                    _log(
+                        "DEBUG",
+                        f"ASGI send: http.response.start status={message.get('status')} on {request_path}"
+                    )
+                elif msg_type == "http.response.body":
+                    body = message.get("body") or b""
+                    body_len = len(body)
+                    _log(
+                        "DEBUG",
+                        f"ASGI send: http.response.body len={body_len} more_body={message.get('more_body', False)} on {request_path}"
+                    )
+
+            await send(message)
+        
+        if scope.get("type") == "http" and is_api:
+            _log("DEBUG", f"Handling API request to {request_path}")
             provided_key = _extract_api_key(scope.get("headers", []))
             if provided_key != EXPECTED_KEY:
-                await send(
+                _log("WARNING", f"Auth failed for {request_path}")
+                await wrapped_send(
                     {
                         "type": "http.response.start",
                         "status": 401,
                         "headers": [(b"content-type", b"application/json")],
                     }
                 )
-                await send(
+                await wrapped_send(
                     {
                         "type": "http.response.body",
                         "body": b'{"detail":"Invalid API key"}',
                         "more_body": False,
                     }
                 )
-                print("Authentication failed!")
+                _log("WARNING", "Authentication failed!")
                 return
+            _log("DEBUG", f"Auth passed for {request_path}, forwarding to inner app")
 
-        await self.inner_app(scope, receive, send)
+        await self.inner_app(scope, wrapped_receive, wrapped_send)
 
 
 def _to_data_url(image_bytes: bytes, mime_type: str) -> str:
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
     return f"data:{mime_type};base64,{image_b64}"
-
-
-def _cache_busted_url(url: str) -> str:
-    parts = urlsplit(url)
-    query_items = parse_qsl(parts.query, keep_blank_values=True)
-    query_items.append(("_ts", str(int(time.time() * 1000))))
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query_items), parts.fragment))
 
 
 def _snapshot_binary(url: str) -> tuple[bytes, str]:
@@ -114,6 +160,13 @@ def _extract_content_text(content: object) -> str:
         text = content.strip()
         if text:
             return text
+
+    if isinstance(content, dict):
+        for key in ("content", "text", "output_text", "reasoning"):
+            value = content.get(key)
+            text = _extract_content_text(value)
+            if text:
+                return text
 
     if isinstance(content, list):
         text_parts: list[str] = []
@@ -139,7 +192,7 @@ def _extract_content_text(content: object) -> str:
     return ""
 
 
-def _call_openai_chat_completions(content_parts: list[dict]) -> str:
+def _call_openai_chat_completions(content_parts: list[dict], max_tokens: int | None = None) -> str:
     messages: list[dict] = []
     if not OPENAI_ENABLE_THINKING:
         messages.append(
@@ -162,10 +215,11 @@ def _call_openai_chat_completions(content_parts: list[dict]) -> str:
         }
     )
 
+    effective_max_tokens = max_tokens if max_tokens is not None else OPENAI_MAX_TOKENS
     request_payload = {
         "model": OPENAI_MODEL,
         "messages": messages,
-        "max_tokens": OPENAI_MAX_TOKENS,
+        "max_tokens": effective_max_tokens,
         "temperature": OPENAI_TEMPERATURE,
     }
 
@@ -176,39 +230,74 @@ def _call_openai_chat_completions(content_parts: list[dict]) -> str:
             "options": {
                 "think": False,
             },
+            "chat_template_kwargs": {
+                "enable_thinking": False
+            },
         }
 
-    print("[vision_prompt][debug] OpenAI raw request:")
-    print(json.dumps(request_payload, indent=2, ensure_ascii=False))
+    _log("DEBUG", "OpenAI raw request:")
+    _log("DEBUG", json.dumps(request_payload, indent=2, ensure_ascii=False))
+    _log("DEBUG", f"Calling OpenAI chat.completions at {OPENAI_BASE_URL} with timeout {OPENAI_TIMEOUT_SECONDS}s")
+    sys.stdout.flush()
 
-    completion = openai_client.chat.completions.create(**request_payload)
+    try:
+        _log("DEBUG", "Starting OpenAI API call...")
+        sys.stdout.flush()
+        completion = openai_client.chat.completions.create(**request_payload)
+        _log("DEBUG", "OpenAI API call completed successfully")
+        sys.stdout.flush()
+    except Exception as e:
+        error_msg = f"OpenAI call failed with error: {type(e).__name__}: {str(e)}"
+        _log("ERROR", error_msg)
+        sys.stdout.flush()
+        raise RuntimeError(error_msg) from e
 
-    print("[vision_prompt][debug] OpenAI raw response:")
-    print(completion.model_dump_json(indent=2))
+    _log("DEBUG", "OpenAI raw response:")
+    _log("DEBUG", completion.model_dump_json(indent=2))
+    sys.stdout.flush()
 
     if not completion.choices:
+        _log("ERROR", "OpenAI response has no choices")
         raise RuntimeError("openai response does not contain choices")
 
     message = completion.choices[0].message
     content = getattr(message, "content", None)
+    _log("DEBUG", f"Extracted message content type: {type(content).__name__}")
 
     text = _extract_content_text(content)
     if text:
+        _log("DEBUG", f"Successfully extracted text: {text[:100]}..." if len(text) > 100 else f"Successfully extracted text: {text}")
         return text
 
     # Fallback to raw model dump; some backends serialize content differently.
+    _log("DEBUG", "Primary extraction failed, trying message.model_dump()")
     message_dump = message.model_dump() if hasattr(message, "model_dump") else {}
     text = _extract_content_text(message_dump.get("content"))
     if text:
+        _log("DEBUG", f"Successfully extracted text from model_dump: {text[:100]}..." if len(text) > 100 else f"Successfully extracted text from model_dump: {text}")
         return text
 
+    text = _extract_content_text(message_dump.get("reasoning"))
+    if text:
+        _log("DEBUG", f"Successfully extracted reasoning from model_dump: {text[:100]}..." if len(text) > 100 else f"Successfully extracted reasoning from model_dump: {text}")
+        return text
+
+    _log("DEBUG", "Second extraction failed, trying completion.model_dump()")
     dump_content = completion.model_dump() if hasattr(completion, "model_dump") else {}
     choices = dump_content.get("choices", []) if isinstance(dump_content, dict) else []
     if choices and isinstance(choices[0], dict):
         text = _extract_content_text(choices[0].get("message", {}).get("content"))
         if text:
+            _log("DEBUG", f"Successfully extracted text from completion.model_dump: {text[:100]}..." if len(text) > 100 else f"Successfully extracted text from completion.model_dump: {text}")
             return text
 
+        text = _extract_content_text(choices[0].get("message", {}).get("reasoning"))
+        if text:
+            _log("DEBUG", f"Successfully extracted reasoning from completion.model_dump: {text[:100]}..." if len(text) > 100 else f"Successfully extracted reasoning from completion.model_dump: {text}")
+            return text
+
+    _log("ERROR", f"All extraction methods failed. dump_content keys: {list(dump_content.keys()) if isinstance(dump_content, dict) else 'not a dict'}")
+    _log("DEBUG", f"Full response dump: {json.dumps(dump_content, indent=2, ensure_ascii=False, default=str)}")
     raise RuntimeError("openai response returned empty content")
 
 
@@ -216,48 +305,79 @@ mcp = FastMCP("vision-prompt")
 
 
 @mcp.tool()
-def vision_prompt(prompt: str) -> str:
-    """Capture a snapshot through the camera and run a prompt on it."""
-    if not prompt or not prompt.strip():
-        raise ValueError("prompt must not be empty")
+def vision_prompt(prompt: str, answer_length: str = "short") -> str:
+    """Capture a snapshot through the camera and run a prompt on it.
+    
+    Args:
+        prompt: The prompt to send to the vision model
+        answer_length: Response length preference - 'short' (256 tokens), 'medium' (512 tokens), or 'long' (2048 tokens)
+    """
+    try:
+        started_at = time.time()
+        _log("DEBUG", f"vision_prompt called with prompt: {prompt[:100]}..." if len(prompt) > 100 else f"vision_prompt called with prompt: {prompt}")
+        _log("DEBUG", f"answer_length: {answer_length}")
+        if not prompt or not prompt.strip():
+            raise ValueError("prompt must not be empty")
 
-    snapshot_url = SNAPSHOT_URL
-    prompt_text = prompt.strip()
+        # Validate and get max tokens for answer length
+        if answer_length not in ANSWER_LENGTH_TOKENS:
+            raise ValueError(f"answer_length must be one of {list(ANSWER_LENGTH_TOKENS.keys())}, got '{answer_length}'")
+        max_tokens = ANSWER_LENGTH_TOKENS[answer_length]
+        _log("DEBUG", f"Using max_tokens={max_tokens} for answer_length='{answer_length}'")
 
-    content_parts: list[dict] = [
-        {
-            "type": "text",
-            "text": prompt_text,
-        }
-    ]
+        snapshot_url = SNAPSHOT_URL
+        prompt_text = prompt.strip()
+        _log("DEBUG", f"Starting vision_prompt processing")
 
-    if OPENAI_IMAGE_INPUT_MODE == "url":
-        content_parts.append(
+        content_parts: list[dict] = [
             {
-                "type": "image_url",
-                "image_url": {
-                    "url": snapshot_url,
-                    "detail": OPENAI_IMAGE_DETAIL,
-                },
+                "type": "text",
+                "text": prompt_text,
             }
-        )
-    else:
-        image_bytes, mime_type = _snapshot_binary(snapshot_url)
-        content_parts.append(
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": _to_data_url(image_bytes, mime_type),
-                    "detail": OPENAI_IMAGE_DETAIL,
-                },
-            }
-        )
+        ]
 
-    text = _call_openai_chat_completions(content_parts)
-    if not text:
-        raise RuntimeError("prompt returned empty text")
+        if OPENAI_IMAGE_INPUT_MODE == "url":
+            content_parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": snapshot_url,
+                        "detail": OPENAI_IMAGE_DETAIL,
+                    },
+                }
+            )
+        else:
+            image_bytes, mime_type = _snapshot_binary(snapshot_url)
+            content_parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": _to_data_url(image_bytes, mime_type),
+                        "detail": OPENAI_IMAGE_DETAIL,
+                    },
+                }
+            )
 
-    return text
+        _log("DEBUG", f"Calling OpenAI with {len(content_parts)} content parts")
+        text = _call_openai_chat_completions(content_parts, max_tokens=max_tokens)
+        if not text:
+            _log("ERROR", "OpenAI returned empty text")
+            raise RuntimeError("prompt returned empty text")
+
+        result_preview = text[:100] + "..." if len(text) > 100 else text
+        _log("INFO", f"vision_prompt RETURNING RESULT: {result_preview}")
+        _log("DEBUG", f"Return value type: {type(text).__name__}, length: {len(text)}")
+        _log("DEBUG", f"vision_prompt elapsed: {time.time() - started_at:.3f}s")
+        sys.stdout.flush()
+        _log("DEBUG", "[PRE-RETURN] About to return from vision_prompt")
+        sys.stdout.flush()
+        return text
+    except Exception as e:
+        _log("ERROR", f"vision_prompt failed: {type(e).__name__}: {str(e)}")
+        import traceback
+        _log("DEBUG", f"[TRACEBACK] {traceback.format_exc()}")
+        sys.stdout.flush()
+        raise
 
 
 mcp_app = mcp.http_app(transport="streamable-http")
@@ -265,10 +385,14 @@ app = APIKeyProtectedApp(mcp_app)
 
 
 if __name__ == "__main__":
-    print(f"Vision MCP Server starting on http://{HOST}:{PORT}/mcp (streamable-http)")
-    print(f"Using snapshot URL: {SNAPSHOT_URL}")
-    print(f"Using OpenAI base URL: {OPENAI_BASE_URL}")
-    print(f"Using model: {OPENAI_MODEL}")
-    print(f"Using image input mode: {OPENAI_IMAGE_INPUT_MODE}")
-    print(f"Using thinking mode: {OPENAI_ENABLE_THINKING}")
+    print(f"Vision MCP Server starting on http://{HOST}:{PORT}/mcp (streamable-http)", flush=True)
+    print(f"Using snapshot URL: {SNAPSHOT_URL}", flush=True)
+    print(f"Using OpenAI base URL: {OPENAI_BASE_URL}", flush=True)
+    print(f"Using model: {OPENAI_MODEL}", flush=True)
+    print(f"Using image input mode: {OPENAI_IMAGE_INPUT_MODE}", flush=True)
+    print(f"Using thinking mode: {OPENAI_ENABLE_THINKING}", flush=True)
+    print(f"HTTP timeout: {HTTP_TIMEOUT_SECONDS}s", flush=True)
+    print(f"Debug level: {list(LOG_LEVELS.keys())[DEBUG_LEVEL]} (set DEBUG_LEVEL env var to change)", flush=True)
+    print(f"Available answer lengths: {list(ANSWER_LENGTH_TOKENS.keys())}", flush=True)
+    sys.stdout.flush()
     uvicorn.run(app, host=HOST, port=PORT)

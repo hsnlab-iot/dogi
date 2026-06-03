@@ -1,6 +1,7 @@
 import os
 import socket
 import importlib
+from pathlib import Path
 from boltons.fileutils import atomic_save
 try:
     tomllib = importlib.import_module('tomllib')
@@ -14,6 +15,7 @@ CONFIG_DIR = os.path.join(CONTROL_DIR, 'config')
 
 def _build_runtime_state():
     return {
+        'folder': None,
         'config_data': None,
         'prompts_data': None,
         'openai_client': None,
@@ -44,7 +46,6 @@ def _build_runtime_state():
 
 
 _state = _build_runtime_state()
-_folder = ''
 
 def _build_default_config():
     return {
@@ -104,16 +105,19 @@ def _normalize_lang(raw_lang, fallback):
     return normalized[:2]
 
 
-def _load_config_file(folder = ''):
+def _load_config_file():
     defaults = _build_default_config()    
-    config_path = os.path.join(CONFIG_DIR, folder, 'config.toml')
-
-    if not os.path.exists(config_path):
+    config_dir = Path(CONFIG_DIR)
+    config_path = (
+        config_dir / _state['folder'] / 'config.toml' if _state['folder']
+        else config_dir / 'config.toml'
+    )
+    
+    if not config_path.exists():
         print(f'Warning: config file does not exist: {config_path}. Using defaults.')
         return defaults
 
-    with open(config_path, 'rb') as f:
-        loaded = tomllib.load(f)
+    loaded = tomllib.loads(config_path.read_text(encoding="utf-8"))
 
     if not isinstance(loaded, dict):
         print(f'Warning: config file has invalid structure: {config_path}')
@@ -123,37 +127,42 @@ def _load_config_file(folder = ''):
     return _merge_dict(defaults, loaded)
 
 
-def _load_prompts_file(folder = ''):
-    prompts_path = os.path.join(CONFIG_DIR, folder, 'prompts.toml')
-    if not os.path.exists(prompts_path):
+def _load_prompts_file():
+    config_dir = Path(CONFIG_DIR)
+    prompts_path = (
+        config_dir / _state['folder'] / 'prompts.toml' if _state['folder']
+        else config_dir / 'prompts.toml'
+    )
+
+    if not prompts_path.exists():
         print(f'Warning: prompts file does not exist: {prompts_path}')
         return {}
 
-    with open(prompts_path, 'rb') as f:
-        loaded = tomllib.load(f)
+    loaded = tomllib.loads(prompts_path.read_text(encoding="utf-8"))
 
     if not isinstance(loaded, dict):
         print(f'Warning: prompts file has invalid structure: {prompts_path}')
         return {}
 
+    print(f"Prompts file loaded: {prompts_path}")
     return loaded
 
 
-def get_config_data(folder = ''):
+def get_config_data():
+    if _state['folder'] is None:
+        init()
+
+    print(f"get_config_data with folder: '{_state['folder']}'")
+
     if _state['config_data'] is None:
-        if not folder:
-            folder = _folder
-        #_state['config_data'] = _load_config_file(folder)
-        init(folder)
+        _state['config_data'] = _load_config_file()
 
     return _state['config_data']
 
 
-def get_prompts_data(folder = ''):
+def get_prompts_data():
     if _state['prompts_data'] is None:
-        if not folder:
-            folder = _folder
-        _state['prompts_data'] = _load_prompts_file(folder)
+        _state['prompts_data'] = _load_prompts_file()
 
     return _state['prompts_data']
 
@@ -236,10 +245,13 @@ def init(folder = ''):
         else:
             print("There is no selected pupality")
 
-    print(f"init debug: {folder}")
-    _state['config_data'] = _load_config_file(folder)
+    _state['folder'] = folder
+    print(f"Initializing config with folder: '{_state['folder']}'")
+    _state['config_data'] = _load_config_file()
     
     """
+    # Load this on damand
+
     get_ui_language()
     get_prompt_language()
     get_translation_model()
@@ -254,6 +266,7 @@ def reinit(folder = ''):
     _close_socket(_state['control_socket'])
 
     _state.update(_build_runtime_state())
+    _state['folder'] = None
 
     if (folder):
         print(f"Reinit with {folder}")
@@ -275,31 +288,41 @@ def reinit(folder = ''):
 def get_soul_content():
     """Singleton to read and cache SOUL content once."""
     if _state['soul_content'] is None:
-        soul_path = os.path.join(CONFIG_DIR, f'SOUL.{get_ui_language()}.md')
-        fallback_path = os.path.join(CONFIG_DIR, 'SOUL.en.md')
 
-        # First try to load SOUL content in UI language,
-        # if not found, fallback to English version
+        fallback = False
+        config_dir = Path(CONFIG_DIR)
+        soul_filename = f'SOUL.{get_prompt_language()}.md'
+        soul_path = (
+            config_dir / _state['folder'] / soul_filename if _state['folder']
+            else config_dir / soul_filename
+        )
+    
+        if not soul_path.exists():
+            soul_filename = 'SOUL.en.md'
+            soul_path = (
+                config_dir / _state['folder'] / soul_filename if _state['folder']
+                else config_dir / soul_filename
+            )
+            fallback = True
+
         try:
-            with open(soul_path, 'r', encoding='utf-8') as f:
-                _state['soul_content'] = f.read().strip()
-                print(f'Loaded SOUL content from {soul_path}')
-        except FileNotFoundError:
-            with open(fallback_path, 'r', encoding='utf-8') as f:
-                _state['soul_content'] = f.read().strip()
-                print(f'Loaded SOUL content from {fallback_path}')
+            _state['soul_content'] = soul_path.read_text(encoding='utf-8').strip()
+            print(f'Loaded SOUL content from {soul_path}')
+        except Exception as e:
+            _state['soul_content'] = ''
+            print(f"Load error: {e}")
+        
+        # If the fallback was used, and prompt is not in English,
+        # try to translate it to ui language
+        if fallback or get_prompt_language() != 'en':
+            import utils
 
-            # If the fallback was used, and prompt is not in English,
-            # try to translate it to ui language
-            if get_prompt_language() != 'en' and get_ui_language() != 'en':
-                import utils
-
-                print(f'Translating SOUL content to {get_ui_language()}...')
-                _state['soul_content'] = utils.translate(
-                    _state['soul_content'],
-                    'en',
-                    get_ui_language(),
-                )
+            print(f'Translating SOUL content to {get_prompt_language()}...')
+            _state['soul_content'] = utils.translate(
+                _state['soul_content'],
+                'en',
+                get_prompt_language(),
+            )
 
     return _state['soul_content']
 

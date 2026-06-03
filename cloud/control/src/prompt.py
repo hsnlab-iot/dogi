@@ -13,7 +13,7 @@ import subprocess
 import urllib.request
 import json
 import asyncio
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 
 from typing import List, Dict, Any
 from mcp.types import CallToolResult, ImageContent, TextContent
@@ -41,6 +41,24 @@ worker_stop_event = None
 
 # History context
 message_history = []
+
+def _call_tool_with_timeout(rmcp, function_name: str, function_args: dict, timeout_seconds: float = 60.0) -> CallToolResult:
+    """Call tool with timeout to prevent indefinite hangs."""
+    print(f"[call_tool_timeout] Calling {function_name} with timeout {timeout_seconds}s", flush=True)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(rmcp.call_tool_blocking, function_name, function_args)
+        try:
+            print(f"[call_tool_timeout] Waiting for {function_name}...", flush=True)
+            result = future.result(timeout=timeout_seconds)
+            print(f"[call_tool_timeout] {function_name} returned successfully: {type(result)}", flush=True)
+            return result
+        except FuturesTimeoutError:
+            print(f"[call_tool_timeout] ERROR: {function_name} timed out after {timeout_seconds}s", flush=True)
+            raise RuntimeError(f"Tool '{function_name}' timed out after {timeout_seconds}s - MCP server may be unresponsive")
+        except Exception as e:
+            print(f"[call_tool_timeout] ERROR: {function_name} raised {type(e).__name__}: {str(e)}", flush=True)
+            raise
+
 
 def mcp_to_openai_multimodal_tool(mcp_result: CallToolResult, tool_call_id: str) -> Dict[str, Any]:
     """
@@ -168,16 +186,30 @@ def handle_prompt(data):
                             for tool in tools:
                                 if tool[1] == function_name:
                                     rmcp = tool[0]
-                                    result = rmcp.call_tool_blocking(function_name, json.loads(function_args))
-                                    tool_response, tool_texts, tool_image = mcp_to_openai_multimodal_tool(result, tool_call.id)
+                                    try:
+                                        result = _call_tool_with_timeout(rmcp, function_name, json.loads(function_args), timeout_seconds=60.0)
+                                        print(f"[tools] Tool result: {result}", flush=True)
+                                        tool_response, tool_texts, tool_image = mcp_to_openai_multimodal_tool(result, tool_call.id)
 
-                                    tool_responses_json.append(tool_response)
-                                    sio.emit('ui_update',
-                                             {'type': 'tools_response',
-                                              'data': tool_texts})
-                                    sio.emit('ui_update',
-                                             {'type': 'tools_response',
-                                              'data': tool_image})
+                                        tool_responses_json.append(tool_response)
+                                        sio.emit('ui_update',
+                                                 {'type': 'tools_response',
+                                                  'data': tool_texts})
+                                        sio.emit('ui_update',
+                                                 {'type': 'tools_response',
+                                                  'data': tool_image})
+                                    except Exception as e:
+                                        print(f"[tools] ERROR calling tool: {type(e).__name__}: {str(e)}")
+                                        error_response = {
+                                            "role": "tool",
+                                            "tool_call_id": tool_call.id,
+                                            "content": [{"type": "text", "text": f"Tool error: {str(e)}"}]
+                                        }
+                                        tool_responses_json.append(error_response)
+                                        sio.emit('ui_update',
+                                                 {'type': 'tools_response',
+                                                  'data': f'Tool error: {str(e)}'})
+                                    break
 
                         print("Tools finished.")
                         sio.emit('ui_update',
