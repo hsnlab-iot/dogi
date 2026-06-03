@@ -1,6 +1,6 @@
 [pupcard]
 language = "HUN"
-model = "Qwen3.5"
+model = "Racka:4b"
 tts = "TTS:HUN Diana"
 
 [general]
@@ -12,7 +12,7 @@ ui = "hu"
 prompt = "hu"
 
 [models]
-general = "qwen3.5:4B"
+general = "racka-noreason:4b"
 translation = ""
 vision = ""
 
