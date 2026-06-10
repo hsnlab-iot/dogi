@@ -4,6 +4,7 @@ import base64
 import urllib.request
 from pathlib import Path
 from mcp.types import CallToolResult, ImageContent, TextContent
+from typing import Literal, Optional
 
 sys.path.append("/app")
 from DOGZILLALib.DOGZILLALibClient import DOGZILLA
@@ -13,38 +14,55 @@ dog = DOGZILLA()
 def register_tools(mcp):
 
     @mcp.tool()
-    def body_move(action: str, steps: int = 15, duration: float = 1.0, pace: str = "normal") -> str:
+    def body_move(
+        action: Literal["step", "turn", "stop"], 
+            direction: Literal["forward", "back", "left", "right"] = None,
+            steps: int = 15, 
+            duration: float = 1.0, 
+            pace: Literal["slow", "normal", "high"] = "normal"
+        ) -> str:
+    
         """
-        Perform a movement action. Available actions:
-        - forward: Move forward by a specified number of steps.
-        - back: Move backward by a specified number of steps.
-        - left: Move to the left by a specified number of steps.
-        - right: Move to the right by a specified number of steps.
-        - turnleft: Rotate the body to the left without moving forward.
-        - turnright: Rotate the body to the right without moving forward.
-        - stop: Immediately stop all movement.
+        Execute a low-level chassis movement command to change the robot's
+        physical location by step action or facing direction by turn action.
 
         Parameters:
-        - action: The movement action to perform.
-        - steps: The number of steps to take (default: 15).
-        - duration: The duration of the movement in seconds (default: 1.0).
-        - pace: The speed of the movement (slow, normal, or high; default: normal).
+        - action: Must be exactly one of the allowed movement strings.
+            * 'step': Move in the specified direction by taking steps.
+            * 'turn': Rotate in place to change facing direction.
+            * 'stop': Immediately stop all movement. Ignores other parameters.
+        - direction: The direction of movement or turn. Required for 'step' and 'turn'.
+        - steps: Used ONLY by linear movements ('forward', 'back', 'left', 'right'). Ignored by rotational actions and 'stop'.
+        - duration: The duration cap in seconds, applicable to all moving actions. Max value is 3.0.
+        - pace: The movement speed profile, applicable to all moving actions.
+
+        Returns:
+        - str: A message describing the action taken or an error status.
         """
+    
         duration = min(duration, 3.0)
         dog.pace(pace)
 
-        if action == "forward":
-            dog.forward(steps)
-        elif action == "back":
-            dog.back(steps)
-        elif action == "left":
-            dog.left(steps)
-        elif action == "right":
-            dog.right(steps)
-        elif action == "turnleft":
-            dog.turnleft(50)
-        elif action == "turnright":
-            dog.turnright(50)
+        if action == "step":
+            if direction == "forward":
+                dog.forward(steps)
+            elif direction == "back":
+                dog.back(steps)
+            elif direction == "left":
+                dog.left(steps)
+            elif direction == "right":
+                dog.right(steps)
+            else:
+                return f"Unknown direction for step action: {direction}"                
+
+        elif action == "turn":
+            if direction == "left":
+                dog.turnleft(50)
+            elif direction == "right":
+                dog.turnright(50)
+            else:
+                return f"Unknown direction for turn action: {direction}"
+
         elif action == "stop":
             dog.stop()
             return "Stopped"
@@ -53,39 +71,73 @@ def register_tools(mcp):
 
         time.sleep(duration)
         dog.stop()
-        return f"Performed {action} with steps={steps}, duration={duration}s, pace={pace}"
+        return f"Performed {action} with direction={direction}, steps={steps}, duration={duration}s, pace={pace}"
 
     @mcp.tool()
-    def body_control(action: str, direction: str, amount: int = 8) -> str:
+    def body_attitude(
+        action: Literal["twist", "tilt", "reset_attitude"], 
+        direction: Literal["left", "right", "up", "down"], 
+        amount: int = 8
+    ) -> str:
         """
-        Control the body's attitude. Available actions:
-        - twist: Rotate the body around its vertical axis (yaw). Direction can be left or right.
-        - tilt: Tilt the body up or down (pitch). Direction can be up or down.
-        - reset_attitude: Reset the body's attitude to its default centered position.
+        In-place torso adjustment. Shifts the robot's body attitude (pitch/yaw) 
+        while keeping all feet completely stationary on the ground. The robot 
+        will not rotate its global position or take any steps.
+
+        CRITICAL: The robot will NOT walk, will NOT change its global heading, and 
+        will NOT actually turn around to face a new direction. Do NOT use this tool 
+        if the user wants the robot to turn around, face a different way, or move.
 
         Parameters:
         - action: The attitude control action to perform.
-        - direction: The direction of the twist or tilt (default: left for twist, up for tilt).
-        - amount: The magnitude of the twist or tilt (default: 8).
+            * 'twist': Rotate the body around its vertical axis (yaw).
+            * 'tilt': Tilt the body up or down (pitch).
+            * 'reset_attitude': Reset the body's attitude to its default centered position.
+        - direction: The direction of the action. 
+            * Required for 'twist' ('left' or 'right') and 'tilt' ('up' or 'down').
+            * Ignored for 'reset_attitude'.
+        - amount: The magnitude of the twist or tilt. Clamped between 0 and 20. (default: 8).
+
+        Returns:
+        - str: A message describing the action taken or an error status.
         """
         amount = min(amount, 20)
 
+        if action == "reset_attitude":
+            dog.attitude(["y", "p", "r"], [0, 0, 0])
+            return "Body reset to center"
+
+        # Validate that direction was provided for actions that require it
+        if not direction:
+            return f"Error: 'direction' is required for action '{action}'"
+
         if action == "twist":
+            if direction not in ["left", "right"]:
+                return f"Error: Invalid direction '{direction}' for 'twist'. Use 'left' or 'right'."
             yaw = amount if direction == "left" else -amount
             dog.attitude(["y", "p", "r"], [yaw, 0, 0])
             return f"Twisted {direction} by {amount}"
+
         elif action == "tilt":
+            if direction not in ["up", "down"]:
+                return f"Error: Invalid direction '{direction}' for 'tilt'. Use 'up' or 'down'."
             pitch = -amount if direction == "up" else amount
             dog.attitude(["y", "p", "r"], [0, pitch, 0])
             return f"Tilted {direction} by {amount}"
-        elif action == "reset_attitude":
-            dog.attitude(["y", "p", "r"], [0, 0, 0])
-            return "Body reset to center"
-        else:
-            return f"Unknown action: {action}"
+
+        return f"Unknown action: {action}"
+
+    # Not possible becuase of ambiguity
+    # lookup: Bend the knees and look up.
+    # look_around: Look down and move around curiously
 
     @mcp.tool()
-    def body_action(action: str) -> str:
+    def body_action(
+            action: Literal["sit", "wave", "dance", "happy", "handshake",
+             "spin", "stretch", "shake_head", "pee", "squat", "crawl",
+             "march","three_squats", "seesaw", "sway", "full_dance",
+             "swing", "fancy_stretch", "head_circle", "body_circle", "nod"]
+        ) -> str:
         """
         Perform a predefined body action. Available actions:
         - sit: Sit on the back legs.
@@ -98,15 +150,13 @@ def register_tools(mcp):
         - shake_head: Shake the head left and right.
         - pee: Perform a peeing action.
         - squat: Bend the knees and squat once.
-        - lookup: Bend the knees and look up.
-        - crawl: Crawl or crouch low to the ground.
+        - crawl: Crawl or crouch low to the ground. Moves forward.
         - march: Walk on the spot.
         - three_squats: Perform three squats in a row.
         - seesaw: Perform a seesaw-like motion.
         - sway: Sway the body left and right like a kid.
         - full_dance: Perform a full dance sequence combining head shake, seesaw, and sway.
         - swing: Perform a front and back swinging motion.
-        - look_around: Look down and move around curiously.
         - fancy_stretch: Stretch back legs, then crouch and raise front legs.
         - head_circle: Move the head in a clockwise and anticlockwise circle.
         - body_circle: Perform a slanting circular body motion.
@@ -114,6 +164,9 @@ def register_tools(mcp):
 
         Parameters:
         - action: The body action to perform.
+
+        Returns:
+        - str: A message describing the action taken or an error status.
         """
         actions = {
             "squat": 1,
