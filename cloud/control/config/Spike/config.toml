@@ -30,12 +30,12 @@ visionprompt = "str!http://dogi-mcp:5000/mcp"
 api_base = "http://10.6.6.20:11434/v1"
 api_key = "not-needed"
 keep_alive = "30m"
-enable_thinking = false
+enable_thinking = true
 thinking_budget = 1024
 max_output_tokens = 1536
 translation_max_output_tokens = 2048
 prompt_temperature = 0.9
-prompt_frequency_penalty = 1.5
+prompt_frequency_penalty = 0.8
 binary_images = false
 
 [tts]
