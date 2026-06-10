@@ -3,12 +3,12 @@ import json
 import os
 import sys
 import time
-import threading
 from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 from contextlib import contextmanager
 from typing import Optional, Dict, Any
 import socketio
 import asyncio
+import threading
 
 import requests
 import uvicorn
@@ -101,11 +101,35 @@ def _log(level: str, msg: str):
         sys.stdout.flush()
 
 
-def _send_snapshot_via_socketio(image: str):
-    """Send snapshot to socketio server if configured."""
+_socketio_lock = threading.Lock()
+
+
+def _ensure_socketio_connected() -> bool:
+    """Best-effort Socket.IO connection that never raises to callers."""
     global sio
 
-    if not SOCKETIO_URL or sio is None:
+    if not SOCKETIO_URL:
+        return False
+
+    with _socketio_lock:
+        if sio is None:
+            sio = socketio.Client()
+
+        if sio.connected:
+            return True
+
+        try:
+            sio.connect(SOCKETIO_URL)
+            _log("DEBUG", f"SocketIO connected to {SOCKETIO_URL}")
+            return True
+        except Exception as e:
+            _log("WARNING", f"SocketIO connection failed: {type(e).__name__}: {str(e)}")
+            return False
+
+
+def _send_snapshot_via_socketio(image: str):
+    """Send snapshot to socketio server if configured."""
+    if not _ensure_socketio_connected():
         return
 
     try:
@@ -352,7 +376,7 @@ mcp = FastMCP("vision-prompt")
 
 @mcp.tool()
 def vision_prompt(prompt: str, answer_length: str = "short") -> str:
-    """Capture a snapshot through the camera and run a prompt on it.
+    """Capture a fresh snapshot through the camera and run a prompt on it.
     
     Args:
         prompt: The prompt to send to the vision model
@@ -453,8 +477,6 @@ if __name__ == "__main__":
     sys.stdout.flush()
 
     if SOCKETIO_URL:
-        sio = socketio.Client()
-        sio.connect(SOCKETIO_URL)
-        _log("DEBUG", f"SocketIO connected to {SOCKETIO_URL}")
+        _ensure_socketio_connected()
 
     uvicorn.run(app, host=HOST, port=PORT)
