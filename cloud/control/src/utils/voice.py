@@ -7,6 +7,7 @@ import time
 import re
 import io
 import socketio
+import threading
 
 from transformers import VitsModel, AutoTokenizer
 import torch
@@ -15,6 +16,26 @@ import scipy
 import config
 
 import logging
+
+_mms_cache_lock = threading.Lock()
+_mms_cached_model_name = None
+_mms_cached_model = None
+_mms_cached_tokenizer = None
+
+
+def _get_mms_model_and_tokenizer(model_name):
+    global _mms_cached_model_name, _mms_cached_model, _mms_cached_tokenizer
+
+    with _mms_cache_lock:
+        if _mms_cached_model_name != model_name:
+            model = VitsModel.from_pretrained(model_name)
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            _mms_cached_model = model
+            _mms_cached_tokenizer = tokenizer
+            _mms_cached_model_name = model_name
+
+        return _mms_cached_model, _mms_cached_tokenizer
+
 
 def get_voice_file_path(filename):
     return os.path.join(config.get_cache_dir(), 'voice', filename)
@@ -101,8 +122,7 @@ def tts_opentts_wav(text, params=None):
 
 def tts_mms_wav(text, params=None):
     model_name = params[2] if params and len(params) > 2 and params[2] else "facebook/mms-tts-hun"
-    model = VitsModel.from_pretrained(model_name)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model, tokenizer = _get_mms_model_and_tokenizer(model_name)
     inputs = tokenizer(text, return_tensors="pt")
 
     with torch.no_grad():

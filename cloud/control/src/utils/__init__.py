@@ -1,5 +1,10 @@
 from .translate import translate, translate_opus, lang_short, lang_long, language_longname
-from .prompt import prompt, prompt_with_tools, response_filter
+from .prompt import (
+    prompt,
+    prompt_with_tools,
+    response_filter,
+    remove_reasoning,
+)
 from .voice import (
     get_voice_file_path,
     remove_emojis,
@@ -24,6 +29,7 @@ __all__ = [
     'prompt',
     'prompt_with_tools',
     'response_filter',
+    'remove_reasoning'
     # Re-exported from voice
     'get_voice_file_path',
     'remove_emojis',

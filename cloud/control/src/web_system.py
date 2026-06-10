@@ -47,13 +47,13 @@ def voice_response_thread():
         "hu": "Egy pillanat, máris mondok egy viccet",
     }
     xtext = utils.select_text(text, config.get_ui_language(), True)
-    wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_joke_joy")
+    wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_joke_system")
     text = {
         "en": "Just a second, I tell you a what I see right now",
         "hu": "Egy pillanat, máris elmondom, mit látok most",
     }
     xtext = utils.select_text(text, config.get_ui_language(), True)
-    wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_what_joy")
+    wav, d = utils.tts_wav(xtext, config.get_ui_language() + "_what_system")
 
 voice_thread = threading.Thread(target=voice_response_thread, daemon=True)
 voice_thread.start()
@@ -163,9 +163,10 @@ def handle_event(data):
         sock.send(pickle.dumps({'name': 'motor', 'args': ([11, 30])}))
         sock.send(pickle.dumps({'name': 'motor', 'args': ([21, 30])}))
     if data == "joke":
-        utils.play_wav(config.get_ui_language() + "_joke_joy")
-        prompt_text = config.get_prompt('web_joy', 'handle_event_action_1')
+        utils.play_wav(config.get_ui_language() + "_joke_system")
+        prompt_text = config.get_prompt('web_system', 'handle_event_action_1')
         joke, _ = utils.prompt(prompt_text)
+        joke = utils.remove_reasoning(joke)
         if config.needs_translation():
             joke = utils.translate(joke, config.get_prompt_language())
         jw, d = utils.tts_wav(joke)
@@ -176,9 +177,10 @@ def handle_event(data):
         sock.send(pickle.dumps({'name': 'unload_allmotor'}))
     if data == "what":
         if lastimg is not None:
-            utils.play_wav(config.get_ui_language() + "_what_joy")
-            prompt_text = config.get_prompt('web_joy', 'handle_event_action_2')
+            utils.play_wav(config.get_ui_language() + "_what_system")
+            prompt_text = config.get_prompt('web_system', 'handle_event_action_2')
             text, _ = utils.prompt(prompt_text, images=[lastimg])
+            text = utils.remove_reasoning(text)
             print(f"What: {text}")
             if config.needs_translation():
                 print("Ask translation" )

@@ -261,27 +261,28 @@ def init(folder = ''):
     get_control_socket()
     """
 
-def reinit(folder = ''):
+def reinit(folder = None):
     """Reload configuration from disk and rebuild cached clients and sockets."""
     _close_socket(_state['control_socket'])
 
     _state.update(_build_runtime_state())
     _state['folder'] = None
 
-    if (folder):
+    if isinstance(folder, str):
         print(f"Reinit with {folder}")
+
+        # Save selected folder to file using bolton for atomic writes
+        selected_file = os.path.join(CONFIG_DIR, 'selected')
+        try:
+            with atomic_save(selected_file, text_mode=True) as f:
+                f.write(folder)
+            print(f"Saved selected folder to {selected_file}: '{folder}'")
+        except Exception as e:
+            print(f'Error saving selected folder: {e}')
+
     else:
         print("Reinit")
    
-    # Save selected folder to file using bolton for atomic writes
-    selected_file = os.path.join(CONFIG_DIR, 'selected')
-    try:
-        with atomic_save(selected_file, text_mode=True) as f:
-            f.write(folder)
-        print(f"Saved selected folder to {selected_file}: '{folder}'")
-    except Exception as e:
-        print(f'Error saving selected folder: {e}')
-
     init(folder)
 
 
@@ -500,6 +501,9 @@ def get_openai_general_extra_body(num_predict=None):
         'keep_alive': get_openai_keep_alive(),
         'enable_thinking': thinking_enabled,
         'think': thinking_enabled,
+        'thinking': {
+            'type': 'enabled' if thinking_enabled else 'disabled'
+        },
     }
 
     if num_predict is None:

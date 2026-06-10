@@ -44,6 +44,16 @@ def _reasoning_to_text(reasoning_value):
     return str(reasoning_value)
 
 
+def remove_reasoning(text):
+    if not isinstance(text, str):
+        return text
+    # Remove <think>...</think> blocks
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # Remove everything before a lone </think> tag (some LLMs omit the opening tag)
+    text = re.sub(r'^.*?</think>', '', text, flags=re.DOTALL)
+    return text.lstrip('\n').strip()
+
+
 def _is_probable_base64(value):
     if not isinstance(value, str):
         return False
@@ -445,7 +455,9 @@ def prompt(prompt_text, images=None, stream=False):
         {"role": "user", "content": content},
     ]
     if not thinking_enabled:
-        messages.append({"role": "assistant", "content": "<think></think>"})
+        # Prefill answer
+        #messages.append({"role": "assistant", "content": "<think></think>"})
+        messages.append({"role": "assistant", "content": "Here is the direct response: "})
 
     request_kwargs = {
         "model": model,
@@ -541,6 +553,10 @@ def prompt(prompt_text, images=None, stream=False):
         reasoning_text = _reasoning_to_text(getattr(response.choices[0].message, "reasoning_content", None))
         if reasoning_text:
             print(f"Reasoning: {reasoning_text}")
+        if response.choices and response.choices[0].message and not getattr(response.choices[0].message, "content"):
+            # content is "" or not present
+            if response.choices and response.choices[0].message and getattr(response.choices[0].message, "reasoning"):
+                response.choices[0].message.content = getattr(response.choices[0].message, "reasoning")
         filtered_response = response_filter(response.choices[0].message.content)
 
     print(f"OpenAI ({model}) prompt time: {statistics['elapsed_seconds']}")
