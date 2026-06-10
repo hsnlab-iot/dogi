@@ -39,7 +39,8 @@ def register_tools(mcp):
         Returns:
         - str: A message describing the action taken or an error status.
         """
-    
+
+        print(f'Called: body_move with action={action}, direction={direction}, steps={steps}, duration={duration}, pace={pace}')    
         duration = min(duration, 3.0)
         dog.pace(pace)
 
@@ -73,6 +74,9 @@ def register_tools(mcp):
         dog.stop()
         return f"Performed {action} with direction={direction}, steps={steps}, duration={duration}s, pace={pace}"
 
+    _pitch = 0
+    _yaw = 0
+
     @mcp.tool()
     def body_attitude(
         action: Literal["twist", "tilt", "reset_attitude"], 
@@ -101,10 +105,15 @@ def register_tools(mcp):
         Returns:
         - str: A message describing the action taken or an error status.
         """
+
+        nonlocal _pitch, _yaw
+        print(f'Called: body_attitude with action={action}, direction={direction}, amount={amount}')
         amount = min(amount, 20)
 
         if action == "reset_attitude":
             dog.attitude(["y", "p", "r"], [0, 0, 0])
+            _yaw = 0
+            _pitch = 0
             return "Body reset to center"
 
         # Validate that direction was provided for actions that require it
@@ -115,14 +124,16 @@ def register_tools(mcp):
             if direction not in ["left", "right"]:
                 return f"Error: Invalid direction '{direction}' for 'twist'. Use 'left' or 'right'."
             yaw = amount if direction == "left" else -amount
-            dog.attitude(["y", "p", "r"], [yaw, 0, 0])
+            dog.attitude(["y", "p", "r"], [yaw, _pitch, 0])
+            _yaw = yaw
             return f"Twisted {direction} by {amount}"
 
         elif action == "tilt":
             if direction not in ["up", "down"]:
                 return f"Error: Invalid direction '{direction}' for 'tilt'. Use 'up' or 'down'."
             pitch = -amount if direction == "up" else amount
-            dog.attitude(["y", "p", "r"], [0, pitch, 0])
+            dog.attitude(["y", "p", "r"], [_yaw, pitch, 0])
+            _pitch = pitch
             return f"Tilted {direction} by {amount}"
 
         return f"Unknown action: {action}"
@@ -168,6 +179,8 @@ def register_tools(mcp):
         Returns:
         - str: A message describing the action taken or an error status.
         """
+
+        print(f'Called: body_action with action={action}')
         actions = {
             "squat": 1,
             "lookup": 2,
