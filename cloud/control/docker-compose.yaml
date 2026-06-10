@@ -23,6 +23,8 @@ services:
       - VICTORIA_BASE_URL=http://dogi-vm:8428
       - PHOENIX_COLLECTOR_ENDPOINT=http://dogi-phoenix:6006
       - MCP_KEY=${MCP_KEY}
+      #- HF_HUB_OFFLINE=1
+      #- TRANSFORMERS_OFFLINE=1
     ports:
       #- "6080:6080" # the remote display port
       #- "5050-5059:5050-5059"
