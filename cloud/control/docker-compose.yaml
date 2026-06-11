@@ -64,7 +64,8 @@ services:
     restart: unless-stopped
 
   opentts:
-    image: synesthesiam/opentts:hu
+    image: synesthesiam/opentts:all
+    #image: synesthesiam/opentts:hu
     #image: synesthesiam/opentts:de
     #image: synesthesiam/opentts:zh
     container_name: opentts
