@@ -1,0 +1,54 @@
+[web_system.handle_event_action_1]
+en = '''
+Tell me a joke about dogs or robot dogs.
+Joke with cats are preferred.
+It should not be a long one.
+'''
+
+[web_system.handle_event_action_2]
+en = '''
+Describe what do you see in the image.
+If there is a person in the image, write about them in more detail.
+Try to figure out which actor or actress they resemble most.
+'''
+
+[web_voice.test_init_1]
+en = '''
+Say a short, wise message.
+Be funny and cute.
+'''
+
+[keresd.main_loop_1]
+en = '''
+This is a ball-finding game.
+You are viewing this image through your own camera,
+which is looking straight ahead.
+Make a short description of what you can see in the image!
+Focus only on nearby objects. Ignore the background.
+If you see a ball, name it. 
+If there is NO ball, do NOT use the word "ball" at all.
+'''
+
+[keresd.main_loop_2]
+en = '''
+Does the following description mention a found ball? 
+Answer with exactly one word: YES or NO.
+
+Description: {description}
+'''
+
+[keresd.main_loop_3]
+en = '''
+You are viewing this image through your own camera,
+which is looking straight ahead.
+Describe where you see the ball in the image,
+and how does the ball look like!
+'''
+
+[keresd.main_loop_4]
+en = '''
+You are viewing this image through your own camera,
+which is looking straight ahead.
+Answer with a single word, YES or NO !
+Based on the image, is there any hazard, obstacle, or drop-off directly in front of you?
+'''

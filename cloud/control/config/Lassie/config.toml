@@ -1,18 +1,18 @@
 [pupcard]
 language = "ENG"
-model = "Gemma4:e4b"
+model = "Qwen3.5:4b"
 tts = "Meta ENG"
 
 [general]
-cache = "~/.cache/arthur"
-log = "~/log/arthur"
+cache = "~/.cache/lassie"
+log = "~/log/lassie"
 
 [language]
 ui = "en"
 prompt = "en"
 
 [models]
-general = "gemma4:e4b"
+general = "qwen3.5:4b"
 translation = ""
 vision = ""
 
@@ -21,16 +21,16 @@ vision = ""
 # sse for SSE MCP servers
 # str for Streamable HTTP MCP servers
 highfive = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
-capture = "sse!http://robot_ip:8000/mcp/sse"
+#capture = "sse!http://robot_ip:8000/mcp/sse"
 dice = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
 body = "str!http://robot_ip:5000/mcp"
-#visionprompt = "str!http://dogi-mcp:5000/mcp"
+visionprompt = "str!http://dogi-mcp:5000/mcp"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
 api_key = "not-needed"
 keep_alive = "30m"
-enable_thinking = false
+enable_thinking = true
 thinking_budget = 1024
 max_output_tokens = 1536
 translation_max_output_tokens = 2048

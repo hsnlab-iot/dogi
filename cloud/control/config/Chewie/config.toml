@@ -1,18 +1,20 @@
 [pupcard]
 language = "ENG"
-model = "Gemma4:e4b"
+model = "lfm2.5:1.2b"
+#model = "phi4-mini"
 tts = "Meta ENG"
 
 [general]
-cache = "~/.cache/arthur"
-log = "~/log/arthur"
+cache = "~/.cache/chewie"
+log = "~/log/chewie"
 
 [language]
 ui = "en"
 prompt = "en"
 
 [models]
-general = "gemma4:e4b"
+general = "lfm2.5-thinking:1.2b"
+#general = "phi4-mini:latest"
 translation = ""
 vision = ""
 
@@ -21,10 +23,10 @@ vision = ""
 # sse for SSE MCP servers
 # str for Streamable HTTP MCP servers
 highfive = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
-capture = "sse!http://robot_ip:8000/mcp/sse"
+#capture = "sse!http://robot_ip:8000/mcp/sse"
 dice = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
 body = "str!http://robot_ip:5000/mcp"
-#visionprompt = "str!http://dogi-mcp:5000/mcp"
+visionprompt = "str!http://dogi-mcp:5000/mcp"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
@@ -39,9 +41,10 @@ prompt_frequency_penalty = 0.8
 binary_images = false
 
 [tts]
-# Facebook english
-protocol = "mms"
-model = "facebook/mms-tts-eng"
+protocol = "openai"
+api_base = "http://10.6.6.20:8880/v1"
+voice = "alloy"
+model = "tts-1"
 
 [ports]
 voice = 5059

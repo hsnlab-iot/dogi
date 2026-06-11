@@ -1,22 +1,20 @@
 [pupcard]
 language = "GER"
-model = "Qwen3.6"
+model = "Qwen3.5 + translategemma"
 tts = "Meta GER"
 
 [general]
-cache = "~/.cache"
-log = "~/log"
+cache = "~/.cache/rex"
+log = "~/log/rex"
 
 [language]
-ui = "hu"
-prompt = "hu"
-#ui = "en"
-#prompt = "en"
+ui = "de"
+prompt = "en"
 
 [models]
-general = "qwen3.5:9B"
+general = "qwen3.5:4b"
 #general = "gemma4:e4b"
-translation = ""
+translation = "translategemma:4b"
 vision = ""
 
 [tools]
@@ -40,33 +38,13 @@ thinking_budget = 1024
 max_output_tokens = 1536
 translation_max_output_tokens = 2048
 prompt_temperature = 0.9
-prompt_frequency_penalty = 1.5
+prompt_frequency_penalty = 0.8
 binary_images = false
 
 [tts]
-# TTS protocol: 'opentts' | 'openai' | 'mms'
-# opentts: uses voice
-# openai:  uses model + voice
-# mms:     uses model
-
-# Diana
-protocol = "opentts"
-api_base = "http://opentts:5500/api/tts"
-voice = "hu_diana_majlinger"
-
 # Facebook english
 #protocol = "mms"
-#model = "facebook/mms-tts-eng"
-
-#protocol = "openai"
-#api_base = "http://10.6.6.20:8880/v1"
-#voice = "alloy"
-#model = "tts-1"
-
-#- TTS_VOICE="larynx:eva_k-glow_tts"
-#- TTS_VOICE="hu_diana_majlinger"
-#- TTS_VOICE="zh_baker"
-#- TTS_ENGINE_API="http://10.6.6.20:8124/synthesize/"
+#model = "facebook/mms-tts-deu"
 
 [ports]
 voice = 5059
