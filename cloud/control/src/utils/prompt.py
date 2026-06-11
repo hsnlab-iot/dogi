@@ -553,9 +553,9 @@ def prompt(prompt_text, images=None, stream=False):
         reasoning_text = _reasoning_to_text(getattr(response.choices[0].message, "reasoning_content", None))
         if reasoning_text:
             print(f"Reasoning: {reasoning_text}")
-        if response.choices and response.choices[0].message and not getattr(response.choices[0].message, "content"):
+        if response.choices and response.choices[0].message and not getattr(response.choices[0].message, "content", None):
             # content is "" or not present
-            if response.choices and response.choices[0].message and getattr(response.choices[0].message, "reasoning"):
+            if response.choices and response.choices[0].message and getattr(response.choices[0].message, "reasoning", None):
                 response.choices[0].message.content = getattr(response.choices[0].message, "reasoning")
         filtered_response = response_filter(response.choices[0].message.content)
 

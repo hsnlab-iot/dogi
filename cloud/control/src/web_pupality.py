@@ -14,6 +14,9 @@ from flask_socketio import SocketIO, emit
 
 from urllib.parse import urlparse
 
+import threading
+import urllib.request
+
 import config
 
 import mimetypes
@@ -137,7 +140,6 @@ def handle_refresh_pupalities():
     socketio.emit('pupalities', PUPALITIES_CACHE)
     print(f'Refreshed pupalities: {len(PUPALITIES_CACHE)}')
 
-
 @socketio.on('pupality_select')
 def handle_pupality_select(payload):
     if not isinstance(payload, dict):
@@ -150,8 +152,16 @@ def handle_pupality_select(payload):
     )
     config.reinit(selected_name)
 
+    def _reload_web_main():
+        try:
+            with urllib.request.urlopen('http://localhost:5059/reload', timeout=5) as resp:
+                print(f'web_main reload response: {resp.status}')
+        except Exception as exc:
+            print(f'web_main reload error: {exc}')
 
-@socketio.on_error()  # Handle socketio errors
+    threading.Thread(target=_reload_web_main, daemon=True).start()
+
+
 def handle_error(e):
     print('SocketIO Error:', e)
 

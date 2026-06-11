@@ -103,13 +103,14 @@ body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    overflow-x: auto;
+    overflow-x: hidden;
     display: grid;
     grid-template-columns: repeat(auto-fill, 300px);
+    grid-auto-rows: max-content;
     justify-content: center;
     align-content: start;
     gap: 14px;
-    padding: 2px;
+    padding: 2px 2px 14px;
 }
 
 .pupality-card {
@@ -187,9 +188,13 @@ body {
 }
 
 .card-title {
+    flex: 1;
+    min-width: 0;
     margin: 0;
     font-size: 20px;
     line-height: 1.15;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .lang-chip {
@@ -213,6 +218,7 @@ body {
 }
 
 .meta-key {
+    flex-shrink: 0;
     color: var(--muted);
     font-size: 12px;
     text-transform: uppercase;
@@ -220,10 +226,14 @@ body {
 }
 
 .meta-value {
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
     font-size: 13px;
     font-weight: 700;
     text-align: right;
     overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .empty-state {
