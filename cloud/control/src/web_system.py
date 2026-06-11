@@ -137,66 +137,74 @@ def handle_event(data):
             return
         inMotion = True
 
-    if data == "reset":
-        sock.send(pickle.dumps({'name': 'reset'}))
-    if data == "pee":
-        sock.send(pickle.dumps({'name': 'action', 'args': (11, )}))
-    if data == "wave":
-        sock.send(pickle.dumps({'name': 'action', 'args': (13, )}))
-    if data == "look":
-        sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, 0])}))
-        time.sleep(1.5)
-        sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, 16])}))
-        time.sleep(1.5)
-        sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, -16])}))
-        time.sleep(1.5)
-        sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 0, 0])}))
-    if data == "sit":
-        sock.send(pickle.dumps({'name': 'reset'}))
-        time.sleep(1)
-        sock.send(pickle.dumps({'name': 'motor', 'args': ([32, 93])}))
-        sock.send(pickle.dumps({'name': 'motor', 'args': ([42, 93])}))
-        sock.send(pickle.dumps({'name': 'motor', 'args': ([31, -73])}))
-        sock.send(pickle.dumps({'name': 'motor', 'args': ([41, -73])}))
-        sock.send(pickle.dumps({'name': 'motor', 'args': ([12, 10])}))
-        sock.send(pickle.dumps({'name': 'motor', 'args': ([22, 10])}))
-        sock.send(pickle.dumps({'name': 'motor', 'args': ([11, 30])}))
-        sock.send(pickle.dumps({'name': 'motor', 'args': ([21, 30])}))
-    if data == "joke":
-        utils.play_wav(config.get_ui_language() + "_joke_system")
-        prompt_text = config.get_prompt('web_system', 'handle_event_action_1')
-        joke, _ = utils.prompt(prompt_text)
-        joke = utils.remove_reasoning(joke)
-        if config.needs_translation():
-            joke = utils.translate(joke, config.get_prompt_language())
-        jw, d = utils.tts_wav(joke)
-        utils.play_wav(jw)
-    if data == "on":
-        sock.send(pickle.dumps({'name': 'load_allmotor'}))
-    if data == "off":
-        sock.send(pickle.dumps({'name': 'unload_allmotor'}))
-    if data == "what":
-        if lastimg is not None:
-            utils.play_wav(config.get_ui_language() + "_what_system")
-            prompt_text = config.get_prompt('web_system', 'handle_event_action_2')
-            text, _ = utils.prompt(prompt_text, images=[lastimg])
-            text = utils.remove_reasoning(text)
-            print(f"What: {text}")
-            if config.needs_translation():
-                print("Ask translation" )
-                xtext = utils.translate(text, config.get_prompt_language())
-                print("Translation: ", xtext)
+    try:
+        if data == "reset":
+            sock.send(pickle.dumps({'name': 'reset'}))
+        if data == "pee":
+            sock.send(pickle.dumps({'name': 'action', 'args': (11, )}))
+        if data == "wave":
+            sock.send(pickle.dumps({'name': 'action', 'args': (13, )}))
+        if data == "look":
+            sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, 0])}))
+            time.sleep(1.5)
+            sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, 16])}))
+            time.sleep(1.5)
+            sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 22, -16])}))
+            time.sleep(1.5)
+            sock.send(pickle.dumps({'name': 'attitude', 'args': (['r', 'p', 'y'], [0, 0, 0])}))
+        if data == "sit":
+            sock.send(pickle.dumps({'name': 'reset'}))
+            time.sleep(1)
+            sock.send(pickle.dumps({'name': 'motor', 'args': ([32, 93])}))
+            sock.send(pickle.dumps({'name': 'motor', 'args': ([42, 93])}))
+            sock.send(pickle.dumps({'name': 'motor', 'args': ([31, -73])}))
+            sock.send(pickle.dumps({'name': 'motor', 'args': ([41, -73])}))
+            sock.send(pickle.dumps({'name': 'motor', 'args': ([12, 10])}))
+            sock.send(pickle.dumps({'name': 'motor', 'args': ([22, 10])}))
+            sock.send(pickle.dumps({'name': 'motor', 'args': ([11, 30])}))
+            sock.send(pickle.dumps({'name': 'motor', 'args': ([21, 30])}))
+        if data == "joke":
+            try:
+                utils.play_wav(config.get_ui_language() + "_joke_system")
+                prompt_text = config.get_prompt('web_system', 'handle_event_action_1')
+                joke, _ = utils.prompt(prompt_text)
+                joke = utils.remove_reasoning(joke)
+                if config.needs_translation():
+                    joke = utils.translate(joke, config.get_prompt_language())
+                jw, d = utils.tts_wav(joke)
+                utils.play_wav(jw)
+            except Exception as exc:
+                print(f'joke action error: {exc}')
+        if data == "on":
+            sock.send(pickle.dumps({'name': 'load_allmotor'}))
+        if data == "off":
+            sock.send(pickle.dumps({'name': 'unload_allmotor'}))
+        if data == "what":
+            if lastimg is not None:
+                try:
+                    utils.play_wav(config.get_ui_language() + "_what_system")
+                    prompt_text = config.get_prompt('web_system', 'handle_event_action_2')
+                    text, _ = utils.prompt(prompt_text, images=[lastimg])
+                    text = utils.remove_reasoning(text)
+                    print(f"What: {text}")
+                    if config.needs_translation():
+                        print("Ask translation")
+                        xtext = utils.translate(text, config.get_prompt_language())
+                        print("Translation: ", xtext)
+                    else:
+                        xtext = text
+                    print("Ask for TTS")
+                    wav, d = utils.tts_wav(xtext)
+                    utils.play_wav(wav)
+                except Exception as exc:
+                    print(f'what action error: {exc}')
             else:
-                xtext = text
-            print("Ask for TTS")
-            wav, d = utils.tts_wav(xtext)
-            utils.play_wav(wav)
-        else:
-            print("No image available for 'what' action.")
-    if data == "reload":
-        config.reinit()
-    with lock:
-        inMotion = False
+                print("No image available for 'what' action.")
+        if data == "reload":
+            config.reinit()
+    finally:
+        with lock:
+            inMotion = False
 
 @socketio.on_error()  # Handle socketio errors
 def handle_error(e):
