@@ -1,8 +1,8 @@
-[web_joy.handle_event_action_1]
+[web_system.handle_event_action_1]
 en = "Tell me a joke about dogs or robot dogs."
 hu = "Mondj egy kutyás vagy robotkutyás viccet."
 
-[web_joy.handle_event_action_2]
+[web_system.handle_event_action_2]
 en = '''
 Describe what you see in the image.
 If there is a person in the image, write about them in more detail.

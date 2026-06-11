@@ -42,6 +42,7 @@ binary_images = false
 # Facebook english
 protocol = "mms"
 model = "facebook/mms-tts-eng"
+#voice = "larynx:cmu_eey"
 
 [ports]
 voice = 5059

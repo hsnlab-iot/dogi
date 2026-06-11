@@ -1,6 +1,7 @@
 [pupcard]
 language = "HUN"
-model = "Racka:4b"
+#model = "Racka:4b"
+model = "Qwen3.5:4b"
 tts = "TTS:HUN Diana"
 
 [general]
@@ -12,7 +13,7 @@ ui = "hu"
 prompt = "hu"
 
 [models]
-general = "racka-noreason:4b"
+general = "qwen3.5:4b"
 translation = ""
 vision = ""
 
@@ -39,29 +40,9 @@ prompt_frequency_penalty = 1.5
 binary_images = false
 
 [tts]
-# TTS protocol: 'opentts' | 'openai' | 'mms'
-# opentts: uses voice
-# openai:  uses model + voice
-# mms:     uses model
-
-# Diana
 protocol = "opentts"
 api_base = "http://opentts:5500/api/tts"
 voice = "hu_diana_majlinger"
-
-# Facebook english
-#protocol = "mms"
-#model = "facebook/mms-tts-eng"
-
-#protocol = "openai"
-#api_base = "http://10.6.6.20:8880/v1"
-#voice = "alloy"
-#model = "tts-1"
-
-#- TTS_VOICE="larynx:eva_k-glow_tts"
-#- TTS_VOICE="hu_diana_majlinger"
-#- TTS_VOICE="zh_baker"
-#- TTS_ENGINE_API="http://10.6.6.20:8124/synthesize/"
 
 [ports]
 voice = 5059

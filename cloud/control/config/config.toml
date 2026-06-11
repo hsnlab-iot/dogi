@@ -47,7 +47,7 @@ binary_images = false
 # Diana
 protocol = "opentts"
 api_base = "http://opentts:5500/api/tts"
-voice = "hu_diana_majlinger"
+voice = "coqui-tts:en_ljspeech"
 
 # Facebook english
 #protocol = "mms"

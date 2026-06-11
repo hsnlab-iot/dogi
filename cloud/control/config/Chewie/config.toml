@@ -41,10 +41,9 @@ prompt_frequency_penalty = 0.8
 binary_images = false
 
 [tts]
-protocol = "openai"
-api_base = "http://10.6.6.20:8880/v1"
-voice = "alloy"
-model = "tts-1"
+protocol = "opentts"
+api_base = "http://opentts:5500/api/tts"
+voice = "coqui-tts:en_ljspeech"
 
 [ports]
 voice = 5059
