@@ -33,6 +33,7 @@ def _build_runtime_state():
         'openai_translation_max_output_tokens': None,
         'openai_prompt_temperature': None,
         'openai_prompt_frequency_penalty': None,
+        'openai_json_scheme': None,
         'openai_binary_images': None,
         'tts_api_base': None,
         'tts_voice': None,
@@ -71,6 +72,7 @@ def _build_default_config():
             'translation_max_output_tokens': 1024,
             'prompt_temperature': 0.3,
             'prompt_frequency_penalty': 1.5,
+            'scheme': '',
             'binary_images': False,
         },
         'tts': {
@@ -374,7 +376,6 @@ def get_general_model():
                 messages=[{'role': 'user', 'content': 'ping'}],
                 max_tokens=1,
                 temperature=0,
-                extra_body=get_openai_general_extra_body(num_predict=1),
             )
             print(f'General model warm-loaded with keep_alive={get_openai_keep_alive()}')
         except Exception as exc:
@@ -494,30 +495,14 @@ def get_openai_prompt_frequency_penalty():
     return _state['openai_prompt_frequency_penalty']
 
 
-def get_openai_general_extra_body(num_predict=None):
-    """Build model-specific extra_body payload for OpenAI-compatible backends."""
-    thinking_enabled = get_openai_enable_thinking()
-    extra_body = {
-        'keep_alive': get_openai_keep_alive(),
-        'enable_thinking': thinking_enabled,
-        'think': thinking_enabled,
-        'thinking': {
-            'type': 'enabled' if thinking_enabled else 'disabled'
-        },
-    }
+def get_openai_json_scheme():
+    """Singleton to ensure OpenAI-compatible JSON scheme stays in memory."""
+    if _state['openai_json_scheme'] is None:
+        raw_value = _get_config_value('openai', 'scheme', '')
+        _state['openai_json_scheme'] = str(raw_value or '').strip()
+        print(f"Using OpenAI scheme: {_state['openai_json_scheme']}")
 
-    if num_predict is None:
-        num_predict = get_openai_max_output_tokens()
-
-    try:
-        extra_body['num_predict'] = max(1, int(num_predict))
-    except (TypeError, ValueError):
-        extra_body['num_predict'] = get_openai_max_output_tokens()
-
-    if thinking_enabled:
-        extra_body['thinking_budget'] = get_openai_thinking_budget()
-
-    return extra_body
+    return _state['openai_json_scheme']
 
 
 def get_openai_binary_images():

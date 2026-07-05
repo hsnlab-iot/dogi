@@ -346,6 +346,40 @@ def _build_statistics(request_payload, usage_obj, elapsed_seconds, images, strea
         stats["total_tokens"] = usage_dict.get("total_tokens")
     return stats
 
+def _get_openai_general_extra_body(num_predict=None):
+    """Build model-specific extra_body payload for OpenAI-compatible backends."""
+    thinking_enabled = config.get_openai_enable_thinking()
+    extra_body = {
+        'keep_alive': config.get_openai_keep_alive(),
+        'enable_thinking': thinking_enabled,
+        'think': thinking_enabled,
+        'thinking': {
+            'type': 'enabled' if thinking_enabled else 'disabled'
+        },
+    }
+
+    if num_predict is None:
+        num_predict = config.get_openai_max_output_tokens()
+
+    try:
+        extra_body['num_predict'] = max(1, int(num_predict))
+    except (TypeError, ValueError):
+        extra_body['num_predict'] = config.get_openai_max_output_tokens()
+
+    if thinking_enabled:
+        extra_body['thinking_budget'] = config.get_openai_thinking_budget()
+
+    return extra_body
+
+def _get_openai_nim_extra_body():
+
+    extra_body = {
+        'reasoning_budget': config.get_openai_thinking_budget(),
+        'chat_template_kwargs': { 'enable_thinking': config.get_openai_enable_thinking() }
+    }
+
+    return extra_body
+
 
 def prompt_with_tools(prompt, message_history=None, tools=None, images=None):
 
@@ -389,9 +423,14 @@ def prompt_with_tools(prompt, message_history=None, tools=None, images=None):
         model = config.get_general_model()
         print(f"Prompting with text only, using {model}")
 
-    extra_body = config.get_openai_general_extra_body(
-        num_predict=config.get_openai_max_output_tokens()
-    )
+    extra_body = {}
+    print(config.get_openai_json_scheme())
+    if config.get_openai_json_scheme() == "nim":
+        extra_body = _get_openai_nim_extra_body()
+    else:
+        extra_body = _get_openai_general_extra_body(
+            num_predict=config.get_openai_max_output_tokens()
+        )
 
     request_kwargs = {
         "model": model,
