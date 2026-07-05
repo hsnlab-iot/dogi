@@ -51,6 +51,11 @@ def handle_event():
     socketio.emit("client_new")
     pass
 
+@socketio.on('speak')
+def handle_speak(data):
+    socketio.emit("client_speak", data)
+    pass
+
 # ui_update is coming from prompt.py
 @socketio.on('ui_update')
 def handle_event(data):

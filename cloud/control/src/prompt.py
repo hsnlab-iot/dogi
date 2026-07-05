@@ -38,6 +38,7 @@ openai_tools = []
 worker_lock = threading.Lock()
 worker_thread = None
 worker_stop_event = None
+speak_enabled = False
 
 # History context
 message_history = []
@@ -107,17 +108,30 @@ def handle_new():
     global message_history
     message_history = []
 
+
+@sio.on('client_speak')
+def handle_speak(data):
+    global speak_enabled
+
+    if isinstance(data, dict):
+        speak_enabled = bool(data.get('enabled', False))
+    else:
+        speak_enabled = bool(data)
+
 @sio.on('client_prompt')
 def handle_prompt(data):
     """Start a background worker to call the OpenAI-compatible server with the prompt.
     data can be a dict with keys: { prompt: str, tools: [toolName,...] }
     The worker emits status updates via sio.emit('ui_update_reponse', {...}).
     """
-    global worker_thread, worker_stop_event, openai_tools, tools
+    global worker_thread, worker_stop_event, openai_tools, tools, speak_enabled
     try:
         prompt_text = data.get('prompt', '') if isinstance(data, dict) else str(data)
     except Exception:
         prompt_text = str(data)
+
+    if isinstance(data, dict) and 'speak' in data:
+        speak_enabled = bool(data.get('speak'))
 
     sio.emit("ui_update", { "type": "prompt", "data": "abort" })
 
@@ -128,7 +142,7 @@ def handle_prompt(data):
         # set up stop event for this worker
         worker_stop_event = threading.Event()
 
-        def worker(prompt_text, openai_tools, tools, stop_event):
+        def worker(prompt_text, openai_tools, tools, stop_event, should_speak):
             try:
                 tool_calls = True
                 prompt_next = prompt_text
@@ -157,6 +171,11 @@ def handle_prompt(data):
                         sio.emit('ui_update',
                                  {"type": "response",
                                   "data": f'[{round(stats["elapsed_seconds"],1)}s]'})
+
+                        if should_speak and not tool_calls and not stop_event.is_set():
+                            wav, duration = utils.tts_wav(str(response_message.content).strip())
+                            utils.play_wav(wav)
+                            time.sleep(duration)
 
                     tool_calls_json = []
                     tool_responses_json = []
@@ -247,7 +266,7 @@ def handle_prompt(data):
 
         #worker_thread = threading.Thread(target=worker, args=(prompt_text, openai_tools, tools, worker_stop_event), daemon=True)
         #worker_thread.start()
-        worker_thread = sio.start_background_task(worker, prompt_text, openai_tools, tools, worker_stop_event)
+        worker_thread = sio.start_background_task(worker, prompt_text, openai_tools, tools, worker_stop_event, speak_enabled)
 
 def _connect_one_mcp_server(mcp_server):
     robot_ip = os.getenv('ROBOT_IP', '127.0.0.1')
