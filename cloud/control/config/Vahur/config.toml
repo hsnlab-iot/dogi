@@ -1,19 +1,18 @@
 [pupcard]
-language = "GER/ENG"
-model = "Qwen3.5 + translategemma"
-tts = "Meta GER"
+language = "HUN/ENG"
+model = "Qwen3.5:4b + translategemma"
+tts = "Meta HUN"
 
 [general]
-cache = "~/.cache/rex"
-log = "~/log/rex"
+cache = "~/.cache/vahur"
+log = "~/log/vahur"
 
 [language]
-ui = "de"
+ui = "hu"
 prompt = "en"
 
 [models]
 general = "qwen3.5:4b"
-#general = "gemma4:e4b"
 translation = "translategemma:4b"
 vision = ""
 
@@ -22,12 +21,10 @@ vision = ""
 # sse for SSE MCP servers
 # str for Streamable HTTP MCP servers
 highfive = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py"
-capture = "sse!http://robot_ip:8000/mcp/sse"
+#capture = "sse!http://robot_ip:8000/mcp/sse"
 dice = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_dice.py"
 body = "str!http://robot_ip:5000/mcp"
-#4 = "ssh!pi:~/kutyus_env/bin:~/mcp_server.py"
-#5 = "ssh!robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/mcpserver_capture.py"
-#6 = "ssh!pi:~/kutyus_env/bin:~/dogi/onboard/mcp/mcp_memory.py"
+visionprompt = "str!http://dogi-mcp:5000/mcp"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
@@ -42,9 +39,8 @@ prompt_frequency_penalty = 0.8
 binary_images = false
 
 [tts]
-# Facebook english
-#protocol = "mms"
-#model = "facebook/mms-tts-deu"
+protocol = "mms"
+model = "facebook/mms-tts-hun"
 
 [ports]
 voice = 5059
