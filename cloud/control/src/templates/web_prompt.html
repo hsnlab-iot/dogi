@@ -322,6 +322,15 @@
         emitSpeakState();
     });
 
+    // Forward the QR data to the main parent window
+    socket.on('update_qr', function(data) {
+        window.parent.postMessage({
+            type: 'update_qr',
+            qr_url: data.qr_url,
+            label: data.label
+        }, '*');
+    });
+
     bindNewButton();
     bindSpeakCheckbox();
     resetPromptStats();
