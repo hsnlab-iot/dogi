@@ -1,0 +1,17 @@
+# Todos MCP Server Configuration
+
+[server]
+host = "0.0.0.0"
+port = 5001
+
+[logging]
+# ERROR | WARNING | INFO | DEBUG
+level = "INFO"
+
+[todos]
+# Persistent directory for date-scoped todo spaces.
+# Relative path is resolved from this config file location.
+storage_dir = "./todos_data"
+
+# Safety cap per date space (YYYY-MM-DD)
+max_items_per_space = 1000

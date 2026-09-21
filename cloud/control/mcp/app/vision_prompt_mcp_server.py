@@ -22,12 +22,12 @@ except ModuleNotFoundError:
 
 
 # Configuration loading
-config_path = os.getenv("VP_CONFIG")
+config_path = os.getenv("VISION_PROMPT_CONFIG") or os.getenv("VP_CONFIG")
 EXPECTED_KEY = os.getenv("MCP_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_KEY", "not-needed")
 
 if not config_path:
-    raise RuntimeError("VP_CONFIG environment variable must be set")
+    raise RuntimeError("VISION_PROMPT_CONFIG environment variable must be set")
 
 if not os.path.exists(config_path):
     raise RuntimeError(f"Config file not found: {config_path}")
