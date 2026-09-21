@@ -1,0 +1,15 @@
+:5060 {
+    # Vision MCP endpoint via tool-specific path
+    handle /mcp/vision* {
+        uri replace /mcp/vision /mcp
+        reverse_proxy dogi-mcp:5000
+    }
+
+    # Todos MCP endpoint via tool-specific path
+    handle /mcp/todos* {
+        uri replace /mcp/todos /mcp
+        reverse_proxy dogi-mcp:5001
+    }
+
+    respond /health "ok" 200
+}

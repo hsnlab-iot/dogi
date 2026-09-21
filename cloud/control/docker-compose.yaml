@@ -23,11 +23,10 @@ services:
       - VICTORIA_BASE_URL=http://dogi-vm:8428
       - PHOENIX_COLLECTOR_ENDPOINT=http://dogi-phoenix:6006
       - MCP_KEY=${MCP_KEY}
-      #- HF_HUB_OFFLINE=1
-      #- TRANSFORMERS_OFFLINE=1
+      #- HF_HUB_OFFLINE=1         # For offline working
+      #- TRANSFORMERS_OFFLINE=1   # For offline working
     ports:
       #- "6080:6080" # the remote display port
-      #- "5050-5059:5050-5059"
       - "5100:5100/udp" # the incoming video port
     volumes:
       - ./Ultralytics:/root/.config/Ultralytics:rw
@@ -56,11 +55,15 @@ services:
     container_name: dogi-mcp
     environment:
       - MCP_KEY=${MCP_KEY}
-      - VP_CONFIG=/config/vp_config.toml
-    ports:
-      - "5000:5000"
+      - VISION_PROMPT_CONFIG=/config/vision_prompt_config.toml
+      - TODOS_CONFIG=/config/todos_config.toml
+    expose:
+      - "5000"
+      - "5001"
     volumes:
-      - ./mcp/vp_config.toml:/config/vp_config.toml:ro
+      - ./mcp/vision_prompt_config.toml:/config/vision_prompt_config.toml:ro
+      - ./mcp/todos_config.toml:/config/todos_config.toml:ro
+      - ./mcp/todos_data:/config/todos_data
     restart: unless-stopped
 
   opentts:
@@ -86,7 +89,7 @@ services:
       - 8428
     volumes:
       # PERSISTENCE: This ensures your data survives container restarts/updates
-      - ./vmdata:/storage
+      - ./storage/vmdata:/storage
     command:
       - "--storageDataPath=/storage"
     restart: unless-stopped
@@ -104,6 +107,18 @@ services:
     ports:
       - "5059:5059"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy_data:/data
-      - ./caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./storage/caddy_data:/data
+      - ./storage/caddy_config:/config
+
+  caddy-mcp:
+    image: caddy:2-alpine
+    container_name: dogi-mcp-proxy
+    depends_on:
+      - cloud-mcp
+    ports:
+      - "5060:5060"
+    volumes:
+      - ./Caddyfile.mcp:/etc/caddy/Caddyfile:ro
+      - ./storage/caddy_mcp_data:/data
+      - ./storage/caddy_mcp_config:/config

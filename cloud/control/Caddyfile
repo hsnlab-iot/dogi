@@ -1,9 +1,4 @@
 :5059 {
-    # Main Web UI Router
-    handle /* {
-        reverse_proxy dogi:5059
-    }
-
     # Route for Flask socketio
     handle_path /apps/system/socket.io/* {
         rewrite * /socket.io{uri}
@@ -83,6 +78,11 @@
         reverse_proxy dogi:5057 {
             header_up X-Forwarded-Prefix /apps/pupality
         }
+    }
+
+    # Main Web UI Router
+    handle /* {
+        reverse_proxy dogi:5059
     }
 
 }
