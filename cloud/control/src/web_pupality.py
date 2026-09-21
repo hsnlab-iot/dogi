@@ -2,6 +2,8 @@ import os
 import base64
 import mimetypes
 import importlib
+import re
+from pathlib import Path
 
 try:
     tomllib = importlib.import_module('tomllib')
@@ -16,6 +18,7 @@ from urllib.parse import urlparse
 
 import threading
 import urllib.request
+from copy import deepcopy
 
 import config
 
@@ -71,9 +74,234 @@ def _load_pupcard_data(config_path):
     return pupcard
 
 
+def _load_agent_config(agent_name):
+    config_path = Path(config.AGENTS_DIR) / agent_name / 'config.toml'
+    if not config_path.is_file():
+        return {}
+    try:
+        with config_path.open('rb') as f:
+            loaded = tomllib.load(f)
+        if isinstance(loaded, dict):
+            return loaded
+    except Exception as exc:
+        print(f'Failed to load agent config {config_path}: {exc}')
+    return {}
+
+
+def _get_selected_pupality_name():
+    selected_file = Path(config.CONFIG_DIR) / 'selected'
+    if not selected_file.is_file():
+        return ''
+    try:
+        return selected_file.read_text(encoding='utf-8').strip()
+    except Exception as exc:
+        print(f'Failed to read selected pupality file {selected_file}: {exc}')
+        return ''
+
+
+def _find_tool_descriptor(tool_ref):
+    base = Path(config.TOOLS_DIR) / tool_ref
+    candidates = [
+        base,
+        Path(str(base) + '.yaml'),
+        Path(str(base) + '.yml'),
+        Path(str(base) + '.json'),
+        Path(str(base) + '.toml'),
+    ]
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _load_structured_descriptor(path):
+    suffix = path.suffix.lower()
+    if suffix == '.toml':
+        return tomllib.loads(path.read_text(encoding='utf-8'))
+    if suffix == '.json':
+        import json
+        return json.loads(path.read_text(encoding='utf-8'))
+    if suffix in ('.yaml', '.yml'):
+        try:
+            yaml = importlib.import_module('yaml')
+        except ModuleNotFoundError:
+            return {}
+        return yaml.safe_load(path.read_text(encoding='utf-8'))
+    return {}
+
+
+def _parse_skill_frontmatter(markdown_text):
+    stripped = markdown_text.strip()
+    if not stripped.startswith('---\n'):
+        return {}, stripped
+
+    end_idx = stripped.find('\n---\n', 4)
+    if end_idx < 0:
+        return {}, stripped
+
+    meta_raw = stripped[4:end_idx]
+    body = stripped[end_idx + 5:].strip()
+    try:
+        yaml = importlib.import_module('yaml')
+        metadata = yaml.safe_load(meta_raw)
+        if not isinstance(metadata, dict):
+            metadata = {}
+    except Exception:
+        metadata = {}
+    return metadata, body
+
+
+def _normalize_capability(text):
+    return re.sub(r'[^a-z0-9_\-/]+', '-', str(text or '').strip().lower()).strip('-')
+
+
+def _collect_tool_capabilities(tool_descriptors):
+    capabilities = set()
+    for descriptor in tool_descriptors:
+        name = str(descriptor.get('name') or '').strip()
+        if name:
+            capabilities.add(name)
+
+        for tag in descriptor.get('tags', []) or []:
+            norm = _normalize_capability(tag)
+            if norm:
+                capabilities.add(norm)
+
+        for provided in descriptor.get('provided_mcp_tools', []) or []:
+            value = str(provided).strip()
+            if value:
+                capabilities.add(value)
+    return capabilities
+
+
+def _load_soul_for_agent(agent_name, agent_config):
+    agent_dir = Path(config.AGENTS_DIR) / agent_name
+    prompt_lang = str((agent_config.get('language', {}) or {}).get('prompt') or 'en').strip().lower()[:2]
+    candidates = [agent_dir / f'SOUL.{prompt_lang}.md', agent_dir / 'SOUL.en.md']
+
+    for candidate in candidates:
+        if candidate.is_file():
+            try:
+                return candidate.read_text(encoding='utf-8').strip(), str(candidate.name)
+            except Exception:
+                return '', str(candidate.name)
+    return '', ''
+
+
+def get_pupality_info(agent_name):
+    payload = {
+        'id': agent_name,
+        'name': agent_name,
+        'image': '',
+        'soul': '',
+        'soul_file': '',
+        'tools': [],
+        'skills_available': [],
+        'skills_unavailable': [],
+    }
+
+    agent_dir = Path(config.AGENTS_DIR) / agent_name
+    if not agent_dir.is_dir():
+        return payload
+
+    image_path = _find_image_file(str(agent_dir))
+    if image_path:
+        payload['image'] = _image_file_to_data_url(image_path)
+
+    agent_config = _load_agent_config(agent_name)
+    soul_content, soul_file = _load_soul_for_agent(agent_name, agent_config)
+    payload['soul'] = soul_content
+    payload['soul_file'] = soul_file
+
+    tool_refs = []
+    tools_section = agent_config.get('tools', {})
+    if isinstance(tools_section, dict):
+        tool_refs = [str(v).strip() for v in tools_section.get('list', []) if str(v).strip()]
+
+    tool_descriptors = []
+    for ref in tool_refs:
+        descriptor_file = _find_tool_descriptor(ref)
+        if not descriptor_file:
+            payload['tools'].append({'ref': ref, 'available': False})
+            continue
+
+        data = _load_structured_descriptor(descriptor_file)
+        if not isinstance(data, dict):
+            payload['tools'].append({'ref': ref, 'available': False})
+            continue
+
+        data = deepcopy(data)
+        data['ref'] = ref
+        data['available'] = True
+        payload['tools'].append(data)
+        tool_descriptors.append(data)
+
+    capabilities = _collect_tool_capabilities(tool_descriptors)
+
+    skill_refs = []
+    skills_section = agent_config.get('skills', {})
+    if isinstance(skills_section, dict):
+        skill_refs = [str(v).strip() for v in skills_section.get('list', []) if str(v).strip()]
+
+    for skill_ref in skill_refs:
+        skill_file = Path(config.SKILLS_DIR) / f'{skill_ref}.md'
+        if not skill_file.is_file():
+            payload['skills_unavailable'].append({
+                'id': skill_ref,
+                'name': skill_ref,
+                'required_mcp_tools': [],
+                'missing_required_mcp_tools': [],
+                'reason': 'skill_file_not_found',
+            })
+            continue
+
+        try:
+            raw = skill_file.read_text(encoding='utf-8')
+        except Exception as exc:
+            payload['skills_unavailable'].append({
+                'id': skill_ref,
+                'name': skill_ref,
+                'required_mcp_tools': [],
+                'missing_required_mcp_tools': [],
+                'reason': f'skill_read_error: {exc}',
+            })
+            continue
+
+        metadata, _body = _parse_skill_frontmatter(raw)
+        skill_id = str(metadata.get('id') or skill_ref)
+        skill_name = str(metadata.get('name') or skill_id)
+        required = metadata.get('required_mcp_tools') if isinstance(metadata, dict) else []
+        if not isinstance(required, list):
+            required = []
+        required = [str(v).strip() for v in required if str(v).strip()]
+
+        missing = [item for item in required if item not in capabilities]
+        if missing:
+            payload['skills_unavailable'].append({
+                'id': skill_id,
+                'name': skill_name,
+                'required_mcp_tools': required,
+                'missing_required_mcp_tools': missing,
+                'reason': 'missing_required_mcp_tools',
+            })
+        else:
+            payload['skills_available'].append({
+                'id': skill_id,
+                'name': skill_name,
+                'required_mcp_tools': required,
+            })
+
+    return payload
+
+
 def discover_pupalities():
     pupalities = []
-    config_root = config.CONFIG_DIR
+    config_root = config.AGENTS_DIR
+
+    if not os.path.isdir(config_root):
+        print(f'Agents folder not found: {config_root}')
+        return pupalities
 
     for current_root, dirs, _files in os.walk(config_root):
         # We only care about folder-based pupality packs below config root.
@@ -101,6 +329,7 @@ def discover_pupalities():
             continue
 
         pupalities.append({
+            'id': os.path.basename(current_root),
             'name': name,
             'image': image_data_url,
             'language': language,
@@ -126,7 +355,10 @@ def index():
 @socketio.on('connect')
 def handle_connect():
     print('Client connected')
-    emit('pupalities', PUPALITIES_CACHE)
+    emit('pupalities', {
+        'data': PUPALITIES_CACHE,
+        'selected': _get_selected_pupality_name(),
+    })
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -137,8 +369,24 @@ def handle_disconnect():
 def handle_refresh_pupalities():
     global PUPALITIES_CACHE
     PUPALITIES_CACHE = discover_pupalities()
-    socketio.emit('pupalities', PUPALITIES_CACHE)
+    socketio.emit('pupalities', {
+        'data': PUPALITIES_CACHE,
+        'selected': _get_selected_pupality_name(),
+    })
     print(f'Refreshed pupalities: {len(PUPALITIES_CACHE)}')
+
+
+@socketio.on('pupality_info')
+def handle_pupality_info(payload):
+    if not isinstance(payload, dict):
+        payload = {}
+
+    agent_name = str(payload.get('name') or '').strip()
+    if not agent_name:
+        emit('pupality_info', {'name': '', 'error': 'missing_name'})
+        return
+
+    emit('pupality_info', get_pupality_info(agent_name))
 
 @socketio.on('pupality_select')
 def handle_pupality_select(payload):

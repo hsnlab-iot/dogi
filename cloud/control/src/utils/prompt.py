@@ -402,7 +402,7 @@ def prompt_with_tools(prompt, message_history=None, tools=None, images=None):
         if not messages:
             messages.append({
                 "role": "system",
-                "content": config.get_soul_content()
+                "content": config.get_system_prompt()
                 })
         messages.append({
             "role": "user",
@@ -471,7 +471,7 @@ def prompt(prompt_text, images=None, stream=False):
         from . import select_text
         prompt_text = select_text(prompt_text, config.get_prompt_language())
 
-    soul_prompt = config.get_soul_content()
+    soul_prompt = config.get_system_prompt()
 
     model = None
     if images:
@@ -484,7 +484,7 @@ def prompt(prompt_text, images=None, stream=False):
     openai_client = config.get_openai_client()
     now = time.time()
     content = _build_content(prompt_text, images, config.get_openai_binary_images())
-    extra_body = config.get_openai_general_extra_body(
+    extra_body = _get_openai_general_extra_body(
         num_predict=config.get_openai_max_output_tokens()
     )
     thinking_enabled = config.get_openai_enable_thinking()

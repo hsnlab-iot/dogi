@@ -9,12 +9,24 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     PYTHONUTF8=1 \
-    PYTHONIOENCODING=UTF-8
+    PYTHONIOENCODING=UTF-8 \
+    VIRTUAL_ENV=/opt/venv
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN \
+  echo "nvidia-cudnn-cu12==9.1.0.70" > overrides.txt && \
+  echo "nvidia-cublas-cu12==12.1.3.1" >> overrides.txt
 
 RUN \
-  /opt/venv/bin/pip install mcp python-socketio[client] && \
-  /opt/venv/bin/pip install arize-phoenix-otel openinference-instrumentation-openai openai && \
-  /opt/venv/bin/pip install boltons gevent gevent-websocket ujson websockets wsproto
+  uv venv && \
+  uv pip install  mcp python-socketio[client] && \
+  uv pip install  arize-phoenix-otel openinference-instrumentation-openai openai && \
+  uv pip install  boltons gevent gevent-websocket ujson websockets wsproto
+
+RUN \
+  uv pip install f5-tts torch torchaudio \
+    --extra-index-url https://download.pytorch.org/whl/cu124 \
+    --override overrides.txt
 
 # Copy the supervisor configuration file
 COPY src/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

@@ -10,7 +10,7 @@ import socketio
 import threading
 
 from transformers import VitsModel, AutoTokenizer
-import torch
+import torch, torchaudio
 import scipy
 
 import config
@@ -21,6 +21,12 @@ _mms_cache_lock = threading.Lock()
 _mms_cached_model_name = None
 _mms_cached_model = None
 _mms_cached_tokenizer = None
+
+_f5_cache_lock = threading.Lock()
+_f5_cached_device = None
+_f5_cached_ckpt_file = None
+_f5_cached_vocab_file = None
+_f5_cached_engine = None
 
 
 def _get_mms_model_and_tokenizer(model_name):
@@ -38,7 +44,9 @@ def _get_mms_model_and_tokenizer(model_name):
 
 
 def get_voice_file_path(filename):
-    return os.path.join(config.get_cache_dir(), 'voice', filename)
+    voice_dir = os.path.join(config.get_cache_dir(), 'voice')
+    os.makedirs(voice_dir, exist_ok=True)
+    return os.path.join(voice_dir, filename)
 
 
 def remove_emojis(text):
@@ -68,13 +76,13 @@ def remove_emojis(text):
 
 
 def tts_openai_wav(text, params=None, voice=None):
-    if not params or len(params) < 3:
+    if not params or not isinstance(params, dict):
         print("TTS OpenAI parameters are missing")
         return None
 
-    tts_api_base = str(params[0] or "").strip()
-    tts_voice = voice or params[1]
-    tts_model = params[2]
+    tts_api_base = str(params.get('api_base') or "").strip()
+    tts_voice = voice or params.get('voice')
+    tts_model = params.get('model')
 
     if not tts_api_base:
         print("TTS OpenAI api_base is not set")
@@ -97,12 +105,12 @@ def tts_openai_wav(text, params=None, voice=None):
 
 
 def tts_opentts_wav(text, params=None):
-    if not params or len(params) < 2:
+    if not params or not isinstance(params, dict):
         print("TTS OpenTTS parameters are missing")
         return None
 
-    tts_api_base = str(params[0] or "").strip()
-    tts_voice = params[1]
+    tts_api_base = str(params.get('api_base') or "").strip()
+    tts_voice = params.get('voice')
 
     if not tts_api_base:
         print("TTS OpenTTS api_base is not set")
@@ -121,7 +129,11 @@ def tts_opentts_wav(text, params=None):
 
 
 def tts_mms_wav(text, params=None):
-    model_name = params[2] if params and len(params) > 2 and params[2] else "facebook/mms-tts-hun"
+    model_name = (
+        params.get('model')
+        if isinstance(params, dict) and params.get('model')
+        else "facebook/mms-tts-hun"
+    )
     model, tokenizer = _get_mms_model_and_tokenizer(model_name)
     inputs = tokenizer(text, return_tensors="pt")
 
@@ -136,6 +148,90 @@ def tts_mms_wav(text, params=None):
         return wav_buffer.read()
 
 
+def _get_f5_engine(params=None):
+    global _f5_cached_device, _f5_cached_ckpt_file, _f5_cached_vocab_file, _f5_cached_engine
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    ckpt_file = str(params.get('ckpt_file') or '').strip() if isinstance(params, dict) else ''
+    vocab_file = str(params.get('vocab_file') or '').strip() if isinstance(params, dict) else ''
+
+    if ckpt_file and not os.path.exists(ckpt_file):
+        print(f"Warning: TTS F5 ckpt_file does not exist: {ckpt_file}")
+    if vocab_file and not os.path.exists(vocab_file):
+        print(f"Warning: TTS F5 vocab_file does not exist: {vocab_file}")
+
+    with _f5_cache_lock:
+        if (
+            _f5_cached_engine is None
+            or _f5_cached_device != device
+            or _f5_cached_ckpt_file != ckpt_file
+            or _f5_cached_vocab_file != vocab_file
+        ):
+            try:
+                from f5_tts.api import F5TTS
+            except ModuleNotFoundError as exc:
+                raise RuntimeError("f5-tts Python package is not installed") from exc
+
+            f5_kwargs = {
+                'device': device,
+            }
+            if ckpt_file:
+                f5_kwargs['ckpt_file'] = ckpt_file
+            if vocab_file:
+                f5_kwargs['vocab_file'] = vocab_file
+
+            _f5_cached_engine = F5TTS(**f5_kwargs)
+            _f5_cached_device = device
+            _f5_cached_ckpt_file = ckpt_file
+            _f5_cached_vocab_file = vocab_file
+
+    return _f5_cached_engine
+
+
+def tts_f5_wav(text, params=None):
+    if not params or not isinstance(params, dict):
+        print("TTS F5 parameters are missing")
+        return None
+
+    reference_text = str(params.get('reference_text') or "").strip()
+    reference_wav = str(params.get('reference_wav') or "").strip()
+
+    if not reference_text:
+        print("TTS F5 reference_text is missing")
+        return None
+
+    if not reference_wav:
+        print("TTS F5 reference_wav is missing")
+        return None
+
+    if not os.path.exists(reference_wav):
+        print(f"TTS F5 reference_wav does not exist: {reference_wav}")
+        return None
+
+    f5_engine = _get_f5_engine(params)
+    audio, sample_rate, _ = f5_engine.infer(
+        ref_file=reference_wav,
+        ref_text=reference_text,
+        gen_text=text,
+        nfe_step=32,
+    )
+
+    # Convert the NumPy array into a PyTorch tensor explicitly
+    if not isinstance(audio, torch.Tensor):
+        audio_tensor = torch.from_numpy(audio)
+    else:
+        audio_tensor = audio.cpu()
+
+    # Shape it properly into a 2D tensor (1, Time) for torchaudio
+    audio_tensor = audio_tensor.unsqueeze(0)
+
+    wav_buffer = io.BytesIO()
+    torchaudio.save(wav_buffer, audio_tensor, sample_rate, format="wav")
+
+    wav_buffer.seek(0)
+    return wav_buffer.read()
+
+
 def tts_wav(text, filename=None):
     # Clean emojis and problematic characters from text before TTS processing
     text = remove_emojis(text)
@@ -147,10 +243,8 @@ def tts_wav(text, filename=None):
 
     if not filename_ok:
         params = config.get_tts_parameters()
-        tts_voice = params[1]
-        tts_model = params[2]
-        tts_protocol = params[3]
-        print(f"Requesting TTS (protocol={tts_protocol}) with voice: {tts_voice} model: {tts_model} text: {text}")
+        tts_protocol = str(config.get_config_data().get('tts', {}).get('protocol') or '').strip().lower()
+        print(f"Requesting TTS (protocol={tts_protocol}) with parameters: {params}")
 
         wav = None
         now = time.time()
@@ -160,6 +254,11 @@ def tts_wav(text, filename=None):
             wav = tts_mms_wav(text, params)
         elif tts_protocol == 'opentts':
             wav = tts_opentts_wav(text, params)
+        elif tts_protocol == 'f5':
+            wav = tts_f5_wav(text, params)
+
+        if wav is None:
+            raise RuntimeError(f"TTS generation failed for protocol: {tts_protocol}")
 
         print("TTS request time:", time.time() - now)
 

@@ -312,19 +312,44 @@ def _connect_one_mcp_server(mcp_server):
     local_tools = []
 
     try:
-        for tool in mcp_tools.tools:
+        tools_list = getattr(mcp_tools, 'tools', mcp_tools)
+        if tools_list is None:
+            tools_list = []
+
+        for tool in tools_list:
             print(tool)
+
+            tool_name = getattr(tool, 'name', None)
+            if not tool_name and isinstance(tool, dict):
+                tool_name = tool.get('name')
+
+            if not tool_name:
+                print('skipping malformed tool entry without name:', tool)
+                continue
+
+            tool_description = getattr(tool, 'description', '')
+            if isinstance(tool, dict):
+                tool_description = tool.get('description', tool_description)
+
+            tool_schema = getattr(tool, 'inputSchema', None)
+            if tool_schema is None:
+                tool_schema = getattr(tool, 'input_schema', None)
+            if tool_schema is None and isinstance(tool, dict):
+                tool_schema = tool.get('inputSchema') or tool.get('input_schema')
+            if tool_schema is None:
+                tool_schema = {"type": "object", "properties": {}}
+
             local_openai_tools.append(
                 {
                     "type": "function",
                     "function": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.inputSchema,
+                        "name": str(tool_name),
+                        "description": str(tool_description or ''),
+                        "parameters": tool_schema,
                     },
                 }
             )
-            local_tools.append((rmcp, tool.name, tool.description))
+            local_tools.append((rmcp, str(tool_name), str(tool_description or '')))
     except Exception as e:
         print('failed to parse mcp_tools list:', e)
 

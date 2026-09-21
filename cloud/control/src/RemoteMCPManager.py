@@ -139,7 +139,18 @@ class RemoteMCPManager:
         )
         self.http_client = httpx.AsyncClient(headers=headers, timeout=timeout)
         self.transport_ctx = streamable_http_client(url, http_client=self.http_client)
-        self.read, self.write, _ = await self.transport_ctx.__aenter__()
+        entered = await self.transport_ctx.__aenter__()
+
+        # Compatibility across MCP client versions:
+        # streamable_http_client.__aenter__ may return either
+        # (read, write) or (read, write, close_fn/metadata).
+        if isinstance(entered, tuple) and len(entered) >= 2:
+            self.read, self.write = entered[0], entered[1]
+        else:
+            raise RuntimeError(
+                f"Unexpected streamable_http_client enter result: {type(entered)}"
+            )
+
         self.session = ClientSession(self.read, self.write)
         await self.session.__aenter__()
         await self.session.initialize()

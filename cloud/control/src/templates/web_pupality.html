@@ -27,6 +27,16 @@
     </div>
 </div>
 
+<div id="info-overlay" class="info-overlay" hidden>
+    <div class="info-window" role="dialog" aria-modal="true" aria-labelledby="info-title">
+        <div class="info-window-header">
+            <h2 id="info-title">Pupality Info</h2>
+            <button id="info-close" class="info-close" aria-label="Close info">Close</button>
+        </div>
+        <div id="info-content" class="info-content"></div>
+    </div>
+</div>
+
 <script>
     var socket = io({
         path: '/apps/pupality/socket.io/'
@@ -34,6 +44,9 @@
 
     var pupalities = [];
     var selectedPupalityName = '';
+    var activeInfoName = '';
+    var infoOverlay = null;
+    var infoContent = null;
 
     function normalizePupalities(payload) {
         if (Array.isArray(payload)) return payload;
@@ -72,8 +85,9 @@
         card.setAttribute('role', 'button');
         card.setAttribute('tabindex', '0');
 
-        var itemName = item && item.name ? String(item.name) : '';
-        if (itemName && itemName === selectedPupalityName) {
+        var itemId = item && item.id ? String(item.id) : '';
+        var itemName = item && item.name ? String(item.name) : itemId;
+        if (itemId && itemId === selectedPupalityName) {
             card.classList.add('is-selected');
         }
 
@@ -114,15 +128,21 @@
         body.appendChild(createMetaItem('LLM', item && item.llm_model ? String(item.llm_model) : '-'));
         body.appendChild(createMetaItem('TTS', item && item.tts ? String(item.tts) : '-'));
 
+        var infoButton = document.createElement('button');
+        infoButton.className = 'info-button';
+        infoButton.type = 'button';
+        infoButton.textContent = 'Info';
+
         card.appendChild(imageWrap);
         card.appendChild(body);
+        card.appendChild(infoButton);
 
         function emitSelection() {
-            selectedPupalityName = itemName;
+            selectedPupalityName = itemId;
             renderPupalities(pupalities);
 
             var selected = {
-                name: itemName,
+                name: itemId,
             };
             socket.emit('pupality_select', selected);
         }
@@ -135,7 +155,171 @@
             }
         });
 
+        infoButton.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (activeInfoName === itemId && infoOverlay && !infoOverlay.hidden) {
+                hideInfo();
+                return;
+            }
+
+            activeInfoName = itemId;
+            socket.emit('pupality_info', { name: itemId });
+        });
+
         return card;
+    }
+
+    function hideInfo() {
+        if (!infoOverlay || !infoContent) return;
+        infoOverlay.hidden = true;
+        infoContent.innerHTML = '';
+        activeInfoName = '';
+    }
+
+    function renderToolsSection(tools) {
+        var section = document.createElement('section');
+        section.className = 'info-section';
+
+        var title = document.createElement('h3');
+        title.textContent = 'Tools';
+        section.appendChild(title);
+
+        var list = document.createElement('ul');
+        list.className = 'info-list';
+
+        if (!Array.isArray(tools) || !tools.length) {
+            var empty = document.createElement('li');
+            empty.textContent = 'No tools configured.';
+            list.appendChild(empty);
+        } else {
+            tools.forEach(function(tool) {
+                var li = document.createElement('li');
+                var name = tool && tool.name ? String(tool.name) : String(tool.ref || 'unknown');
+                var type = tool && tool.type ? String(tool.type) : '-';
+                var url = tool && tool.url ? String(tool.url) : '-';
+                li.textContent = name + ' [' + type + '] ' + url;
+                list.appendChild(li);
+            });
+        }
+
+        section.appendChild(list);
+        return section;
+    }
+
+    function _skillsLineText(skill, unavailable) {
+        var skillName = skill && skill.name ? String(skill.name) : String((skill && skill.id) || 'unknown-skill');
+        var required = Array.isArray(skill && skill.required_mcp_tools) ? skill.required_mcp_tools : [];
+        var missing = Array.isArray(skill && skill.missing_required_mcp_tools) ? skill.missing_required_mcp_tools : [];
+
+        if (!required.length) return skillName;
+
+        if (!unavailable) {
+            return skillName + ' (' + required.join(', ') + ')';
+        }
+
+        var rendered = required.map(function(dep) {
+            if (missing.indexOf(dep) >= 0) {
+                return '--' + dep + '--';
+            }
+            return dep;
+        });
+        return skillName + ' (' + rendered.join(', ') + ')';
+    }
+
+    function renderSkillsSection(availableSkills, unavailableSkills) {
+        var section = document.createElement('section');
+        section.className = 'info-section';
+
+        var title = document.createElement('h3');
+        title.textContent = 'Skills';
+        section.appendChild(title);
+
+        var list = document.createElement('ul');
+        list.className = 'info-list';
+
+        if (Array.isArray(availableSkills) && availableSkills.length) {
+            availableSkills.forEach(function(skill) {
+                var li = document.createElement('li');
+                li.textContent = _skillsLineText(skill, false);
+                list.appendChild(li);
+            });
+        }
+
+        if (Array.isArray(unavailableSkills) && unavailableSkills.length) {
+            unavailableSkills.forEach(function(skill) {
+                var li = document.createElement('li');
+                li.className = 'skill-unavailable';
+
+                var lineText = _skillsLineText(skill, true);
+                if (lineText.indexOf('--') >= 0) {
+                    var fragments = lineText.split(/(--[^-]+--)/g);
+                    fragments.forEach(function(fragment) {
+                        if (!fragment) return;
+                        if (fragment.startsWith('--') && fragment.endsWith('--')) {
+                            var miss = document.createElement('span');
+                            miss.className = 'skill-missing-dep';
+                            miss.textContent = fragment.slice(2, -2);
+                            li.appendChild(miss);
+                        } else {
+                            li.appendChild(document.createTextNode(fragment));
+                        }
+                    });
+                } else {
+                    li.textContent = lineText;
+                }
+
+                list.appendChild(li);
+            });
+        }
+
+        if (!list.childNodes.length) {
+            var empty = document.createElement('li');
+            empty.textContent = 'No skills configured.';
+            list.appendChild(empty);
+        }
+
+        section.appendChild(list);
+        return section;
+    }
+
+    function renderInfo(payload) {
+        if (!infoOverlay || !infoContent) return;
+
+        infoContent.innerHTML = '';
+
+        var topSection = document.createElement('section');
+        topSection.className = 'info-section info-top';
+
+        var img = document.createElement('img');
+        img.className = 'info-image';
+        img.alt = (payload && payload.name ? String(payload.name) : 'Pupality') + ' image';
+        var src = safeImageSource(payload && payload.image);
+        if (src) {
+            img.src = src;
+        }
+
+        var soulWrap = document.createElement('div');
+        soulWrap.className = 'soul-wrap';
+
+        var soulTitle = document.createElement('h3');
+        soulTitle.textContent = 'SOUL' + (payload && payload.soul_file ? ' [' + payload.soul_file + ']' : '');
+        soulWrap.appendChild(soulTitle);
+
+        var soulText = document.createElement('pre');
+        soulText.className = 'soul-text';
+        soulText.textContent = payload && payload.soul ? String(payload.soul) : 'No SOUL file found.';
+        soulWrap.appendChild(soulText);
+
+        topSection.appendChild(img);
+        topSection.appendChild(soulWrap);
+        infoContent.appendChild(topSection);
+
+        infoContent.appendChild(renderToolsSection(payload && payload.tools));
+        infoContent.appendChild(renderSkillsSection(payload && payload.skills_available, payload && payload.skills_unavailable));
+
+        infoOverlay.hidden = false;
     }
 
     function renderPupalities(list) {
@@ -167,8 +351,27 @@
     });
 
     socket.on('pupalities', function(payload) {
+        if (payload && typeof payload.selected === 'string') {
+            selectedPupalityName = payload.selected;
+        }
         pupalities = normalizePupalities(payload);
         renderPupalities(pupalities);
+    });
+
+    socket.on('pupality_info', function(payload) {
+        if (!payload || !payload.name) return;
+        if (payload.name !== activeInfoName) return;
+        renderInfo(payload);
+    });
+
+    infoOverlay = document.getElementById('info-overlay');
+    infoContent = document.getElementById('info-content');
+
+    document.getElementById('info-close').addEventListener('click', hideInfo);
+    infoOverlay.addEventListener('click', function(event) {
+        if (event.target === infoOverlay) {
+            hideInfo();
+        }
     });
 
     renderPupalities([]);

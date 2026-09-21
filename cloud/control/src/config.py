@@ -1,6 +1,8 @@
 import os
+import json
 import socket
 import importlib
+import re
 from pathlib import Path
 from boltons.fileutils import atomic_save
 try:
@@ -12,6 +14,266 @@ except ModuleNotFoundError:
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 CONTROL_DIR = os.path.dirname(SRC_DIR)
 CONFIG_DIR = os.path.join(CONTROL_DIR, 'config')
+AGENTS_DIR = os.path.join(CONFIG_DIR, 'agents')
+TOOLS_DIR = os.path.join(CONFIG_DIR, 'tools')
+SKILLS_DIR = os.path.join(CONFIG_DIR, 'skills')
+
+
+def _resolve_agent_dir(folder_name):
+    """Resolve selected agent directory with fallback for legacy layout."""
+    if not folder_name:
+        return None
+
+    preferred = Path(AGENTS_DIR) / folder_name
+    if preferred.is_dir():
+        return preferred
+
+    legacy = Path(CONFIG_DIR) / folder_name
+    if legacy.is_dir():
+        return legacy
+
+    return None
+
+
+def _get_current_agent_dir():
+    return _resolve_agent_dir(_state['folder'])
+
+
+def _load_structured_file(path):
+    suffix = path.suffix.lower()
+    if suffix == '.json':
+        return json.loads(path.read_text(encoding='utf-8'))
+    if suffix == '.toml':
+        return tomllib.loads(path.read_text(encoding='utf-8'))
+    if suffix in ('.yaml', '.yml'):
+        try:
+            yaml = importlib.import_module('yaml')
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                f"PyYAML is required to parse '{path.name}'"
+            ) from exc
+        return yaml.safe_load(path.read_text(encoding='utf-8'))
+
+    raise ValueError(f'Unsupported descriptor file extension: {path.suffix}')
+
+
+def _load_tool_descriptor_file(tool_ref):
+    if not tool_ref:
+        return None, None
+
+    tools_dir = Path(TOOLS_DIR)
+    direct_path = tools_dir / tool_ref
+
+    candidates = []
+    if direct_path.suffix:
+        candidates.append(direct_path)
+    else:
+        candidates.extend([
+            tools_dir / f'{tool_ref}.yaml',
+            tools_dir / f'{tool_ref}.yml',
+            tools_dir / f'{tool_ref}.json',
+            tools_dir / f'{tool_ref}.toml',
+        ])
+
+    for candidate in candidates:
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        data = _load_structured_file(candidate)
+        if not isinstance(data, dict):
+            print(f'Warning: tool descriptor is not an object: {candidate}')
+            return None, None
+        return candidate, data
+
+    print(f'Warning: tool descriptor not found for ref: {tool_ref}')
+    return None, None
+
+
+def _normalize_tool_tag(tag):
+    cleaned = re.sub(r'[^a-z0-9_\-/]+', '-', str(tag).strip().lower())
+    cleaned = re.sub(r'-+', '-', cleaned).strip('-')
+    return cleaned
+
+
+def _extract_tags_from_source_file(source_file):
+    if not source_file:
+        return []
+
+    path = Path(source_file)
+    if not path.exists() or not path.is_file():
+        return []
+
+    try:
+        content = path.read_text(encoding='utf-8')
+    except Exception as exc:
+        print(f'Warning: failed to read source file for tags {path}: {exc}')
+        return []
+
+    raw_tags = set()
+    for match in re.findall(r'def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', content):
+        raw_tags.add(match)
+    for match in re.findall(r'name\s*=\s*[\"\']([^\"\']+)[\"\']', content):
+        raw_tags.add(match)
+    for match in re.findall(r'description\s*=\s*[\"\']([^\"\']+)[\"\']', content):
+        for token in re.split(r'[^a-zA-Z0-9_\-/]+', match):
+            if len(token) >= 4:
+                raw_tags.add(token)
+
+    normalized = []
+    for tag in raw_tags:
+        candidate = _normalize_tool_tag(tag)
+        if not candidate or len(candidate) < 3:
+            continue
+        normalized.append(candidate)
+
+    return sorted(set(normalized))
+
+
+def _extract_tool_ids_from_source_file(source_file, server_name):
+    if not source_file:
+        return []
+
+    path = Path(source_file)
+    if not path.exists() or not path.is_file():
+        return []
+
+    try:
+        content = path.read_text(encoding='utf-8')
+    except Exception:
+        return []
+
+    tool_names = set()
+
+    for match in re.findall(r'name\s*=\s*[\"\']([^\"\']+)[\"\']', content):
+        if match:
+            tool_names.add(match.strip())
+
+    for match in re.findall(r'@mcp\.tool\(\)\s*\ndef\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', content):
+        if match:
+            tool_names.add(match.strip())
+
+    ids = []
+    for tool_name in sorted(tool_names):
+        ids.append(f'{server_name}/{tool_name}')
+
+    return ids
+
+
+def _tool_descriptor_to_endpoint(tool_ref, descriptor_file, descriptor):
+    kind = str(descriptor.get('type') or '').strip().lower()
+    target = descriptor.get('url') or descriptor.get('target') or descriptor.get('connection')
+    target = str(target or '').strip()
+
+    if not kind or not target:
+        print(
+            f'Warning: invalid tool descriptor in {descriptor_file}. '
+            f"Expected 'type' and 'url/target/connection'."
+        )
+        return None, None
+
+    endpoint = f'{kind}!{target}'
+    source_file = str(descriptor.get('source_file') or '').strip()
+    if source_file and not Path(source_file).is_absolute():
+        source_file = str((Path(CONTROL_DIR) / source_file).resolve())
+
+    raw_tags = descriptor.get('tags')
+    tags = []
+    if isinstance(raw_tags, list):
+        tags = [_normalize_tool_tag(tag) for tag in raw_tags if _normalize_tool_tag(tag)]
+    if not tags:
+        tags = _extract_tags_from_source_file(source_file)
+
+    provided_tools = descriptor.get('provided_mcp_tools')
+    if isinstance(provided_tools, list):
+        provided_mcp_tools = [str(v).strip() for v in provided_tools if str(v).strip()]
+    else:
+        provided_mcp_tools = []
+
+    server_name = str(descriptor.get('name') or Path(str(tool_ref)).stem)
+    if not provided_mcp_tools:
+        provided_mcp_tools = _extract_tool_ids_from_source_file(source_file, server_name)
+
+    metadata = {
+        'ref': str(tool_ref),
+        'file': str(descriptor_file),
+        'name': server_name,
+        'description': str(descriptor.get('description') or ''),
+        'type': kind,
+        'url': target,
+        'endpoint': endpoint,
+        'tags': tags,
+        'source_file': source_file,
+        'provided_mcp_tools': provided_mcp_tools,
+    }
+
+    return endpoint, metadata
+
+
+def _parse_markdown_frontmatter(content):
+    stripped = content.strip()
+    if not stripped.startswith('---\n'):
+        return {}, content.strip()
+
+    closing_idx = stripped.find('\n---\n', 4)
+    if closing_idx < 0:
+        return {}, content.strip()
+
+    header = stripped[4:closing_idx]
+    body = stripped[closing_idx + 5:].strip()
+
+    try:
+        yaml = importlib.import_module('yaml')
+        metadata = yaml.safe_load(header)
+        if not isinstance(metadata, dict):
+            metadata = {}
+    except Exception as exc:
+        print(f'Warning: failed to parse skill frontmatter: {exc}')
+        metadata = {}
+
+    return metadata, body
+
+
+def _load_skill_file(skill_ref):
+    if not skill_ref:
+        return None
+
+    skills_dir = Path(SKILLS_DIR)
+    direct_path = skills_dir / skill_ref
+    candidates = []
+
+    if direct_path.suffix:
+        candidates.append(direct_path)
+    else:
+        candidates.extend([
+            skills_dir / f'{skill_ref}.md',
+            skills_dir / f'{skill_ref}.markdown',
+        ])
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate
+
+    return None
+
+
+def _collect_available_tool_capabilities(tool_metadata):
+    capabilities = set()
+
+    for meta in tool_metadata:
+        name = str(meta.get('name') or '').strip()
+        if name:
+            capabilities.add(name)
+
+        for tag in meta.get('tags', []) or []:
+            tag_value = _normalize_tool_tag(tag)
+            if tag_value:
+                capabilities.add(tag_value)
+
+        for provided in meta.get('provided_mcp_tools', []) or []:
+            provided_value = str(provided).strip()
+            if provided_value:
+                capabilities.add(provided_value)
+
+    return capabilities
 
 def _build_runtime_state():
     return {
@@ -39,9 +301,15 @@ def _build_runtime_state():
         'tts_voice': None,
         'tts_model': None,
         'tts_protocol': None,
+        'tts_parameters': None,
         'cache_dir': None,
         'soul_content': None,
         'tools_list': None,
+        'tools_meta': None,
+        'skills_list': None,
+        'skills_unavailable': None,
+        'skills_content': None,
+        'system_prompt': None,
         'log_dir': None,
     }
 
@@ -79,7 +347,10 @@ def _build_default_config():
             'api_base': '',
             'voice': '',
             'model': '',
-            'protocol': 'mms',  # 'opentts' | 'openai' | 'mms'
+            'reference_text': '',
+            'reference_wav': '',
+            'repo_id': '',
+            'protocol': 'mms',  # 'opentts' | 'openai' | 'mms' | 'f5'
         },
         'ports': {
             'voice': 5059,
@@ -107,13 +378,67 @@ def _normalize_lang(raw_lang, fallback):
     return normalized[:2]
 
 
+def _find_f5_repo_files(snapshot_dir):
+    root = Path(snapshot_dir)
+    if not root.exists():
+        return '', ''
+
+    ckpt_extensions = ('.safetensors', '.ckpt', '.pt', '.pth', '.bin')
+    vocab_priority_names = ('vocab.txt', 'vocab.json', 'vocabulary.txt', 'vocabulary.json')
+    vocab_extensions = ('.txt', '.json', '.model')
+
+    ckpt_file = ''
+    vocab_file = ''
+
+    for candidate in root.rglob('*'):
+        if not candidate.is_file():
+            continue
+        lower_name = candidate.name.lower()
+
+        if not ckpt_file and lower_name.endswith(ckpt_extensions):
+            ckpt_file = str(candidate)
+
+        if not vocab_file and lower_name in vocab_priority_names:
+            vocab_file = str(candidate)
+
+    if not vocab_file:
+        for candidate in root.rglob('*'):
+            if not candidate.is_file():
+                continue
+            lower_name = candidate.name.lower()
+            if 'vocab' in lower_name and lower_name.endswith(vocab_extensions):
+                vocab_file = str(candidate)
+                break
+
+    return ckpt_file, vocab_file
+
+
+def _download_f5_repo_files(repo_id):
+    try:
+        huggingface_hub = importlib.import_module('huggingface_hub')
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "huggingface_hub package is required when [tts].repo_id is configured"
+        ) from exc
+
+    print(f"Downloading F5 model files from Hugging Face repo: {repo_id}")
+    snapshot_dir = huggingface_hub.snapshot_download(repo_id=repo_id)
+    ckpt_file, vocab_file = _find_f5_repo_files(snapshot_dir)
+
+    if not ckpt_file or not vocab_file:
+        raise RuntimeError(
+            f"Could not detect ckpt/vocab files in Hugging Face repo '{repo_id}'. "
+            f"Detected ckpt_file={ckpt_file!r}, vocab_file={vocab_file!r}."
+        )
+
+    return ckpt_file, vocab_file
+
+
 def _load_config_file():
     defaults = _build_default_config()    
     config_dir = Path(CONFIG_DIR)
-    config_path = (
-        config_dir / _state['folder'] / 'config.toml' if _state['folder']
-        else config_dir / 'config.toml'
-    )
+    agent_dir = _get_current_agent_dir()
+    config_path = agent_dir / 'config.toml' if agent_dir else config_dir / 'config.toml'
     
     if not config_path.exists():
         print(f'Warning: config file does not exist: {config_path}. Using defaults.')
@@ -131,10 +456,8 @@ def _load_config_file():
 
 def _load_prompts_file():
     config_dir = Path(CONFIG_DIR)
-    prompts_path = (
-        config_dir / _state['folder'] / 'prompts.toml' if _state['folder']
-        else config_dir / 'prompts.toml'
-    )
+    agent_dir = _get_current_agent_dir()
+    prompts_path = agent_dir / 'prompts.toml' if agent_dir else config_dir / 'prompts.toml'
 
     if not prompts_path.exists():
         print(f'Warning: prompts file does not exist: {prompts_path}')
@@ -235,9 +558,9 @@ def init(folder = ''):
                 with open(selected_file, 'r', encoding='utf-8') as f:
                     folder = f.read().strip()
                 # Validate that the selected folder exists
-                selected_folder_path = os.path.join(CONFIG_DIR, folder)
-                if not os.path.isdir(selected_folder_path):
-                    print(f'Error: selected folder does not exist: {selected_folder_path}')
+                selected_folder_path = _resolve_agent_dir(folder)
+                if selected_folder_path is None:
+                    print(f'Error: selected folder does not exist in {AGENTS_DIR}: {folder}')
                     folder = ''
                 else:
                     print(f'Loaded selected folder from file: {folder}')
@@ -294,18 +617,13 @@ def get_soul_content():
 
         fallback = False
         config_dir = Path(CONFIG_DIR)
+        agent_dir = _get_current_agent_dir()
         soul_filename = f'SOUL.{get_prompt_language()}.md'
-        soul_path = (
-            config_dir / _state['folder'] / soul_filename if _state['folder']
-            else config_dir / soul_filename
-        )
+        soul_path = agent_dir / soul_filename if agent_dir else config_dir / soul_filename
     
         if not soul_path.exists():
             soul_filename = 'SOUL.en.md'
-            soul_path = (
-                config_dir / _state['folder'] / soul_filename if _state['folder']
-                else config_dir / soul_filename
-            )
+            soul_path = agent_dir / soul_filename if agent_dir else config_dir / soul_filename
             fallback = True
 
         try:
@@ -589,40 +907,85 @@ def get_tts_parameters():
     """Singleton to ensure TTS settings stay in memory.
 
     Returns:
-        (api_base, voice, model, protocol) where protocol is one of:
-        'opentts' – OpenTTS HTTP server (uses voice)
-        'openai'  – OpenAI-compatible TTS API (uses model + voice)
-        'mms'     – MMS built-in TTS engine (uses model)
+        openai -> {'api_base', 'voice', 'model'}
+        f5     -> {'reference_text', 'reference_wav', 'repo_id', 'ckpt_file', 'vocab_file'}
+        other  -> None
     """
-    if (
-        _state['tts_api_base'] is None
-        or _state['tts_voice'] is None
-        or _state['tts_model'] is None
-        or _state['tts_protocol'] is None
-    ):
-        _state['tts_api_base'] = _get_config_value('tts', 'api_base')
-        _state['tts_voice'] = _get_config_value('tts', 'voice')
-        _state['tts_model'] = _get_config_value('tts', 'model')
-        _state['tts_protocol'] = str(
-            _get_config_value('tts', 'protocol') or 'mms'
-        ).strip().lower()
+    if _state['tts_parameters'] is None:
+        tts_api_base = str(_get_config_value('tts', 'api_base') or '').strip()
+        tts_voice = str(_get_config_value('tts', 'voice') or '').strip()
+        tts_model = str(_get_config_value('tts', 'model') or '').strip()
+        tts_protocol = str(_get_config_value('tts', 'protocol') or 'mms').strip().lower()
+        tts_reference_text = str(_get_config_value('tts', 'reference_text', '') or '').strip()
+        tts_reference_wav = str(_get_config_value('tts', 'reference_wav', '') or '').strip()
+        tts_repo_id = str(_get_config_value('tts', 'repo_id', '') or '').strip()
+        # Backward compatibility: explicit file paths are still accepted when repo_id is not set.
+        tts_ckpt_file = str(_get_config_value('tts', 'ckpt_file', '') or '').strip()
+        tts_vocab_file = str(_get_config_value('tts', 'vocab_file', '') or '').strip()
 
-        if _state['tts_protocol'] == 'openai':
+        def _resolve_tts_path(path_value):
+            if not path_value:
+                return ''
+            resolved_path = Path(path_value).expanduser()
+            if not resolved_path.is_absolute():
+                agent_dir = _get_current_agent_dir()
+                if agent_dir is not None:
+                    resolved_path = agent_dir / resolved_path
+                else:
+                    resolved_path = Path(CONFIG_DIR) / resolved_path
+            return str(resolved_path)
+
+        tts_reference_wav = _resolve_tts_path(tts_reference_wav)
+        if tts_repo_id:
+            tts_ckpt_file, tts_vocab_file = _download_f5_repo_files(tts_repo_id)
+        else:
+            tts_ckpt_file = _resolve_tts_path(tts_ckpt_file)
+            tts_vocab_file = _resolve_tts_path(tts_vocab_file)
+
+        if tts_protocol == 'openai' and tts_api_base.endswith('/audio/speech'):
             # Accept either a full speech endpoint or a generic OpenAI-compatible base URL.
-            if _state['tts_api_base'].endswith('/audio/speech'):
-                # remove ending
-                _state['tts_api_base'] = _state['tts_api_base'][:-len('/audio/speech')]
+            tts_api_base = tts_api_base[:-len('/audio/speech')]
+
+        _state['tts_api_base'] = tts_api_base
+        _state['tts_voice'] = tts_voice
+        _state['tts_model'] = tts_model
+        _state['tts_protocol'] = tts_protocol
+ 
+        if tts_protocol == 'openai':
+            _state['tts_parameters'] = {
+                'tts_protocol': tts_protocol,
+                'api_base': tts_api_base,
+                'voice': tts_voice,
+                'model': tts_model,
+            }
+        elif tts_protocol == 'f5':
+            _state['tts_parameters'] = {
+                'tts_protocol': tts_protocol,
+                'reference_text': tts_reference_text,
+                'reference_wav': tts_reference_wav,
+                'repo_id': tts_repo_id,
+                'ckpt_file': tts_ckpt_file,
+                'vocab_file': tts_vocab_file,
+            }
+        elif tts_protocol == 'mms':
+            _state['tts_parameters'] = {
+                'tts_protocol': tts_protocol,
+                'model': tts_model
+            }
+        else:
+            _state['tts_parameters'] = {
+                'tts_protocol': tts_protocol
+            }
+
         print(
-            f"Using TTS protocol: {_state['tts_protocol']}, api_base: {_state['tts_api_base']}, "
-            f"voice: {_state['tts_voice']}, model: {_state['tts_model']}"
+            f"Using TTS settings: protocol={tts_protocol}, api_base={tts_api_base}, "
+            f"voice={tts_voice}, model={tts_model}, tts_reference_wav={tts_reference_wav}, "
+            f"tts_repo_id={tts_repo_id}, "
+            f"tts_ckpt_file={tts_ckpt_file}, tts_vocab_file={tts_vocab_file}, "
+            f"returned={_state['tts_parameters']}"
         )
 
-    return (
-        _state['tts_api_base'],
-        _state['tts_voice'],
-        _state['tts_model'],
-        _state['tts_protocol'],
-    )
+    return _state['tts_parameters']
 
 
 def get_cache_dir():
@@ -680,15 +1043,170 @@ def get_tools():
         tools_section = get_config_data().get('tools', {})
 
         values = []
-        # If tools section is a mapping, extract its values;
-        if isinstance(tools_section, dict):
-            iterable = tools_section.values()
-        else:
-            iterable = []
+        metadata = []
 
-        for v in iterable:
-            values.append(str(v))
+        tool_refs = []
+        if isinstance(tools_section, dict) and isinstance(tools_section.get('list'), list):
+            tool_refs = [str(v).strip() for v in tools_section.get('list', []) if str(v).strip()]
+        elif isinstance(tools_section, list):
+            tool_refs = [str(v).strip() for v in tools_section if str(v).strip()]
+
+        if tool_refs:
+            for tool_ref in tool_refs:
+                descriptor_file, descriptor = _load_tool_descriptor_file(tool_ref)
+                if descriptor_file is None or descriptor is None:
+                    continue
+
+                endpoint, meta = _tool_descriptor_to_endpoint(tool_ref, descriptor_file, descriptor)
+                if not endpoint:
+                    continue
+
+                values.append(endpoint)
+                metadata.append(meta)
+        elif isinstance(tools_section, dict):
+            # Legacy format: [tools] table entries with inline endpoint strings.
+            for name, value in tools_section.items():
+                if name == 'list':
+                    continue
+                endpoint = str(value).strip()
+                if not endpoint:
+                    continue
+                values.append(endpoint)
+                metadata.append({
+                    'ref': str(name),
+                    'file': '',
+                    'name': str(name),
+                    'description': '',
+                    'type': endpoint.split('!', 1)[0] if '!' in endpoint else '',
+                    'url': endpoint.split('!', 1)[1] if '!' in endpoint else endpoint,
+                    'endpoint': endpoint,
+                    'tags': [],
+                    'source_file': '',
+                    'provided_mcp_tools': [],
+                })
 
         _state['tools_list'] = values
+        _state['tools_meta'] = metadata
 
     return _state['tools_list']
+
+
+def get_tools_metadata():
+    if _state['tools_meta'] is None:
+        get_tools()
+    return _state['tools_meta'] or []
+
+
+def get_skills():
+    """Return selected runtime skill file refs from config.toml."""
+    if _state['skills_list'] is None:
+        skills_section = get_config_data().get('skills', {})
+        values = []
+
+        if isinstance(skills_section, dict) and isinstance(skills_section.get('list'), list):
+            values = [str(v).strip() for v in skills_section.get('list', []) if str(v).strip()]
+        elif isinstance(skills_section, list):
+            values = [str(v).strip() for v in skills_section if str(v).strip()]
+        elif isinstance(skills_section, dict):
+            values = [str(v).strip() for k, v in skills_section.items() if k != 'list' and str(v).strip()]
+        elif isinstance(skills_section, str) and skills_section.strip():
+            values = [skills_section.strip()]
+
+        _state['skills_list'] = values
+
+    return _state['skills_list']
+
+
+def get_skills_content():
+    """Read selected skill files and return combined markdown content."""
+    if _state['skills_content'] is None:
+        get_tools()
+        available_capabilities = _collect_available_tool_capabilities(get_tools_metadata())
+        blocks = []
+        unavailable = []
+
+        for skill_ref in get_skills():
+            skill_file = _load_skill_file(skill_ref)
+            if skill_file is None:
+                unavailable.append({
+                    'skill': skill_ref,
+                    'reason': 'skill_file_not_found',
+                    'missing_required_mcp_tools': [],
+                })
+                print(f'Warning: skill file not found for ref: {skill_ref}')
+                continue
+
+            try:
+                raw = skill_file.read_text(encoding='utf-8')
+            except Exception as exc:
+                unavailable.append({
+                    'skill': skill_ref,
+                    'reason': f'skill_read_error: {exc}',
+                    'missing_required_mcp_tools': [],
+                })
+                print(f'Warning: failed to read skill file {skill_file}: {exc}')
+                continue
+
+            metadata, body = _parse_markdown_frontmatter(raw)
+            required = metadata.get('required_mcp_tools') if isinstance(metadata, dict) else []
+            if not isinstance(required, list):
+                required = []
+
+            missing = []
+            for req in required:
+                req_value = str(req).strip()
+                if not req_value:
+                    continue
+                if req_value not in available_capabilities:
+                    missing.append(req_value)
+
+            skill_id = str(metadata.get('id') or Path(skill_ref).stem)
+            skill_name = str(metadata.get('name') or skill_id)
+
+            if missing:
+                unavailable.append({
+                    'skill': skill_id,
+                    'name': skill_name,
+                    'file': str(skill_file),
+                    'reason': 'missing_required_mcp_tools',
+                    'missing_required_mcp_tools': missing,
+                })
+                print(
+                    f'Warning: skipping skill {skill_id} due to missing required_mcp_tools: {missing}'
+                )
+                continue
+
+            blocks.append(
+                f'## {skill_name} ({skill_id})\n\n'
+                f'{body.strip()}'
+            )
+
+        _state['skills_content'] = '\n\n'.join(blocks).strip()
+        _state['skills_unavailable'] = unavailable
+
+    return _state['skills_content']
+
+
+def get_unavailable_skills():
+    if _state['skills_unavailable'] is None:
+        get_skills_content()
+    return _state['skills_unavailable'] or []
+
+
+def get_system_prompt():
+    """Compose runtime system prompt from SOUL and selected skills."""
+    if _state['system_prompt'] is None:
+        soul_content = get_soul_content().strip()
+        skills_content = get_skills_content().strip()
+
+        if skills_content:
+            _state['system_prompt'] = (
+                f'{soul_content}\n\n'
+                '# Active runtime skills\n'
+                'The following skills are active and should be followed while solving tasks:\n\n'
+                f'{skills_content}'
+            ).strip()
+        else:
+            _state['system_prompt'] = soul_content
+
+    return _state['system_prompt']
