@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>STT Kliens</title>
+  <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #121212; color: white; }
+    #name-modal { position: fixed; inset: 0; background: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+    input, button { padding: 15px; font-size: 18px; border-radius: 8px; border: none; margin: 10px; }
+    #talk-btn { width: 220px; height: 220px; border-radius: 50%; font-size: 24px; font-weight: bold; color: white; background: #444; border: 4px solid #666; cursor: not-allowed; opacity: 0.5; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    #talk-btn.active { background: #d32f2f; border-color: #ff5252; opacity: 1; cursor: pointer; box-shadow: 0 0 20px rgba(211, 47, 47, 0.8); }
+    #talk-btn.recording { background: #b71c1c; transform: scale(0.95); }
+    #status { margin-top: 20px; font-size: 16px; color: #aaa; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div id="name-modal">
+    <h2>Név megadása</h2>
+    <input type="text" id="username-input" placeholder="A te neved..." />
+    <button onclick="joinRoom()" style="background: #2196F3; color: white;">Csatlakozás</button>
+  </div>
+
+  <div id="status">Kapcsolódás...</div>
+  <button id="talk-btn" disabled>TALK</button>
+
+  <script>
+    const CLIENT_API_KEY = "{{ client_api_key }}";
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('room') || 'default-room';
+
+    let ably, channel, controlChannel;
+    let username = "";
+    let allowedUser = "";
+    let recognition;
+    let currentTranscript = "";
+    let wakeLock = null;
+
+    const talkBtn = document.getElementById('talk-btn');
+    const statusDiv = document.getElementById('status');
+
+    // Helper for Haptic Feedback (Vibration)
+    function triggerHaptic(durationMs = 30) {
+      if ('vibrate' in navigator) {
+        try {
+          navigator.vibrate(durationMs);
+        } catch (e) {
+          // Ignore if blocked by browser policy
+        }
+      }
+    }
+
+    // Web Speech API
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'hu-HU';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            currentTranscript += event.results[i][0].transcript + ' ';
+          }
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error('STT Hiba:', event.error);
+      };
+    }
+
+    // Screen Wake Lock with iOS Silent Video Fallback
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+        } catch (err) {
+          console.warn('WakeLock request failed:', err);
+        }
+      } else {
+        // Fallback for iOS Safari: Play dummy silent video in loop
+        enableNoSleepVideo();
+      }
+    }
+
+    function enableNoSleepVideo() {
+      if (!document.getElementById('no-sleep-video')) {
+        const video = document.createElement('video');
+        video.id = 'no-sleep-video';
+        video.setAttribute('playsinline', '');
+        video.setAttribute('muted', '');
+        video.setAttribute('loop', '');
+        video.style.display = 'none';
+        // Base64 1x1 pixel silent video
+        video.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAAptZGF0AAAAAA==';
+        document.body.appendChild(video);
+        video.play().catch(() => {});
+      }
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    });
+
+    function joinRoom() {
+      username = document.getElementById('username-input').value.trim();
+      if (!username) return alert("Kérlek adj meg egy nevet!");
+
+      triggerHaptic(50); // Haptic feedback on join
+      requestWakeLock();
+
+      document.getElementById('name-modal').style.display = 'none';
+      statusDiv.textContent = `Csatlakozva mint: ${username} (${roomId})`;
+
+      ably = new Ably.Realtime({ key: CLIENT_API_KEY, clientId: username });
+      channel = ably.channels.get(`stt-${roomId}`);
+      controlChannel = ably.channels.get(`stt-control-${roomId}`);
+
+      channel.presence.enter({ name: username });
+
+      controlChannel.subscribe('active-floor', (message) => {
+        allowedUser = message.data.activeUser;
+        updateButtonState();
+      });
+    }
+
+    function updateButtonState() {
+      if (allowedUser === username) {
+        talkBtn.disabled = false;
+        talkBtn.classList.add('active');
+        statusDiv.textContent = "Tied a szó! Nyomd meg a gombot a beszédhez.";
+      } else {
+        talkBtn.disabled = true;
+        talkBtn.classList.remove('active');
+        statusDiv.textContent = allowedUser ? `Most ${allowedUser} beszél...` : "Várakozás a szóra...";
+      }
+    }
+
+    function startRecording(e) {
+      e.preventDefault();
+      if (talkBtn.disabled) return;
+
+      triggerHaptic(40); // Haptic pulse on button press
+      
+      currentTranscript = "";
+      talkBtn.classList.add('recording');
+      statusDiv.textContent = "Rögzítés... Beszélj!";
+      recognition.start();
+    }
+
+    function stopRecording(e) {
+      e.preventDefault();
+      if (!talkBtn.classList.contains('recording')) return;
+
+      triggerHaptic(20); // Short haptic pulse on release
+
+      talkBtn.classList.remove('recording');
+      statusDiv.textContent = "Üzenet küldése...";
+      recognition.stop();
+
+      setTimeout(() => {
+        if (currentTranscript.trim()) {
+          channel.publish('speech', {
+            sender: username,
+            text: currentTranscript.trim(),
+            timestamp: new Date().toISOString()
+          });
+          statusDiv.textContent = "Elküldve!";
+        } else {
+          statusDiv.textContent = "Nem észleltem beszédet.";
+        }
+        updateButtonState();
+      }, 500);
+    }
+
+    talkBtn.addEventListener('mousedown', startRecording);
+    talkBtn.addEventListener('mouseup', stopRecording);
+    talkBtn.addEventListener('touchstart', startRecording);
+    talkBtn.addEventListener('touchend', stopRecording);
+
+  </script>
+</body>
+</html>

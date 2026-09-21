@@ -21,7 +21,7 @@
                 &#128266;
             </button>
         </div>
-        <h1 class="title">Robotkutya v26.6a</h1>
+        <h1 class="title">Robotkutya v26.09.a</h1>
     </div>
     
     <div class="content-wrapper">
@@ -29,18 +29,24 @@
             <iframe id="myIframe" scrolling="no"></iframe>
         </div>
 
-        <div class="logos-container">
-            <div class="logos">
+        <div class="right-sidebar">
+            <div class="logo-card">
                 <img src="{{ url_for('static', filename='images/bme_logo_nagy_bordo.jpg') }}" alt="BME logo">
             </div>
-            <div class="logos">
+            <div class="logo-card">
                 <img src="{{ url_for('static', filename='images/Ericsson_logo.png') }}" alt="Ericsson logo">
             </div>
-            <div class="logos">
+            <div class="logo-card">
                 <img src="{{ url_for('static', filename='images/tmit75_logo.png') }}" alt="TMIT75_logo">
             </div>
-            <div class="logos">
+            <div class="logo-card">
                 <img src="{{ url_for('static', filename='images/hsn_logo.png') }}" alt="HSN_logo">
+            </div>
+
+            <!-- DINAMIKUS USER QR PLACEHOLDER -->
+            <div id="qrCard" class="logo-card qr-card" style="display: none;">
+                <img id="userQrImg" src="" alt="User QR Code">
+                <div id="qrLabel" class="qr-label">Scan to Connect</div>
             </div>
         </div>
     </div>
@@ -58,40 +64,52 @@
             socket.emit('page_change', page);
         }
 
+        // Function to update the dynamic QR code in the right sidebar
+        function updateDynamicQr(qrImageUrl, labelText) {
+            var qrCard = document.getElementById('qrCard');
+            var qrImg = document.getElementById('userQrImg');
+            var qrLabel = document.getElementById('qrLabel');
+
+            if (qrImageUrl) {
+                qrImg.src = qrImageUrl;
+                if (labelText) qrLabel.textContent = labelText;
+                qrCard.style.display = 'block';
+            } else {
+                qrCard.style.display = 'none'; // Rejtve marad, ha nincs URL
+            }
+        }
+
+        socket.on('update_qr', function(data) {
+            // data = { qr_url: '/static/qr_cache/user_qr.png', label: 'User Mobile Access' }
+            updateDynamicQr(data.qr_url, data.label);
+        });
+
+        // Add event listener, as the event will come from a child iframe
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'update_qr') {
+                updateDynamicQr(event.data.qr_url, event.data.label);
+            }
+        });
+
         function setVoiceEnabled(enabled) {
             var voiceBtn = document.getElementById('voiceToggle');
-            if (!voiceBtn) {
-                return;
-            }
-
-            if (enabled) {
-                voiceBtn.classList.add('active');
-            } else {
-                voiceBtn.classList.remove('active');
-            }
+            if (!voiceBtn) return;
+            if (enabled) voiceBtn.classList.add('active');
+            else voiceBtn.classList.remove('active');
         }
 
         function enableVoice() {
             if (audioContext && audioContext.state !== 'running') {
-                audioContext.resume().then(function() {
-                    console.log('Playback resumed successfully');
-                });
+                audioContext.resume();
             }
-
-            fetch('/voice/init', {
-                method: 'GET'
-            });
-
+            fetch('/voice/init', { method: 'GET' });
             setVoiceEnabled(true);
         }
 
         window.onload = function() {
             audioContext = new AudioContext();
-
             var voiceBtn = document.getElementById('voiceToggle');
-            if (voiceBtn) {
-                voiceBtn.addEventListener('click', enableVoice);
-            }
+            if (voiceBtn) voiceBtn.addEventListener('click', enableVoice);
         };
  
         socket.on('page_load', function(url) {
@@ -103,7 +121,6 @@
         });
 
         socket.on('audio_play', function(data) {
-            console.log('Received request:', data);
             var audio = new Audio('/voice/' + encodeURIComponent(data));
             audio.play();
         });
@@ -112,12 +129,10 @@
             fetch('/api/status')
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
-                    var el = document.getElementById('status');
-                    el.innerHTML = data.statusHTML;
+                    document.getElementById('status').innerHTML = data.statusHTML;
                 })
                 .catch(function() {
-                    var el = document.getElementById('status');
-                    el.textContent = 'ERROR';
+                    document.getElementById('status').textContent = 'ERROR';
                 });
         }
 

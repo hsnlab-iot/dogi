@@ -25,6 +25,9 @@ services:
       - MCP_KEY=${MCP_KEY}
       #- HF_HUB_OFFLINE=1         # For offline working
       #- TRANSFORMERS_OFFLINE=1   # For offline working
+      - ABLY_USER_KEY=${ABLY_USER_KEY}
+      - ABLY_MASTER_KEY=${ABLY_MASTER_KEY}
+      - ABLY_ROOM_ID=${ABLY_ROOM_ID}
     ports:
       #- "6080:6080" # the remote display port
       - "5100:5100/udp" # the incoming video port

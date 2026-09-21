@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<script>
+  (function bypassPinggy() {
+    if (!sessionStorage.getItem('pinggy_bypassed')) {
+      fetch(window.location.href, {
+        method: 'GET',
+        headers: {
+          'X-Pinggy-No-Screen': 'true'
+        },
+        credentials: 'include',
+        cache: 'no-store'
+      })
+      .then(response => {
+        sessionStorage.setItem('pinggy_bypassed', 'true');
+        // Reload after setting the cookie session on Pinggy
+        window.location.reload();
+      })
+      .catch(err => console.error('Pinggy bypass error:', err));
+    }
+  })();
+</script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <!-- Manifest Link -->
+  <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
+  <meta name="theme-color" content="#1a1a1a">
+
+  <!-- iOS / Android App Behavior -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="STT Master">
+  
+  <!-- Home Screen Icons -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/icon-180.png">
+
+  <title>STT Master Control</title>
+  
+  <!-- Dependencies: Ably Realtime & HTML5 QR Code Scanner -->
+  <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <style>
+    body { font-family: sans-serif; background: #1a1a1a; color: white; padding: 15px; margin: 0; }
+    h1 { font-size: 20px; text-align: center; margin-top: 5px; }
+    .status-bar { text-align: center; font-size: 13px; margin-bottom: 15px; color: #aaa; }
+    .status-bar strong { color: #fff; }
+    .status-online { color: #4CAF50; font-weight: bold; }
+    .status-offline { color: #f44336; font-weight: bold; }
+    
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-bottom: 20px; }
+    .user-card { background: #333; border: 2px solid #555; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 75px; }
+    .user-card.active { border-color: #4CAF50; background: #1b4721; }
+    .user-name { font-weight: bold; font-size: 13px; text-overflow: ellipsis; overflow: hidden; width: 100%; text-align: center; white-space: nowrap; }
+    .btn-grant { background: #2196F3; color: white; border: none; padding: 4px 8px; font-size: 11px; border-radius: 4px; cursor: pointer; width: 100%; }
+    .btn-kick { background: #f44336; color: white; border: none; padding: 2px 6px; font-size: 10px; border-radius: 4px; cursor: pointer; margin-top: 2px; }
+    #revoke-all { width: 100%; padding: 12px; background: #ff9800; color: black; font-weight: bold; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; margin-bottom: 15px; }
+    
+    /* Config & Scanner Card */
+    .config-card { background: #2a2a2a; border-radius: 8px; padding: 12px; margin-top: 20px; text-align: center; border: 1px solid #444; }
+    .btn-scan { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-weight: bold; width: 100%; cursor: pointer; font-size: 14px; }
+    .btn-clear { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: 8px; }
+    #reader { width: 100%; display: none; margin-top: 10px; border-radius: 6px; overflow: hidden; }
+  </style>
+</head>
+<body>
+
+  <h1>Master Control</h1>
+  
+  <div class="status-bar">
+    Status: <span id="status" class="status-offline">Disconnected (No Key)</span> | 
+    Room: <strong id="roomDisplay">Loading...</strong>
+  </div>
+
+  <button id="revoke-all" onclick="setFloor('')">MUTE ALL</button>
+
+  <h3>Active clients:</h3>
+  <div class="grid" id="user-grid"></div>
+
+  <!-- MASTER KEY QR CAMERA SETUP -->
+  <div class="config-card">
+    <button id="scanBtn" class="btn-scan" onclick="startScanner()">📷 Scan Master Key QR</button>
+    <button id="clearBtn" class="btn-clear" onclick="clearKey()" style="display:none;">Clear Stored Key</button>
+    <div id="reader"></div>
+  </div>
+
+  <script>
+    // Read ROOM_ID from URL parameter or fallback to localStorage / default
+    const urlParams = new URLSearchParams(window.location.search);
+    let roomId = urlParams.get('room');
+
+    if (roomId) {
+        localStorage.setItem('stt_room_id', roomId);
+    } else {
+        roomId = localStorage.getItem('stt_room_id') || 'default-room';
+    }
+    document.getElementById('roomDisplay').textContent = roomId;
+
+    let ably = null;
+    let channel = null;
+    let controlChannel = null;
+    let activeUser = "";
+    let presentUsers = [];
+    let html5QrcodeScanner = null;
+
+    // INITIALIZE ABLY REALTIME CONNECTION
+    function initAbly(masterKey) {
+        try {
+            ably = new Ably.Realtime({ key: masterKey, clientId: 'MasterController' });
+            channel = ably.channels.get(`stt-${roomId}`);
+            controlChannel = ably.channels.get(`stt-control-${roomId}`);
+
+            ably.connection.on('connected', () => {
+                document.getElementById('status').textContent = 'Online';
+                document.getElementById('status').className = 'status-online';
+                document.getElementById('scanBtn').textContent = '🔄 Re-scan Master Key';
+                document.getElementById('clearBtn').style.display = 'inline-block';
+
+                // Sync presence list
+                channel.presence.subscribe(() => {
+                  channel.presence.get((err, members) => {
+                    if (!err) {
+                      presentUsers = members;
+                      renderUsers();
+                    }
+                  });
+                });
+
+                // Get initial presence list on connection
+                channel.presence.get((err, members) => {
+                    if (!err) {
+                        presentUsers = members;
+                        renderUsers();
+                    }
+                });
+            });
+
+            ably.connection.on('failed', () => {
+                document.getElementById('status').textContent = 'Auth Failed (Invalid Key)';
+                document.getElementById('status').className = 'status-offline';
+            });
+
+        } catch (err) {
+            alert('Initialization Error: ' + err.message);
+        }
+    }
+
+    // MODERATOR ACTIONS
+    function setFloor(username) {
+      activeUser = username;
+      if (controlChannel) {
+        // Publish floor control message
+        controlChannel.publish('active-floor', { activeUser: activeUser });
+      }
+      renderUsers();
+    }
+
+    function kickUser(clientId) {
+      if (!channel) return;
+      channel.presence.get({ clientId: clientId }, (err, members) => {
+        if (members && members.length > 0) {
+          channel.presence.updateClient(clientId, { kicked: true });
+          if (activeUser === clientId) setFloor('');
+        }
+      });
+    }
+
+    function renderUsers() {
+      const grid = document.getElementById('user-grid');
+      grid.innerHTML = '';
+
+      presentUsers.forEach(member => {
+        const name = member.clientId;
+        const isCurrent = name === activeUser;
+
+        const card = document.createElement('div');
+        card.className = `user-card ${isCurrent ? 'active' : ''}`;
+        card.innerHTML = `
+          <div class="user-name">${name}</div>
+          <button class="btn-grant" onclick="setFloor('${name}')">
+            ${isCurrent ? 'Speaking (Re-sync)' : 'Grant Floor'}
+          </button>
+          <button class="btn-kick" onclick="kickUser('${name}')">Kick</button>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // CHECK STORED KEY ON STARTUP
+    const storedKey = localStorage.getItem('ABLY_MASTER_KEY');
+    if (storedKey) {
+        initAbly(storedKey);
+    }
+
+    // CAMERA SCANNER FUNCTIONS
+    function startScanner() {
+        document.getElementById('reader').style.display = 'block';
+        html5QrcodeScanner = new Html5Qrcode("reader");
+
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 220, height: 220 } },
+            (decodedText) => {
+                localStorage.setItem('ABLY_MASTER_KEY', decodedText);
+                html5QrcodeScanner.stop().then(() => {
+                    document.getElementById('reader').style.display = 'none';
+                    initAbly(decodedText);
+                });
+            },
+            (errorMessage) => { /* scanning */ }
+        ).catch(err => {
+            alert("Camera permission error: " + err);
+        });
+    }
+
+    function clearKey() {
+        localStorage.removeItem('ABLY_MASTER_KEY');
+        location.reload();
+    }
+  </script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('Service Worker registered successfully:', reg.scope))
+        .catch((err) => console.error('Service Worker registration failed:', err));
+    });
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <rect width="512" height="512" rx="115" fill="#0a0a10"/>
+  
+  <!-- Headphones Arc (Moderator Control) -->
+  <path d="M 130 256 A 126 126 0 0 1 382 256" fill="none" stroke="#ff9800" stroke-width="16" stroke-linecap="round"/>
+  <rect x="100" y="220" width="40" height="80" rx="20" fill="#ff9800"/>
+  <rect x="372" y="220" width="40" height="80" rx="20" fill="#ff9800"/>
+
+  <!-- Head Outline -->
+  <rect x="160" y="180" width="192" height="170" rx="50" fill="#161622" stroke="#2196f3" stroke-width="8"/>
+
+  <!-- Ears -->
+  <path d="M 160 190 L 110 130 L 180 150 Z" fill="#2196f3"/>
+  <path d="M 352 190 L 402 130 L 332 150 Z" fill="#2196f3"/>
+
+  <!-- Eyes LED Screen -->
+  <rect x="190" y="210" width="132" height="50" rx="25" fill="#05050a"/>
+  <circle cx="225" cy="235" r="12" fill="#2196f3"/>
+  <circle cx="287" cy="235" r="12" fill="#2196f3"/>
+
+  <!-- Moderator Mic Extension -->
+  <path d="M 120 280 C 120 370, 200 370, 230 370" fill="none" stroke="#ff9800" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="240" cy="370" r="14" fill="#ff9800"/>
+
+  <!-- STT Sound Wave Graphic at Bottom -->
+  <line x1="200" y1="430" x2="200" y2="450" stroke="#2196f3" stroke-width="6" stroke-linecap="round"/>
+  <line x1="228" y1="415" x2="228" y2="465" stroke="#2196f3" stroke-width="6" stroke-linecap="round"/>
+  <line x1="256" y1="400" x2="256" y2="480" stroke="#ff9800" stroke-width="8" stroke-linecap="round"/>
+  <line x1="284" y1="415" x2="284" y2="465" stroke="#2196f3" stroke-width="6" stroke-linecap="round"/>
+  <line x1="312" y1="430" x2="312" y2="450" stroke="#2196f3" stroke-width="6" stroke-linecap="round"/>
+</svg>

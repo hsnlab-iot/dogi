@@ -1,152 +1,176 @@
 @font-face {
     font-family: 'Jedth';
-    src: url('jedth.ttf') format('truetype'); /* Ensure the path is correct */
+    src: url('jedth.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
 }
 
-body {
-    background-image: url('../images/deep_navy_blue_metal_texture_background.jpg'); /* Set background image */
-    background-size: cover; /* Ensure the image covers the entire page */
-    background-position: center; /* Center the background image */
-    background-repeat: no-repeat; /* Prevent the image from repeating */    font-family: Arial, sans-serif;
-    color: white;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column; /* Stacks the header, iframe, and logos vertically */
-    min-height: 100vh;
-    overflow: hidden; /* Prevents scrolling */
+* {
+    box-sizing: border-box; /* Megakadályozza a görgetősávok megjelenését elcsúszó paddingok miatt */
 }
 
+html, body {
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Nincs felesleges görgetés */
+}
+
+body {
+    background-image: url('../images/deep_navy_blue_metal_texture_background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    font-family: Arial, sans-serif;
+    color: white;
+    display: flex;
+    flex-direction: column;
+}
+
+/* HEADER */
 .header {
     display: flex;
-    justify-content: space-between; /* Space between tabs and title */
-    align-items: center; /* Center items vertically */
-    padding: 10px; /* Padding around header */
-    width: 98%; /* Full width for the header */
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 15px;
+    width: 100%;
+    flex-shrink: 0; /* Ne menjen össze kis kijelzőn sem */
 }
 
 .tabs {
     display: flex;
-    justify-content: flex-start; /* Align tabs to the left */
+    justify-content: flex-start;
     align-items: center;
     flex: 1;
 }
 
 .tab {
-    padding: 10px 15px; /* Adjust padding for better spacing */
-    margin-right: 5px; /* Space between tabs */
+    padding: 8px 14px;
+    margin-right: 6px;
     border-radius: 5px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: opacity 0.3s;
+    font-weight: bold;
 }
 
-.tab:hover {
-    opacity: 0.8;
-}
-
-.tab1 { background-color: #FF5733; } /* Red */
-.tab2 { background-color: #33FF57; } /* Green */
-.tab3 { background-color: #3357FF; } /* Blue */
-.tab4 { background-color: #F1C40F; } /* Yellow */
-.tab5 { background-color: #9B59B6; } /* Purple */
-.tab6 { background-color: #17A2B8; } /* Teal */
+.tab:hover { opacity: 0.8; }
+.tab1 { background-color: #FF5733; }
+.tab2 { background-color: #33FF57; color: black; }
+.tab3 { background-color: #3357FF; }
+.tab4 { background-color: #F1C40F; color: black; }
+.tab5 { background-color: #9B59B6; }
+.tab6 { background-color: #17A2B8; }
 
 .tab-voice {
     margin-left: auto;
-    margin-right: 0;
-    min-width: 44px;
+    margin-right: 15px;
+    min-width: 40px;
     text-align: center;
     border: none;
     color: white;
     background-color: #C0392B;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
 }
 
-.tab-voice.active {
-    background-color: #27AE60;
+.tab-voice.active { background-color: #27AE60; }
+
+.title {
+    font-family: 'Jedth';
+    font-size: 22px;
+    color: white;
+    margin: 0;
+    white-space: nowrap;
 }
 
+/* MAIN CONTENT WRAPPER */
 .content-wrapper {
     display: flex;
-    justify-content: space-between; /* Space between iframe and logos */
-    width: 100%; /* Full width for the content */
-    flex-grow: 1; /* Allow content to grow vertically */
+    flex-direction: row;
+    flex: 1; /* Kitölti a header és statusbar közötti teljes magasságot */
+    padding: 0 10px 10px 10px;
+    gap: 12px;
+    min-height: 0; /* Szükséges a flexbox belső görgetésmentességéhez */
 }
+
+/* IFRAME KONTÉNER (Rugalmasan kitölti a bal oldali teljes teret) */
 .iframe-container {
-    display: flex;
-    justify-content: center; /* Center iframe horizontally */
-    align-items: center;
-    height: 780px; /* Fixed height for iframe area */
-    border: 5px solid #FFFFFF; /* Border around iframe area */
-    border-radius: 8px; /* Rounded corners for the border */
-    width: 100%; /* Allow flexibility in width */
-    max-width: 1280px; /* Set the max width for the container */
-    position: relative; /* For logos positioning */
-    margin-top: 0;
-    margin-left: 0;
-    overflow: hidden; /* Prevents logos from overflowing */
+    flex: 1; /* Elfoglal minden szabad helyet a jobb oldali sáv mellett */
+    height: 100%;
+    border: 3px solid #FFFFFF;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.2);
 }
 
 iframe {
-    width: 100%; /* Ensure iframe takes the full width of its container */
+    width: 100%;
     height: 100%;
-    border: none; /* Remove default iframe border */
+    border: none;
+    display: block;
 }
 
-.logos-container {
+/* JOBB OLDALI SÁV (Fix szélességgel, nem csúszik el semmilyen kijelzőn) */
+.right-sidebar {
+    width: 210px; /* Fix szélesség, pontosan a kártyák mérete */
+    flex-shrink: 0; /* Tilos összenyomni! */
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 10px;
-    flex-grow: 1; /* Allow logos to grow vertically */
+    gap: 10px;
+    overflow-y: auto; /* Ha túl sok elem lenne, helyben görgethető */
 }
 
-.logos {
-    display: inline-block;
-    background-color: white; /* White background for logos */
-    padding: 10px; /* Padding around logos */
-    border-radius: 5px; /* Rounded corners for the container */
-    margin-bottom: 10px;
+.logo-card {
+    background-color: white;
+    padding: 8px;
+    border-radius: 6px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
-.logos img {
+.logo-card img {
+    max-width: 100%;
+    height: auto;
     display: block;
-    width: 200px; /* Keeping logo width at 100 pixels */
+    object-fit: contain;
 }
 
-.title {
-    font-family: 'Jedth'; /* Use the custom font */
-    font-size: 24px; /* Font size for the title */
-    color: white; /* Title color */
-    margin: 0; /* Remove default margin */
+/* DINAMIKUS USER QR KÁRTYA STÍLUS */
+.qr-card {
+    border: 2px solid #17A2B8;
+    background-color: #ffffff;
 }
 
+.qr-label {
+    color: #333;
+    font-size: 11px;
+    font-weight: bold;
+    margin-top: 4px;
+    text-align: center;
+}
+
+/* STATUSBAR */
 .statusbar {
     width: 100%;
-    background-color: rgba(0, 0, 0, 0.55);
+    height: 28px;
+    flex-shrink: 0;
+    background-color: rgba(0, 0, 0, 0.75);
     border-top: 1px solid rgba(255, 255, 255, 0.15);
-    padding: 4px 14px;
+    padding: 0 14px;
     font-size: 13px;
     color: #ccc;
     display: flex;
     align-items: center;
     gap: 8px;
-    box-sizing: border-box;
 }
 
-.statusbar-label {
-    opacity: 0.7;
-    white-space: nowrap;
-}
-
-.status-value {
-    font-weight: bold;
-    letter-spacing: 0.05em;
-}
-
-.status-on  { color: #33FF57; }
+.statusbar-label { opacity: 0.7; white-space: nowrap; }
+.status-value { font-weight: bold; letter-spacing: 0.05em; }
+.status-on { color: #33FF57; }
 .status-off { color: #FF5733; }
 .status-unknown { color: #aaa; }
