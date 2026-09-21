@@ -1,0 +1,38 @@
+name: body
+type: str
+url: http://onboard-mcp:5000/mcp
+
+description: >
+  Direct physical movement and stance control for the DOGZILLA quadruped chassis.  Provides low-level directional locomotion (walking, turning, stopping), in-place torso attitude adjustments (yaw/pitch tilt and twist with planted feet), and high-level predefined expressiveness and functional routines (sitting, waving, crawling, dancing).
+
+provided_mcp_tools:
+  - body_move
+  - body_attitude
+  - body_action
+
+performance_profile:
+  expected_latency_seconds: 0.1
+  max_timeout_seconds: 5
+  resource_intensity: low  # Onboard hardware control API dispatch
+
+capabilities:
+  - physical_locomotion
+  - directional_turning
+  - torso_attitude_control
+  - gesture_expressiveness
+  - functional_routines
+
+system_behavior_hints:
+  - "Use body_attitude (tilt/twist) when camera pan/tilt adjustments are needed while keeping feet planted."
+  - "Prefer step actions with short durations (1.0-1.5s) when navigating near obstacles."
+  - "Call body_move with action=stop immediately if visual feedback or safety sensors detect a hazard."
+  - "Use body_action for predefined expressive gestures or complex body routines (e.g., sit, crawl, wave)."
+
+tags:
+  - movement
+  - attitude
+  - action
+  - locomotion
+  - chassis
+  - quadruped
+  - hardware

@@ -1,0 +1,1 @@
+Rex isa gemran version, for testing the translation.

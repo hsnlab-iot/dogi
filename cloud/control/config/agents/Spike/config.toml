@@ -1,0 +1,53 @@
+[pupcard]
+language = "ENG"
+model = "Nemotron 3"
+tts = "F5 ENG"
+
+[general]
+cache = "~/.cache/spike"
+log = "~/log/spike"
+
+[language]
+ui = "en"
+prompt = "en"
+
+[models]
+general = "nemotron-3-nano:4b"
+translation = ""
+vision = ""
+
+[openai]
+api_base = "http://10.6.6.20:11434/v1"
+api_key = "not-needed"
+keep_alive = "30m"
+enable_thinking = true
+thinking_budget = 1024
+max_output_tokens = 1536
+translation_max_output_tokens = 2048
+prompt_temperature = 0.9
+prompt_frequency_penalty = 0.8
+binary_images = false
+
+[tts]
+# Facebook english
+#protocol = "mms"
+#model = "facebook/mms-tts-eng"
+protocol = "f5"
+reference_text = "Some call me nature, others call me mother nature."
+reference_wav = "basic_ref_en.wav"
+
+[ports]
+voice = 5059
+control = 5002
+
+[streamer]
+url = "http://10.100.0.38:8000"
+stream_ip = "10.100.0.20"
+stream_port = 5100
+
+[tools]
+list = ["highfive", "dice", "body", "visionprompt"]
+
+[skills]
+list = ["object_search", "visual_vlm_analysis", "cautious_navigation"]
+

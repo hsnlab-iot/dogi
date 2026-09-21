@@ -1,0 +1,28 @@
+name: visionprompt
+type: str
+url: http://dogi-mcp:5000/mcp
+
+description: >
+  Captures a real-time snapshot from the robot dog's camera stream and passes it along with a textual prompt to a vision-language model (VLM). Use this tool to inspect the immediate environment, identify objects, read visual labels, analyze spatial obstacles, or verify the outcome of physical actions.
+
+provided_mcp_tools:
+  - vision_prompt
+
+performance_profile:
+  expected_latency_seconds: 2.0
+  max_timeout_seconds: 30
+  resource_intensity: high  # GPU bound VLM processing
+
+capabilities:
+  - visual_perception
+  - object_identification
+  - spatial_reasoning
+  - optical_character_recognition
+  - environmental_verification
+
+tags:
+  - vision
+  - image
+  - analysis
+  - prompt
+  - camera

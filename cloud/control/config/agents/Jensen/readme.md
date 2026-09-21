@@ -1,0 +1,1 @@
+Jensen is running a true LLM model on NVIDIA server. However, the server is rate limited. At current stage this could lead to errors.

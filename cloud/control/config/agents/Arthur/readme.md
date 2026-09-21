@@ -1,0 +1,1 @@
+Arthur is running on the Gemma4 model, which is a large one and thus we cannot run other models. He has the capture tool, which captures a snapshot with the camera, and the image is processed as the part of the prompt.

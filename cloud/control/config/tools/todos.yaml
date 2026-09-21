@@ -1,0 +1,28 @@
+name: todos
+type: str
+url: http://robot_ip:5060/mcp/todos
+
+description: >
+  Manages date-scoped task lists, goals, and persistent state tracking across execution sessions. Use this tool to log upcoming actions, check current task progress, mark completed objectives, and generate summary reports of daily robot activities.
+
+provided_mcp_tools:
+  - todos
+
+performance_profile:
+  expected_latency_seconds: 0.1
+  max_timeout_seconds: 5
+  resource_intensity: low  # In-memory / local disk state storage
+
+capabilities:
+  - task_management
+  - persistent_state_tracking
+  - session_planning
+  - historical_activity_logging
+
+tags:
+- task
+  - planning
+  - productivity
+  - state
+  - memory
+  - agenda

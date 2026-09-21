@@ -1,0 +1,31 @@
+name: capture
+type: sse
+url: http://onboard:8000/mcp/sse
+public_url: http://<host>:8000/mcp/sse
+
+description: >
+  Captures a raw camera frame from the onboard primary camera (/dev/video0) and   returns it as a base64 JPEG data URL. WARNING: Injecting raw image base64 payloads into the LLM context consumes a very high number of tokens (often 1000+ tokens per image).  Use this tool ONLY when raw visual payload bytes are strictly required by external pipelines or UI renderers. For environmental visual queries or scene descriptions, ALWAYS prefer other tools to save context tokens, when available.
+
+provided_mcp_tools:
+  - camera_snapshot
+
+performance_profile:
+  expected_latency_seconds: 0.2
+  max_timeout_seconds: 2.0
+  resource_intensity: low  # Onboard thread-pool JPEG capture & base64 encoding
+
+capabilities:
+  - raw_image_capture
+  - visual_frame_extraction
+
+system_behavior_hints:
+  - "HIGH TOKEN COST WARNING: Avoid calling camera_snapshot during standard text multi-turn conversations unless base64 image data is explicitly requested."
+  - "Use camera_snapshot primarily for out-of-band processing, visual logging, or sending images to external interfaces."
+
+tags:
+  - camera
+  - image
+  - vision
+  - snapshot
+  - sensor
+  - onboard

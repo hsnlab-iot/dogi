@@ -1,0 +1,49 @@
+[pupcard]
+language = "ENG"
+model = "Gemma4:e4b"
+tts = "Meta ENG"
+
+[general]
+cache = "~/.cache/arthur"
+log = "~/log/arthur"
+
+[language]
+ui = "en"
+prompt = "en"
+
+[models]
+general = "gemma4:e4b"
+translation = ""
+vision = ""
+
+[openai]
+api_base = "http://10.6.6.20:11434/v1"
+api_key = "not-needed"
+keep_alive = "30m"
+enable_thinking = false
+thinking_budget = 1024
+max_output_tokens = 1536
+translation_max_output_tokens = 2048
+prompt_temperature = 0.9
+prompt_frequency_penalty = 0.8
+binary_images = false
+
+[tts]
+# Facebook english
+protocol = "mms"
+model = "facebook/mms-tts-eng"
+
+[ports]
+voice = 5059
+control = 5002
+
+[streamer]
+url = "http://10.100.0.38:8000"
+stream_ip = "10.100.0.20"
+stream_port = 5100
+
+[tools]
+list = ["highfive", "capture", "dice", "body"]
+
+[skills]
+list = ["cautious_navigation"]
