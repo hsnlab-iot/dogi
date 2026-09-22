@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function bypassPinggy() {
+      if (!sessionStorage.getItem('pinggy_bypassed')) {
+        fetch(window.location.href, {
+          method: 'GET',
+          headers: { 'X-Pinggy-No-Screen': 'true' },
+          credentials: 'include',
+          cache: 'no-store'
+        })
+        .then(() => {
+          sessionStorage.setItem('pinggy_bypassed', 'true');
+          window.location.reload();
+        })
+        .catch(err => console.error('Pinggy bypass error:', err));
+      }
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
+  <meta name="theme-color" content="#0f172a">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dogi Controller">
+  
+  <link rel="stylesheet" href="/style.css">
+  <title>Dogi Controller</title>
+</head>
+<body>
+
+  <div id="app-container">
+
+    <!-- MAIN PAGE -->
+    <div id="page-main" class="page active">
+      <header>
+        <h1>Dogi controller</h1>
+        <div class="header-actions">
+          <button class="icon-btn" onclick="showPage('page-log')" title="System Log">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+          </button>
+          <button class="icon-btn" onclick="toggleModal('modal-settings', true)" title="Settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="content">
+        <!-- BLE Connection Panel -->
+        <div class="card">
+          <div class="btn-group">
+            <button class="action-btn" id="scanBtn" onclick="scanBLE()">Scan</button>
+            <button class="action-btn secondary" id="connectBtn" onclick="connectBLE()">Connect</button>
+          </div>
+          <select id="deviceSelect">
+            <option value="">No devices found</option>
+          </select>
+        </div>
+
+        <!-- Video Control Section -->
+        <div class="video-control-card">
+          <div class="card-title">Video Stream Quality</div>
+          <div class="slider-container">
+            <input type="range" id="videoSlider" min="0" max="4" step="1" value="0" onchange="onVideoQualityChange(this.value)">
+            <div class="slider-labels">
+              <span>OFF</span>
+              <span>256K</span>
+              <span>512K</span>
+              <span>1024K</span>
+              <span>2048K</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- WiFi Interface -->
+        <div class="card">
+          <div class="card-title">WiFi Interface</div>
+          <div class="btn-group">
+            <button class="action-btn secondary" onclick="sendCommand('WSTA')">WiFi STA</button>
+            <button class="action-btn secondary" onclick="sendCommand('WAP')">WiFi AP</button>
+          </div>
+        </div>
+
+        <!-- Connection Route -->
+        <div class="card">
+          <div class="card-title">Connection Route</div>
+          <div class="btn-group">
+            <button class="action-btn secondary" onclick="sendCommand('USEWIFI')">Use WiFi</button>
+            <button class="action-btn secondary" onclick="sendCommand('USE5G')">Use 5G</button>
+          </div>
+        </div>
+
+        <!-- System Controls -->
+        <div class="card">
+          <div class="card-title">System</div>
+          <div class="btn-group">
+            <button class="action-btn secondary" onclick="sendCommand('RESTART')">Restart dogi</button>
+            <button class="action-btn danger" onclick="sendCommand('SHUTDOWN')">Shutdown</button>
+          </div>
+        </div>
+
+        <!-- Telemetry Data -->
+        <div class="card">
+          <div class="telemetry-grid">
+            <div class="field">
+              <label>wlan0 address:</label>
+              <input type="text" id="wlan0" readonly placeholder="---">
+            </div>
+            <div class="field">
+              <label>wwan0 address:</label>
+              <input type="text" id="wwan0" readonly placeholder="---">
+            </div>
+            <div class="field">
+              <label>Route:</label>
+              <input type="text" id="route" readonly placeholder="---">
+            </div>
+            <div class="field">
+              <label>WiFi mode:</label>
+              <input type="text" id="wifimode" readonly placeholder="---">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FULL PAGE: SYSTEM LOG -->
+    <div id="page-log" class="page">
+      <header>
+        <button class="icon-btn" onclick="showPage('page-main')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </button>
+        <h1>System Log</h1>
+        <div class="header-actions">
+          <label class="switch" title="Font Size Toggle">
+            <input type="checkbox" id="fontToggle" onchange="toggleLogFontSize(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </header>
+
+      <div class="content">
+        <div id="logOutput" class="log-container font-small"></div>
+        <button class="action-btn secondary" onclick="clearLogs()">Clear Log</button>
+      </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="modal-settings" class="modal-overlay">
+      <div class="modal-content">
+        <div class="card-title" style="margin-bottom: 8px;">Settings</div>
+        
+        <div class="switch-label">
+          <span>Demo / Simulation Mode</span>
+          <label class="switch">
+            <input type="checkbox" id="demoToggle" onchange="toggleDemoMode(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <button class="action-btn" onclick="toggleModal('modal-settings', false)" style="margin-top: 10px;">Close</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // BLE Service & Characteristic UUIDs matching App Inventor spec
+    const SERVICE_UUID = "b4e18281-8b71-412e-8564-000000000000";
+    const CMD_UUID     = "b4e18281-8b71-40be-8954-000000000001";
+    const STATUS_UUID  = "b4e18281-8b71-40be-8954-000000000002";
+
+    const VIDEO_COMMANDS = ['VID_OFF', 'VID_256K', 'VID_512K', 'VID_1024K', 'VID_2048K'];
+
+    let bleDevice = null;
+    let gattServer = null;
+    let cmdCharacteristic = null;
+    let statusCharacteristic = null;
+
+    let isDemoMode = false;
+    let demoInterval = null;
+
+    function log(msg) {
+      const output = document.getElementById('logOutput');
+      const timestamp = new Date().toLocaleTimeString();
+      output.innerText += `[${timestamp}] ${msg}\n`;
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById('logOutput').innerText = '';
+    }
+
+    function showPage(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+    }
+
+    function toggleModal(modalId, show) {
+      const modal = document.getElementById(modalId);
+      if (show) modal.classList.add('active');
+      else modal.classList.remove('active');
+    }
+
+    function toggleLogFontSize(isBig) {
+      const logContainer = document.getElementById('logOutput');
+      if (isBig) {
+        logContainer.classList.remove('font-small');
+        logContainer.classList.add('font-large');
+      } else {
+        logContainer.classList.remove('font-large');
+        logContainer.classList.add('font-small');
+      }
+    }
+
+    function toggleDemoMode(enabled) {
+      isDemoMode = enabled;
+      log(`Demo mode ${enabled ? 'enabled' : 'disabled'}`);
+      if (enabled) {
+        startDemoTelemetry();
+      } else {
+        if (demoInterval) clearInterval(demoInterval);
+      }
+    }
+
+    async function scanBLE() {
+      if (isDemoMode) {
+        log("Demo Mode: Simulated scan performed.");
+        const select = document.getElementById('deviceSelect');
+        select.innerHTML = '<option value="demo-device">Dogi Robot (Demo)</option>';
+        return;
+      }
+
+      try {
+        log("Scanning for Bluetooth devices...");
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }],
+          optionalServices: [SERVICE_UUID]
+        });
+
+        const select = document.getElementById('deviceSelect');
+        select.innerHTML = `<option value="${bleDevice.id}">${bleDevice.name || 'Dogi Robot'}</option>`;
+        log(`Found device: ${bleDevice.name || bleDevice.id}`);
+      } catch (err) {
+        log(`Scan failed: ${err.message}`);
+      }
+    }
+
+    async function connectBLE() {
+      if (isDemoMode) {
+        log("Demo Mode: Connected to simulated Dogi.");
+        return;
+      }
+
+      if (!bleDevice) {
+        log("No device selected. Please scan first.");
+        return;
+      }
+
+      try {
+        log("Connecting to GATT Server...");
+        gattServer = await bleDevice.gatt.connect();
+        const service = await gattServer.getPrimaryService(SERVICE_UUID);
+        
+        cmdCharacteristic = await service.getCharacteristic(CMD_UUID);
+        statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
+
+        await statusCharacteristic.startNotifications();
+        statusCharacteristic.addEventListener('characteristicvaluechanged', handleStatusUpdate);
+
+        log("Connected successfully! Subscribed to telemetry updates.");
+        await sendCommand('CONNECT');
+      } catch (err) {
+        log(`Connection failed: ${err.message}`);
+      }
+    }
+
+    async function sendCommand(cmd) {
+      log(`Sending command: ${cmd}`);
+      if (isDemoMode) {
+        log(`Demo Mode: Command "${cmd}" processed.`);
+        return;
+      }
+
+      if (!cmdCharacteristic) {
+        log("Error: Not connected to BLE device.");
+        return;
+      }
+
+      try {
+        const encoder = new TextEncoder();
+        await cmdCharacteristic.writeValue(encoder.encode(cmd));
+      } catch (err) {
+        log(`Failed to send command: ${err.message}`);
+      }
+    }
+
+    function onVideoQualityChange(val) {
+      const cmd = VIDEO_COMMANDS[val];
+      sendCommand(cmd);
+    }
+
+    function handleStatusUpdate(event) {
+      const decoder = new TextDecoder('utf-8');
+      const rawString = decoder.decode(event.target.value);
+      log(`Received raw data: ${rawString}`);
+
+      const parts = rawString.split('@');
+      parts.forEach(part => {
+        if (part.includes('IP:')) {
+          const val = part.split('IP:')[1];
+          document.getElementById('wlan0').value = val;
+        } else if (part.includes('wwan:')) {
+          const val = part.split('wwan:')[1];
+          document.getElementById('wwan0').value = val;
+        } else if (part.includes('MODE:')) {
+          const val = part.split('MODE:')[1];
+          document.getElementById('wifimode').value = val;
+        } else if (part.includes('Route:')) {
+          const val = part.split('Route:')[1];
+          document.getElementById('route').value = val;
+        }
+      });
+    }
+
+    function startDemoTelemetry() {
+      if (demoInterval) clearInterval(demoInterval);
+      demoInterval = setInterval(() => {
+        if (!isDemoMode) return;
+        const simulatedData = "IP:192.168.1.100@wwan:10.0.0.42@MODE:STA@Route:WiFi";
+        handleStatusUpdate({
+          target: { value: new TextEncoder().encode(simulatedData) }
+        });
+      }, 5000);
+    }
+
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => log('Service Worker registered successfully.'))
+          .catch((err) => log(`Service Worker failed: ${err}`));
+      });
+    }
+  </script>
+</body>
+</html>
