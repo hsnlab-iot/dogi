@@ -14,14 +14,14 @@ body {
 /* General container styling: use grid to keep left column stacked vertically */
 .container {
     display: grid;
-    grid-template-columns: 1fr 300px; /* main column and tools column */
-    gap: 24px; /* space between columns */
-    padding: 12px 8px; /* reduced page horizontal padding */
+    /* A jobb oszlop fix 260px (vagy pl. clamp(200px, 20vw, 300px)), a bal oszlop kitölti a maradékot */
+    grid-template-columns: 1fr 260px; 
+    gap: 16px;
+    padding: 12px;
     box-sizing: border-box;
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;             /* Megkötés nélkül kitölti az iframe szélességét */
+    max-width: 100%;         /* Törölve a max-width: 1200px */
     min-height: 100vh;
-    min-height: 100dvh;
 }
 
 /* Force main-content into the left grid column and tools into the right */
@@ -196,21 +196,20 @@ textarea {
 /* Reasoning specific styling (4 lines) */
 /* reasoning is a readonly textarea now */
 #response-output {
-    min-height: 160px; /* Approx 4 lines */
-    height: 160px;
-    resize: none;
+    min-height: 120px;
+    height: 25vh;            /* Ablakmagasság-arányos skálázódás */
+    resize: vertical;        /* Engedélyezi a kézi átméretezést is */
     overflow-y: auto;
-    font-size: 24px; /* match requested text size */
+    font-size: 1.1rem;
 }
 
 /* Response specific styling (3 lines) */
 #tools-response-output {
-    /* approx 3 lines at 24px font-size */
-    min-height: 120px;
-    height: 120px;
-    resize: none;
+    min-height: 100px;
+    height: 20vh;
+    resize: vertical;
     overflow-y: auto;
-    font-size: 24px; /* match requested text size */
+    font-size: 1.1rem;
 }
 
 /* Make response content stack vertically (textarea then image) */

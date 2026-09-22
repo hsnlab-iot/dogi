@@ -197,6 +197,31 @@
         setStatsValue('stats-tokens', formatInteger(totalTokens));
         setStatsValue('stats-response-time', formatSeconds(elapsedSeconds));
     }
+
+    function insertPromptText(text) {
+        var promptInput = document.getElementById('prompt-input');
+        if (!promptInput) return;
+
+        var incoming = String(text || '').trim();
+        if (!incoming) return;
+
+        var isFocused = document.activeElement === promptInput;
+        var value = promptInput.value || '';
+
+        if (isFocused && typeof promptInput.selectionStart === 'number' && typeof promptInput.selectionEnd === 'number') {
+            var start = promptInput.selectionStart;
+            var end = promptInput.selectionEnd;
+            promptInput.value = value.slice(0, start) + incoming + value.slice(end);
+            var cursor = start + incoming.length;
+            promptInput.selectionStart = cursor;
+            promptInput.selectionEnd = cursor;
+            return;
+        }
+
+        var separator = value && !value.endsWith('\n') ? '\n' : '';
+        promptInput.value = value + separator + incoming;
+        promptInput.scrollTop = promptInput.scrollHeight;
+    }
     
     socket.on('ui_update_tools_response', function(data) {
         console.log('tools_response event', data.data);
@@ -315,6 +340,12 @@
         }
         else if (data.data == 'abort') {
             setToAbort();
+        }
+    });
+
+    socket.on('ui_update_prompt_insert', function(data) {
+        if (data && typeof data.data !== 'undefined') {
+            insertPromptText(data.data);
         }
     });
 
