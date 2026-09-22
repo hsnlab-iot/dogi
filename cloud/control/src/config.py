@@ -5,7 +5,7 @@ import importlib
 import re
 from pathlib import Path
 from boltons.fileutils import atomic_save
-import ollama as ollama_runtime
+import ollama_runtime
 try:
     tomllib = importlib.import_module('tomllib')
 except ModuleNotFoundError:
@@ -972,6 +972,7 @@ def get_tts_parameters():
 
     Returns:
         openai -> {'api_base', 'voice', 'model'}
+        opentts-> {'api_base', 'voice'}
         f5     -> {'reference_text', 'reference_wav', 'repo_id', 'ckpt_file', 'vocab_file'}
         other  -> None
     """
@@ -1021,6 +1022,12 @@ def get_tts_parameters():
                 'api_base': tts_api_base,
                 'voice': tts_voice,
                 'model': tts_model,
+            }
+        elif tts_protocol == 'opentts':
+            _state['tts_parameters'] = {
+                'tts_protocol': tts_protocol,
+                'api_base': tts_api_base,
+                'voice': tts_voice,
             }
         elif tts_protocol == 'f5':
             _state['tts_parameters'] = {

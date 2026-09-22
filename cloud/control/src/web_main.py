@@ -6,7 +6,7 @@ import urllib.request
 import urllib.parse
 import libtmux
 import config
-import ollama as ollama_runtime
+import ollama_runtime
 import time
 
 import utils
