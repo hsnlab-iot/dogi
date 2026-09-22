@@ -1,7 +1,7 @@
 [pupcard]
 language = "HUN"
 #model = "Racka:4b"
-model = "Qwen3.5:4b"
+model = "Qwen3.5:4b + Qwen3-VL:4b"
 tts = "TTS:HUN Diana"
 
 [general]
@@ -15,7 +15,7 @@ prompt = "hu"
 [models]
 general = "qwen3.5:4b"
 translation = ""
-vision = ""
+vision = "qwen3-vl:4b"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
@@ -48,4 +48,4 @@ stream_port = 5100
 list = ["highfive", "dice", "body", "visionprompt"]
 
 [skills]
-list = ["ovatos_mozgas"]
+list = ["hu_ovatos_mozgas", "hu_vizualis_elemzes"]

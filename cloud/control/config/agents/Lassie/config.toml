@@ -1,6 +1,6 @@
 [pupcard]
 language = "ENG"
-model = "Qwen3.5:4b"
+model = "Qwen3.5:4b + Qwen3-VL:4b"
 tts = "Meta ENG"
 
 [general]
@@ -14,7 +14,7 @@ prompt = "en"
 [models]
 general = "qwen3.5:4b"
 translation = ""
-vision = ""
+vision = "qwen3-vl:4b"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"

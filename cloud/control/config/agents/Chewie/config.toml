@@ -1,6 +1,6 @@
 [pupcard]
 language = "ENG"
-model = "lfm2.5:1.2b"
+model = "lfm2.5:1.2b + Qwen3-VL:4b"
 #model = "phi4-mini"
 tts = "Meta ENG"
 
@@ -16,7 +16,7 @@ prompt = "en"
 general = "lfm2.5-thinking:1.2b"
 #general = "phi4-mini:latest"
 translation = ""
-vision = ""
+vision = "qwen3-vl:4b"
 
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
