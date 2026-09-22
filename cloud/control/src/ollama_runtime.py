@@ -65,6 +65,13 @@ def _extract_gpu_utilization(model_item):
     return 0.0
 
 
+def _extract_details_value(model_item, key):
+    details = model_item.get('details') if isinstance(model_item, dict) else None
+    if not isinstance(details, dict):
+        return None
+    return details.get(key)
+
+
 def _normalize_ps_models(ps_payload):
     models = ps_payload.get('models', []) if isinstance(ps_payload, dict) else []
     if not isinstance(models, list):
@@ -76,11 +83,19 @@ def _normalize_ps_models(ps_payload):
             continue
 
         model_name = item.get('model') or 'unknown'
+        model_size = _extract_first_number(item, ['size', 'model_size'])
+        size_vram = _extract_first_number(item, ['size_vram', 'gpu_memory', 'gpu_bytes'])
+
         normalized.append(
             {
                 'model': str(model_name),
                 'gpu_utilization': round(_extract_gpu_utilization(item), 2),
                 'context_length': _extract_context_size(item),
+                'model_size_bytes': int(model_size) if model_size is not None else 0,
+                'gpu_vram_bytes': int(size_vram) if size_vram is not None else 0,
+                'parameter_size': str(_extract_details_value(item, 'parameter_size') or ''),
+                'quantization_level': str(_extract_details_value(item, 'quantization_level') or ''),
+                'family': str(_extract_details_value(item, 'family') or ''),
             }
         )
 

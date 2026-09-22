@@ -8,6 +8,11 @@ import libtmux
 import config
 import ollama_runtime
 import time
+import threading
+import socket
+import errno
+import json
+from datetime import datetime, timezone
 
 import utils
 import config
@@ -21,7 +26,103 @@ app = Flask(__name__)
 socketio = SocketIO(app)
 socketio.init_app(app, cors_allowed_origins="*")
 
+
+@app.after_request
+def _add_status_api_cors_headers(response):
+    path = str(request.path or '')
+    if path.startswith('/api/status'):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
 session = None
+
+_ping_lock = threading.Lock()
+_ping_state = {
+    'sequence': 0,
+    'timestamp': 0.0,
+    'timestamp_iso': '',
+    'robot_ip': '',
+    'port': 56789,
+    'timeout_seconds': 3.0,
+    'rtt_ms': -1.0,
+    'status': 'init',
+    'error': '',
+}
+
+
+def _utc_iso(ts):
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
+def _syn_rst_ping_once(robot_ip, port=56789, timeout_seconds=3.0):
+    started = time.monotonic()
+    if not robot_ip:
+        return -1.0, 'unavailable', 'ROBOT_IP is not defined'
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(float(timeout_seconds))
+        result = sock.connect_ex((robot_ip, int(port)))
+        elapsed_ms = (time.monotonic() - started) * 1000.0
+
+        # Closed port => RST -> connection refused (expected for SYN-RST timing).
+        if result == errno.ECONNREFUSED:
+            return round(elapsed_ms, 3), 'rst', ''
+
+        # Open port is not a SYN-RST result for this test.
+        if result == 0:
+            return -1.0, 'unexpected_open', 'port is open, expected RST on closed port'
+
+        # Timeout/unreachable or any other error => unavailable.
+        return -1.0, 'unavailable', f'connect_ex={result}'
+    except socket.timeout:
+        return -1.0, 'timeout', 'timeout'
+    except Exception as exc:
+        return -1.0, 'error', str(exc)
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+
+
+def _ping_worker_loop(interval_seconds=1.0):
+    period = max(0.2, float(interval_seconds))
+
+    while True:
+        started_wall = time.time()
+        robot_ip = str(os.environ.get('ROBOT_IP') or '').strip()
+        port = 56789
+        timeout_seconds = 3.0
+
+        rtt_ms, status, error_text = _syn_rst_ping_once(
+            robot_ip,
+            port=port,
+            timeout_seconds=timeout_seconds,
+        )
+
+        finished = time.time()
+        with _ping_lock:
+            _ping_state['sequence'] += 1
+            _ping_state['timestamp'] = finished
+            _ping_state['timestamp_iso'] = _utc_iso(finished)
+            _ping_state['robot_ip'] = robot_ip
+            _ping_state['port'] = port
+            _ping_state['timeout_seconds'] = timeout_seconds
+            _ping_state['rtt_ms'] = float(rtt_ms)
+            _ping_state['status'] = status
+            _ping_state['error'] = str(error_text or '')
+
+        elapsed = finished - started_wall
+        sleep_seconds = period - elapsed
+        if sleep_seconds > 0:
+            time.sleep(sleep_seconds)
+
+
+_ping_thread = threading.Thread(target=_ping_worker_loop, daemon=True)
+_ping_thread.start()
 
 pageconfig = [ \
     { 'name': 'Search', 'port': PORT, 'page': '/apps/search/', 'app': '/app/keresd.py' }, \
@@ -53,106 +154,101 @@ def _get_victoria_query_url():
     return base.rstrip('/')
 
 
+def _get_ping_snapshot():
+    with _ping_lock:
+        return dict(_ping_state)
+
+
+def _fetch_stream_stats(host, timeout_seconds=1.0):
+    url = f'http://{host}:5051/stats'
+    try:
+        req = urllib.request.Request(url, method='GET')
+        with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
+            payload = resp.read().decode('utf-8')
+        data = json.loads(payload)
+        if not isinstance(data, dict):
+            raise ValueError('invalid stats payload')
+        data['ok'] = True
+        data['source'] = url
+        return data
+    except Exception as exc:
+        return {
+            'ok': False,
+            'source': url,
+            'error': str(exc),
+            'fps': 0.0,
+            'bitrate_bps': 0.0,
+            'bitrate_mbps': 0.0,
+            'resolution': {'width': 0, 'height': 0, 'label': 'unknown'},
+            'sample_count': 0,
+            'window_seconds': 0.0,
+        }
+
+
+def _flatten_ollama_models(ollama_status):
+    flat = []
+    servers = ollama_status.get('servers') if isinstance(ollama_status, dict) else []
+    if not isinstance(servers, list):
+        return flat
+
+    for server in servers:
+        if not isinstance(server, dict):
+            continue
+        server_url = str(server.get('server_url') or '')
+        ps_models = server.get('ps_models') if isinstance(server.get('ps_models'), list) else []
+        for model in ps_models:
+            if not isinstance(model, dict):
+                continue
+            row = dict(model)
+            row['server_url'] = server_url
+            flat.append(row)
+
+    return flat
+
+
 @app.route('/api/status')
 def api_status():
-    """Query VictoriaMetrics for current streaming state and return it as JSON."""
-    victoria_base = _get_victoria_query_url()
-    if not victoria_base:
-        return jsonify({'status': 'victoria not configured', 'error': 'victoria not configured'})
+    """Return aggregated runtime status for streamer, ollama models and ping."""
+    host = urlparse(request.url_root).hostname or 'localhost'
+
+    streamer = _fetch_stream_stats(host, timeout_seconds=1.0)
+    ping = _get_ping_snapshot()
 
     try:
-        import json
-
-        def run_query(query, timeout=3):
-            # Generic instant query with nocache=1
-            params = urllib.parse.urlencode({'query': query, 'nocache': '1'})
-            url = f"{victoria_base}/api/v1/query?{params}"
-            req = urllib.request.Request(url, method='GET')
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                raw = resp.read().decode('utf-8')
-                return json.loads(raw), raw
-
-        def build_query(state):
-            return f'last_over_time({state}[90s]) and topk(1, tlast_over_time({state}[90s]))'
-
-        # streaming state: use last_over_time over the last 90s; missing -> OFF
-        streaming = None
-        raw_streaming = None
-        try:
-            data_tlast, raw_streaming = run_query(build_query('streamer_state_streaming'))
-            results = data_tlast.get('data', {}).get('result', [])
-            if results:
-                value = results[0].get('value', [None, None])[1]
-                try:
-                    streaming = int(float(value)) == 1
-                except (TypeError, ValueError):
-                    streaming = None
-            else:
-                streaming = False
-        except Exception:
-            streaming = None
-
-        # ollama GPU utilization (may contain multiple models)
-        gpu_parts = []
-        raw_ollama = None
-        try:
-            data_tlast, raw_ollama = run_query(build_query('ollama_state_gpu_utilization'))
-            results = data_tlast.get('data', {}).get('result', [])
-            if results:
-                for r in results:
-                    metric = r.get('metric', {})
-                    model = metric.get('model') or metric.get('name') or metric.get('__name__')
-                    value = r.get('value', [None, None])[1]
-                    if value is None:
-                        pct = 0
-                    else:
-                        try:
-                            pct = int(round(float(value)))
-                        except Exception:
-                            pct = -1
-                    gpu_parts.append((model, pct))
-        except Exception:
-            pass
-
-        def color_span(text, color):
-            return f"<span style=\"color:{color}\">{text}</span>"
-
-        # build streamer text and HTML
-        if streaming:
-            stream_text = 'ON'
-            stream_color = 'green'
-        else:
-            stream_text = 'OFF'
-            stream_color = 'red'
-
-        status_parts = [f"Streamer: {stream_text}"]
-        status_html_parts = ["Streamer: " + color_span(stream_text, stream_color)]
-
-        # ensure at least a default ollama entry
-        if not gpu_parts:
-            gpu_parts = [("none", 0)]
-
-        # append ollama/model parts
-        for model, pct in gpu_parts:
-            model_display = model or 'none'
-            pct_display = pct if pct is not None and pct >= 0 else 0
-            # colors: model green if name exists (not 'none'), else red; gpu green only at 100%
-            gpu_color = 'green' if pct_display == 100 else 'red'
-
-            status_parts.append(f"{model_display} GPU: {pct_display}%")
-            status_html_parts.append(f"{model_display} GPU: {color_span(str(pct_display), gpu_color)}%")
-
-        return jsonify({
-            'status': ' - '.join(status_parts),
-            'statusHTML': ' - '.join(status_html_parts),
-            'streamingResponse': raw_streaming,
-            'ollamaResponse': raw_ollama,
-        })
+        ollama_payload = ollama_runtime.get_runtime_status(include_ps=True)
     except Exception as exc:
-        return jsonify({'status': 'Error', 'error': str(exc)})
+        ollama_payload = {
+            'server_count': 0,
+            'servers': [],
+            'owner_to_server': {},
+            'updated_at': time.time(),
+            'error': str(exc),
+        }
+
+    ollama_models = _flatten_ollama_models(ollama_payload)
+
+    fps = float(streamer.get('fps') or 0.0)
+    ping_rtt = float(ping.get('rtt_ms') or -1.0)
+    model_count = len(ollama_models)
+
+    status_parts = [
+        f'Stream FPS: {fps:.2f}',
+        f'Ping: {ping_rtt:.2f} ms' if ping_rtt >= 0 else 'Ping: -1',
+        f'Ollama models: {model_count}',
+    ]
+
+    return jsonify({
+        'status': ' | '.join(status_parts),
+        'statusHTML': ' | '.join(status_parts),
+        'timestamp': time.time(),
+        'streamer': streamer,
+        'ping': ping,
+        'ollama': ollama_payload,
+        'ollama_models': ollama_models,
+    })
 
 
-@app.route('/api/ollama/status')
+@app.route('/api/status/ollama')
 def api_ollama_status():
     """Return live Ollama runtime worker status including /api/ps model state."""
     include_ps_arg = str(request.args.get('include_ps', '1')).strip().lower()
@@ -163,6 +259,21 @@ def api_ollama_status():
     except Exception as exc:
         return jsonify({'status': 'error', 'error': str(exc)}), 500
 
+@app.route('/api/status/ping')
+def api_ping_status():
+    with _ping_lock:
+        payload = dict(_ping_state)
+    return jsonify(payload)
+
+
+@app.route('/api/status/hf')
+def api_hf_status():
+    offline1 = os.getenv("HF_HUB_OFFLINE") or ""
+    offline2 = os.getenv("TRANSFORMERS_OFFLINE") or ""
+    if offline1 == "1" and offline2 == "1":
+        return {'status': 'offline'}
+    else:
+        return {'status': 'online'}
 
 @app.route('/reload', methods=['POST', 'GET'])
 def reload_config():

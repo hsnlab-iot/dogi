@@ -6,6 +6,7 @@ from flask import Flask, Response, make_response
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from threading import Thread, Lock
+from collections import deque
 
 PORT=5051
 
@@ -40,6 +41,11 @@ lock = Lock()
 lock_keresd = Lock()
 lock_kovesd = Lock()
 lock_mutasd = Lock()
+
+stats_lock = Lock()
+stream_samples = deque(maxlen=180)
+last_stream_width = 0
+last_stream_height = 0
 
 app = Flask(__name__, static_folder='./static')
 # This tells Flask it is behind exactly 1 reverse proxy and 
@@ -105,6 +111,61 @@ def mjpeg_response(generator):
     resp.headers['Access-Control-Allow-Origin'] = '*'
     return resp
 
+
+def _update_stream_stats(frame_width, frame_height, encoded_frame_size_bytes):
+    global last_stream_width, last_stream_height
+
+    now = time.monotonic()
+    with stats_lock:
+        stream_samples.append((now, int(encoded_frame_size_bytes)))
+        last_stream_width = int(frame_width)
+        last_stream_height = int(frame_height)
+
+
+def _compute_stream_stats(window_seconds=5.0):
+    now = time.monotonic()
+    cutoff = now - float(window_seconds)
+
+    with stats_lock:
+        while stream_samples and stream_samples[0][0] < cutoff:
+            stream_samples.popleft()
+
+        samples = list(stream_samples)
+        width = int(last_stream_width)
+        height = int(last_stream_height)
+
+    if len(samples) < 2:
+        return {
+            'window_seconds': float(window_seconds),
+            'fps': 0.0,
+            'bitrate_bps': 0.0,
+            'bitrate_mbps': 0.0,
+            'resolution': {
+                'width': width,
+                'height': height,
+                'label': f'{width}x{height}' if width and height else 'unknown',
+            },
+            'sample_count': len(samples),
+        }
+
+    duration = max(1e-6, samples[-1][0] - samples[0][0])
+    fps = (len(samples) - 1) / duration
+    bytes_total = sum(item[1] for item in samples)
+    bitrate_bps = (bytes_total * 8.0) / duration
+
+    return {
+        'window_seconds': float(window_seconds),
+        'fps': round(float(fps), 2),
+        'bitrate_bps': round(float(bitrate_bps), 2),
+        'bitrate_mbps': round(float(bitrate_bps / 1_000_000.0), 4),
+        'resolution': {
+            'width': width,
+            'height': height,
+            'label': f'{width}x{height}' if width and height else 'unknown',
+        },
+        'sample_count': len(samples),
+    }
+
 @app.route("/mjpeg")
 def mjpeg():
     return mjpeg_response(gen_mjpeg())
@@ -135,6 +196,11 @@ def mjpeg_kovesd():
 def mjpeg_mutasd():
     return mjpeg_response(gen_mjpeg_mutasd())
 
+
+@app.route('/stats')
+def stream_stats():
+    return _compute_stream_stats(window_seconds=5.0)
+
 def get_frames():
     global last_frame
 
@@ -150,6 +216,8 @@ def get_frames():
             _, frame = cv2.imencode('.jpg', img_array)
             with lock:
                 last_frame = frame.copy()
+
+            _update_stream_stats(width, height, len(frame))
 
         except zmq.error.Again:
             pass  # No frame received, continue processing

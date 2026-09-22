@@ -55,7 +55,21 @@
 
         <!-- Előkészített felület a kártyáknak (pl. Ollama) -->
         <div id="cards-container" class="cards-wrapper">
-            <!-- Dinamikus kártyák helye -->
+            <section class="status-card">
+                <h3>Ollama Models (ps)</h3>
+                <div id="status-ollama" class="status-scroll">Loading...</div>
+            </section>
+
+            <section class="status-card">
+                <h3>Robot Ping</h3>
+                <div id="status-ping" class="status-line">Loading...</div>
+                <canvas id="ping-chart" width="420" height="150"></canvas>
+            </section>
+
+            <section class="status-card">
+                <h3>Video Stream</h3>
+                <div id="status-stream" class="status-scroll">Loading...</div>
+            </section>
         </div>
     </div>
 </div>
@@ -117,6 +131,252 @@
                 reader.readAsDataURL(blob);
             });
     });
+
+    var pingHistory = [];
+    var pingHistoryMax = 60;
+    var statusOllama = document.getElementById('status-ollama');
+    var statusPing = document.getElementById('status-ping');
+    var statusStream = document.getElementById('status-stream');
+    var pingChart = document.getElementById('ping-chart');
+    var pingCtx = pingChart.getContext('2d');
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    function drawPingChart() {
+        if (!pingCtx || !pingChart) return;
+
+        var width = pingChart.width;
+        var height = pingChart.height;
+        pingCtx.clearRect(0, 0, width, height);
+
+        pingCtx.fillStyle = '#0d1117';
+        pingCtx.fillRect(0, 0, width, height);
+
+        pingCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+        pingCtx.lineWidth = 1;
+        pingCtx.beginPath();
+        pingCtx.moveTo(36, 8);
+        pingCtx.lineTo(36, height - 24);
+        pingCtx.lineTo(width - 8, height - 24);
+        pingCtx.stroke();
+
+        var values = pingHistory.filter(function(item) { return item !== null; });
+        if (!values.length) {
+            pingCtx.fillStyle = '#9ca3af';
+            pingCtx.font = '12px sans-serif';
+            pingCtx.fillText('No ping samples yet', 46, 26);
+            return;
+        }
+
+        var maxValue = Math.max(10, Math.ceil(Math.max.apply(null, values) * 1.25));
+        var minValue = 0;
+        var chartLeft = 36;
+        var chartTop = 8;
+        var chartWidth = width - chartLeft - 8;
+        var chartHeight = height - chartTop - 32;
+
+        pingCtx.strokeStyle = 'rgba(255,255,255,0.12)';
+        pingCtx.fillStyle = '#9ca3af';
+        pingCtx.font = '10px sans-serif';
+        for (var i = 0; i <= 4; i++) {
+            var y = chartTop + (chartHeight * i / 4);
+            pingCtx.beginPath();
+            pingCtx.moveTo(chartLeft, y);
+            pingCtx.lineTo(chartLeft + chartWidth, y);
+            pingCtx.stroke();
+            var tickValue = Math.round(maxValue - ((maxValue - minValue) * i / 4));
+            pingCtx.fillText(String(tickValue), 4, y + 3);
+        }
+
+        var points = [];
+        var denom = Math.max(1, pingHistory.length - 1);
+        pingHistory.forEach(function(value, index) {
+            if (value === null) return;
+            var x = chartLeft + (chartWidth * index / denom);
+            var yRatio = (value - minValue) / Math.max(1, (maxValue - minValue));
+            var y = chartTop + chartHeight - (yRatio * chartHeight);
+            points.push({ x: x, y: y, value: value });
+        });
+
+        if (!points.length) return;
+
+        pingCtx.strokeStyle = '#34d399';
+        pingCtx.lineWidth = 2;
+        pingCtx.beginPath();
+        pingCtx.moveTo(points[0].x, points[0].y);
+        for (var p = 1; p < points.length; p++) {
+            pingCtx.lineTo(points[p].x, points[p].y);
+        }
+        pingCtx.stroke();
+
+        var lastPoint = points[points.length - 1];
+        pingCtx.fillStyle = '#34d399';
+        pingCtx.beginPath();
+        pingCtx.arc(lastPoint.x, lastPoint.y, 3, 0, Math.PI * 2);
+        pingCtx.fill();
+    }
+
+    function renderOllamaStatus(ollamaPayload) {
+        if (!statusOllama) return;
+
+        var servers = Array.isArray(ollamaPayload && ollamaPayload.servers) ? ollamaPayload.servers : [];
+        if (!servers.length) {
+            statusOllama.innerHTML = '<div class="mono-line">No active Ollama server workers.</div>';
+            return;
+        }
+
+        var html = [];
+        servers.forEach(function(server) {
+            html.push('<div class="status-block">');
+            html.push('<div class="mono-line"><strong>Server:</strong> ' + escapeHtml(server.server_url || 'unknown') + '</div>');
+
+            var psModels = Array.isArray(server.ps_models) ? server.ps_models : [];
+            if (!psModels.length) {
+                html.push('<div class="mono-line">No loaded models reported by ps.</div>');
+            } else {
+                psModels.forEach(function(modelEntry) {
+                    var modelName = escapeHtml(modelEntry.model || 'unknown');
+                    var gpu = Number(modelEntry.gpu_utilization || 0).toFixed(2);
+                    var ctx = escapeHtml(modelEntry.context_length || 0);
+                    var sizeBytes = Number(modelEntry.model_size_bytes || 0);
+                    var vramBytes = Number(modelEntry.gpu_vram_bytes || 0);
+                    var sizeGb = (sizeBytes / (1024 * 1024 * 1024)).toFixed(2);
+                    var vramGb = (vramBytes / (1024 * 1024 * 1024)).toFixed(2);
+                    var quant = escapeHtml(modelEntry.quantization_level || '-');
+                    var family = escapeHtml(modelEntry.family || '-');
+                    html.push(
+                        '<div class="mono-line">• ' + modelName
+                        + ' | size: ' + sizeGb + ' GB'
+                        + ' | vram: ' + vramGb + ' GB'
+                        + ' | GPU: ' + gpu + '%'
+                        + ' | ctx: ' + ctx
+                        + ' | q: ' + quant
+                        + ' | family: ' + family
+                        + '</div>'
+                    );
+                });
+            }
+            html.push('</div>');
+        });
+
+        statusOllama.innerHTML = html.join('');
+    }
+
+    function renderPingStatus(pingPayload) {
+        if (!statusPing) return;
+
+        var robotIp = pingPayload && pingPayload.robot_ip ? String(pingPayload.robot_ip) : 'n/a';
+        var ok = !!(pingPayload && pingPayload.status === 'rst');
+        var sequence = pingPayload && pingPayload.sequence !== undefined ? String(pingPayload.sequence) : '-';
+        var timestampIso = pingPayload && pingPayload.timestamp_iso ? String(pingPayload.timestamp_iso) : '-';
+        var rtt = pingPayload && pingPayload.rtt_ms !== null && pingPayload.rtt_ms !== undefined
+            ? Number(pingPayload.rtt_ms)
+            : null;
+
+        if (rtt !== null && isFinite(rtt) && rtt >= 0) {
+            pingHistory.push(rtt);
+        } else {
+            pingHistory.push(null);
+        }
+        while (pingHistory.length > pingHistoryMax) {
+            pingHistory.shift();
+        }
+
+        var line = 'IP: ' + robotIp + ':56789 | seq=' + sequence + ' | ';
+        if (rtt !== null && isFinite(rtt) && rtt >= 0) {
+            line += 'RTT: ' + rtt.toFixed(2) + ' ms';
+        } else {
+            line += 'RTT: -1';
+            if (pingPayload && pingPayload.error) {
+                line += ' (' + String(pingPayload.error) + ')';
+            }
+        }
+
+        line += ' | ' + timestampIso;
+
+        statusPing.textContent = line;
+        statusPing.className = ok ? 'status-line good' : 'status-line bad';
+        drawPingChart();
+    }
+
+    function renderStreamStatus(streamPayload) {
+        if (!statusStream) return;
+
+        if (!streamPayload || !streamPayload.ok) {
+            var err = streamPayload && streamPayload.error ? String(streamPayload.error) : 'stream stats unavailable';
+            statusStream.innerHTML = '<div class="mono-line">' + escapeHtml(err) + '</div>';
+            return;
+        }
+
+        var resolution = streamPayload.resolution || {};
+        var fps = Number(streamPayload.fps || 0).toFixed(2);
+        var bitrateMbps = Number(streamPayload.bitrate_mbps || 0).toFixed(3);
+        var bitrateBps = Number(streamPayload.bitrate_bps || 0).toFixed(0);
+        var label = resolution.label || 'unknown';
+
+        statusStream.innerHTML = [
+            '<div class="mono-line"><strong>Resolution:</strong> ' + escapeHtml(label) + '</div>',
+            '<div class="mono-line"><strong>FPS:</strong> ' + fps + '</div>',
+            '<div class="mono-line"><strong>Bitrate:</strong> ' + bitrateMbps + ' Mbps (' + bitrateBps + ' bps)</div>',
+            '<div class="mono-line"><strong>Samples:</strong> ' + escapeHtml(streamPayload.sample_count || 0) + ' over ' + escapeHtml(streamPayload.window_seconds || 0) + 's</div>'
+        ].join('');
+    }
+
+    function updateSystemStatus() {
+        var ollamaUrl = 'http://{{ host }}:5059/api/status/ollama?include_ps=1';
+        var pingUrl = 'http://{{ host }}:5059/api/status/ping';
+        var streamUrl = 'http://{{ host }}:5059/video/stats';
+
+        function fetchJsonOrThrow(url) {
+            return fetch(url).then(function(response) {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status + ' for ' + url);
+                }
+                return response.json();
+            });
+        }
+
+        Promise.allSettled([
+            fetchJsonOrThrow(ollamaUrl),
+            fetchJsonOrThrow(pingUrl),
+            fetchJsonOrThrow(streamUrl)
+        ])
+        .then(function(results) {
+            var ollamaResult = results[0];
+            var pingResult = results[1];
+            var streamResult = results[2];
+
+            if (ollamaResult.status === 'fulfilled') {
+                renderOllamaStatus(ollamaResult.value);
+            } else {
+                statusOllama.textContent = 'ollama fetch failed: ' + String(ollamaResult.reason || 'unknown error');
+            }
+
+            if (pingResult.status === 'fulfilled') {
+                renderPingStatus(pingResult.value);
+            } else {
+                statusPing.textContent = 'ping fetch failed: ' + String(pingResult.reason || 'unknown error');
+            }
+
+            if (streamResult.status === 'fulfilled') {
+                var streamPayload = streamResult.value;
+                streamPayload.ok = true;
+                renderStreamStatus(streamPayload);
+            } else {
+                statusStream.textContent = 'stream fetch failed: ' + String(streamResult.reason || 'unknown error');
+            }
+        });
+    }
+
+    updateSystemStatus();
+    setInterval(updateSystemStatus, 1000);
 </script>
 
 </body>

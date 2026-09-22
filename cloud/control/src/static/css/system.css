@@ -147,3 +147,66 @@ body {
     flex-direction: column;
     gap: 10px;
 }
+
+.status-card {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+}
+
+.status-card h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: #dbeafe;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.status-scroll {
+    max-height: 140px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.status-line {
+    font-size: 12px;
+    margin-bottom: 8px;
+    color: #fef08a;
+}
+
+.status-line.good {
+    color: #86efac;
+}
+
+.status-line.bad {
+    color: #fca5a5;
+}
+
+.status-block {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    padding: 6px;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.mono-line {
+    font-family: "DejaVu Sans Mono", "Consolas", monospace;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #f8fafc;
+    overflow-wrap: anywhere;
+}
+
+#ping-chart {
+    width: 100%;
+    max-width: 100%;
+    height: 150px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    background: #0d1117;
+    display: block;
+}
