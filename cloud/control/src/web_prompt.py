@@ -200,6 +200,8 @@ def handle_event(data):
         socketio.emit('ui_update_tool_selection', data)
     elif data['type'] == 'prompt':
         socketio.emit('ui_update_prompt', data)
+    elif data['type'] == 'prompt_insert':
+        socketio.emit('ui_update_prompt_insert', data)
 
 @socketio.on('reload')
 def handle_event(data):

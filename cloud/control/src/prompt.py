@@ -23,8 +23,14 @@ import config
 import RemoteMCPManager
 
 import socketio
+try:
+    from ably import AblyRealtime
+except ImportError:
+    AblyRealtime = None
 
 PORT = 5056
+ROOM_ID = os.getenv("ABLY_ROOM_ID", "dogy-chat")
+ABLY_API_KEY = (os.getenv("ABLY_USER_KEY"))
 
 DEBUG_mode = os.getenv('DEBUG', '0') == '1'
 sio = socketio.Client()
@@ -40,8 +46,75 @@ worker_thread = None
 worker_stop_event = None
 speak_enabled = False
 
+# STT bridge globals
+stt_thread = None
+stt_lock = threading.Lock()
+
 # History context
 message_history = []
+
+
+def _extract_message_data(message):
+    data = getattr(message, 'data', {})
+    return data if isinstance(data, dict) else {}
+
+
+async def _stt_listener_main():
+    if AblyRealtime is None:
+        print('[stt] Ably package is not installed; STT bridge disabled')
+        return
+
+    if not ABLY_API_KEY:
+        print('[stt] No Ably API key found; STT bridge disabled')
+        return
+
+    try:
+        ably = AblyRealtime(ABLY_API_KEY)
+        channel = ably.channels.get(f"stt-{ROOM_ID}")
+        control_channel = ably.channels.get(f"stt-control-{ROOM_ID}")
+        current_active_user = "None (MUTE)"
+
+        def on_floor_change(message):
+            nonlocal current_active_user
+            data = _extract_message_data(message)
+            current_active_user = data.get('activeUser') or "None (MUTE)"
+
+        def on_speech_message(message):
+            data = _extract_message_data(message)
+            sender = data.get('sender')
+            text = str(data.get('text') or '').strip()
+
+            if not text:
+                return
+
+            if sender and sender == current_active_user:
+                sio.emit('ui_update', {
+                    'type': 'prompt_insert',
+                    'data': text,
+                })
+
+        await control_channel.subscribe('active-floor', on_floor_change)
+        await channel.subscribe('speech', on_speech_message)
+        print(f"[stt] Listening on room: {ROOM_ID}")
+
+        await asyncio.Event().wait()
+    except Exception as e:
+        print(f"[stt] listener error: {e}")
+
+
+def _start_stt_listener():
+    global stt_thread
+    with stt_lock:
+        if stt_thread and stt_thread.is_alive():
+            return
+
+        def runner():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(_stt_listener_main())
+
+        stt_thread = threading.Thread(target=runner, daemon=True)
+        stt_thread.start()
 
 def _call_tool_with_timeout(rmcp, function_name: str, function_args: dict, timeout_seconds: float = 60.0) -> CallToolResult:
     """Call tool with timeout to prevent indefinite hangs."""
@@ -395,6 +468,7 @@ if __name__ == '__main__':
     sio.connect(f'http://localhost:{PORT}', socketio_path='/socket.io/') 
 
     connect_mcp_servers()
+    _start_stt_listener()
 
     xtools = [] 
     for tool in tools:
