@@ -31,9 +31,20 @@
     <div class="info-window" role="dialog" aria-modal="true" aria-labelledby="info-title">
         <div class="info-window-header">
             <h2 id="info-title">Pupality Info</h2>
-            <button id="info-close" class="info-close" aria-label="Close info">Close</button>
+            <div class="info-header-controls">
+                <div class="text-size-controls" role="group" aria-label="Text size controls">
+                    <button id="font-normal" class="text-size-button is-active" type="button" title="Normal text size" aria-label="Normal text size">A</button>
+                    <button id="font-large" class="text-size-button" type="button" title="Large text size" aria-label="Large text size">A+</button>
+                    <button id="font-xlarge" class="text-size-button" type="button" title="Extra large text size" aria-label="Extra large text size">A++</button>
+                </div>
+                <button id="info-back" class="info-back" type="button" aria-label="Go back" hidden>Back</button>
+                <button id="info-close" class="info-close" aria-label="Close info">Close</button>
+            </div>
         </div>
-        <div id="info-content" class="info-content"></div>
+        <div id="info-content" class="info-content size-normal">
+            <div id="info-content-main"></div>
+            <div id="info-content-detail" hidden></div>
+        </div>
     </div>
 </div>
 
@@ -47,6 +58,10 @@
     var activeInfoName = '';
     var infoOverlay = null;
     var infoContent = null;
+    var infoMainContent = null;
+    var infoDetailContent = null;
+    var infoBackButton = null;
+    var activeInfoPayload = null;
 
     function normalizePupalities(payload) {
         if (Array.isArray(payload)) return payload;
@@ -77,6 +92,135 @@
         row.appendChild(key);
         row.appendChild(content);
         return row;
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    function setInfoTextSize(sizeName) {
+        if (!infoContent) return;
+        infoContent.classList.remove('size-normal', 'size-large', 'size-xlarge');
+
+        var normalized = sizeName;
+        if (normalized !== 'size-large' && normalized !== 'size-xlarge') {
+            normalized = 'size-normal';
+        }
+        infoContent.classList.add(normalized);
+
+        ['font-normal', 'font-large', 'font-xlarge'].forEach(function(id) {
+            var button = document.getElementById(id);
+            if (!button) return;
+            button.classList.remove('is-active');
+        });
+
+        var activeButtonId = 'font-normal';
+        if (normalized === 'size-large') activeButtonId = 'font-large';
+        if (normalized === 'size-xlarge') activeButtonId = 'font-xlarge';
+
+        var activeButton = document.getElementById(activeButtonId);
+        if (activeButton) {
+            activeButton.classList.add('is-active');
+        }
+    }
+
+    function showInfoMainPage() {
+        if (!infoMainContent || !infoDetailContent || !infoBackButton) return;
+        infoMainContent.hidden = false;
+        infoDetailContent.hidden = true;
+        infoBackButton.hidden = true;
+    }
+
+    function showInfoDetailPage(title, summary, details, bodyText) {
+        if (!infoMainContent || !infoDetailContent || !infoBackButton) return;
+
+        infoDetailContent.innerHTML = '';
+
+        var section = document.createElement('section');
+        section.className = 'info-section';
+
+        var heading = document.createElement('h3');
+        heading.textContent = title || 'Details';
+        section.appendChild(heading);
+
+        if (summary) {
+            var summaryEl = document.createElement('p');
+            summaryEl.className = 'detail-summary';
+            summaryEl.textContent = summary;
+            section.appendChild(summaryEl);
+        }
+
+        if (Array.isArray(details) && details.length) {
+            var meta = document.createElement('ul');
+            meta.className = 'info-list';
+            details.forEach(function(item) {
+                if (!item || !item.label) return;
+                var li = document.createElement('li');
+                if (item.href) {
+                    var link = document.createElement('a');
+                    link.className = 'info-link';
+                    link.href = item.href;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = item.label + ': ' + (item.value || item.href);
+                    li.appendChild(link);
+                } else {
+                    li.textContent = item.label + ': ' + (item.value || '-');
+                }
+                meta.appendChild(li);
+            });
+            section.appendChild(meta);
+        }
+
+        if (bodyText) {
+            var body = document.createElement('pre');
+            body.className = 'soul-text detail-body';
+            body.textContent = bodyText;
+            section.appendChild(body);
+        }
+
+        infoDetailContent.appendChild(section);
+        infoMainContent.hidden = true;
+        infoDetailContent.hidden = false;
+        infoBackButton.hidden = false;
+    }
+
+    function buildToolLookup(tools) {
+        var map = {};
+
+        if (!Array.isArray(tools)) return map;
+
+        tools.forEach(function(tool) {
+            if (!tool || tool.available === false) return;
+            var keys = [];
+            if (tool.ref) keys.push(String(tool.ref));
+            if (tool.name) keys.push(String(tool.name));
+            if (Array.isArray(tool.tags)) {
+                tool.tags.forEach(function(tag) {
+                    if (tag) keys.push(String(tag));
+                });
+            }
+            if (Array.isArray(tool.provided_mcp_tools)) {
+                tool.provided_mcp_tools.forEach(function(capability) {
+                    if (capability) keys.push(String(capability));
+                    var slashParts = String(capability || '').split('/');
+                    if (slashParts.length > 1 && slashParts[1]) {
+                        keys.push(slashParts[1]);
+                    }
+                });
+            }
+
+            keys.forEach(function(key) {
+                map[key] = tool;
+            });
+        });
+
+        return map;
     }
 
     function buildCard(item) {
@@ -172,10 +316,13 @@
     }
 
     function hideInfo() {
-        if (!infoOverlay || !infoContent) return;
+        if (!infoOverlay || !infoContent || !infoMainContent || !infoDetailContent) return;
         infoOverlay.hidden = true;
-        infoContent.innerHTML = '';
+        infoMainContent.innerHTML = '';
+        infoDetailContent.innerHTML = '';
+        showInfoMainPage();
         activeInfoName = '';
+        activeInfoPayload = null;
     }
 
     function renderToolsSection(tools) {
@@ -199,7 +346,48 @@
                 var name = tool && tool.name ? String(tool.name) : String(tool.ref || 'unknown');
                 var type = tool && tool.type ? String(tool.type) : '-';
                 var url = tool && tool.url ? String(tool.url) : '-';
-                li.textContent = name + ' [' + type + '] ' + url;
+
+                if (tool && tool.available === false) {
+                    li.textContent = name + ' [missing descriptor]';
+                    li.className = 'skill-unavailable';
+                    list.appendChild(li);
+                    return;
+                }
+
+                var link = document.createElement('a');
+                link.href = '#';
+                link.className = 'info-link';
+                link.textContent = name + ' [' + type + '] ' + url;
+                link.addEventListener('click', function(event) {
+                    event.preventDefault();
+
+                    var details = [
+                        { label: 'Type', value: type },
+                        { label: 'Endpoint', value: url },
+                    ];
+
+                    if (tool && tool.file) {
+                        details.push({ label: 'Descriptor file', value: String(tool.file) });
+                    }
+
+                    if (tool && tool.source_file) {
+                        details.push({ label: 'Source file', value: String(tool.source_file) });
+                    }
+
+                    if (tool && tool.url && String(tool.url).startsWith('http')) {
+                        details.push({ label: 'Open endpoint', value: String(tool.url), href: String(tool.url) });
+                    }
+
+                    var summary = tool && tool.description ? String(tool.description) : 'No description available.';
+                    var body = '';
+                    if (Array.isArray(tool && tool.provided_mcp_tools) && tool.provided_mcp_tools.length) {
+                        body = 'Provided MCP tools:\n' + tool.provided_mcp_tools.join('\n');
+                    }
+
+                    showInfoDetailPage(name, summary, details, body);
+                });
+
+                li.appendChild(link);
                 list.appendChild(li);
             });
         }
@@ -208,27 +396,7 @@
         return section;
     }
 
-    function _skillsLineText(skill, unavailable) {
-        var skillName = skill && skill.name ? String(skill.name) : String((skill && skill.id) || 'unknown-skill');
-        var required = Array.isArray(skill && skill.required_mcp_tools) ? skill.required_mcp_tools : [];
-        var missing = Array.isArray(skill && skill.missing_required_mcp_tools) ? skill.missing_required_mcp_tools : [];
-
-        if (!required.length) return skillName;
-
-        if (!unavailable) {
-            return skillName + ' (' + required.join(', ') + ')';
-        }
-
-        var rendered = required.map(function(dep) {
-            if (missing.indexOf(dep) >= 0) {
-                return '--' + dep + '--';
-            }
-            return dep;
-        });
-        return skillName + ' (' + rendered.join(', ') + ')';
-    }
-
-    function renderSkillsSection(availableSkills, unavailableSkills) {
+    function renderSkillsSection(availableSkills, unavailableSkills, toolsLookup) {
         var section = document.createElement('section');
         section.className = 'info-section';
 
@@ -239,38 +407,79 @@
         var list = document.createElement('ul');
         list.className = 'info-list';
 
+        function appendSkill(skill, unavailable) {
+            var li = document.createElement('li');
+            if (unavailable) li.className = 'skill-unavailable';
+
+            var skillName = skill && skill.name ? String(skill.name) : String((skill && skill.id) || 'unknown-skill');
+            var summary = skill && skill.description ? String(skill.description) : 'No description available.';
+            var details = [];
+            if (skill && skill.id) details.push({ label: 'ID', value: String(skill.id) });
+            if (skill && skill.doc_url) details.push({ label: 'Doc URL', value: String(skill.doc_url), href: String(skill.doc_url) });
+
+            var skillLink = document.createElement('a');
+            skillLink.href = '#';
+            skillLink.className = 'info-link';
+            skillLink.textContent = skillName;
+            skillLink.addEventListener('click', function(event) {
+                event.preventDefault();
+                showInfoDetailPage(skillName, summary, details, skill && skill.content ? String(skill.content) : '');
+            });
+            li.appendChild(skillLink);
+
+            var required = Array.isArray(skill && skill.required_mcp_tools) ? skill.required_mcp_tools : [];
+            var missing = Array.isArray(skill && skill.missing_required_mcp_tools) ? skill.missing_required_mcp_tools : [];
+
+            if (required.length) {
+                li.appendChild(document.createTextNode(' ('));
+                required.forEach(function(dep, index) {
+                    var depText = String(dep);
+                    var depTool = toolsLookup[depText] || toolsLookup[depText.split('/')[1] || depText];
+
+                    if (depTool) {
+                        var depLink = document.createElement('a');
+                        depLink.href = '#';
+                        depLink.className = 'info-link dep-link';
+                        depLink.textContent = depText;
+                        depLink.addEventListener('click', function(event) {
+                            event.preventDefault();
+                            var depName = depTool.name ? String(depTool.name) : String(depTool.ref || depText);
+                            var depSummary = depTool.description ? String(depTool.description) : 'No description available.';
+                            var depDetails = [
+                                { label: 'Type', value: depTool.type ? String(depTool.type) : '-' },
+                                { label: 'Endpoint', value: depTool.url ? String(depTool.url) : '-' },
+                            ];
+                            showInfoDetailPage(depName, depSummary, depDetails, '');
+                        });
+                        li.appendChild(depLink);
+                    } else {
+                        var depSpan = document.createElement('span');
+                        depSpan.textContent = depText;
+                        if (missing.indexOf(depText) >= 0) {
+                            depSpan.className = 'skill-missing-dep';
+                        }
+                        li.appendChild(depSpan);
+                    }
+
+                    if (index < required.length - 1) {
+                        li.appendChild(document.createTextNode(', '));
+                    }
+                });
+                li.appendChild(document.createTextNode(')'));
+            }
+
+            list.appendChild(li);
+        }
+
         if (Array.isArray(availableSkills) && availableSkills.length) {
             availableSkills.forEach(function(skill) {
-                var li = document.createElement('li');
-                li.textContent = _skillsLineText(skill, false);
-                list.appendChild(li);
+                appendSkill(skill, false);
             });
         }
 
         if (Array.isArray(unavailableSkills) && unavailableSkills.length) {
             unavailableSkills.forEach(function(skill) {
-                var li = document.createElement('li');
-                li.className = 'skill-unavailable';
-
-                var lineText = _skillsLineText(skill, true);
-                if (lineText.indexOf('--') >= 0) {
-                    var fragments = lineText.split(/(--[^-]+--)/g);
-                    fragments.forEach(function(fragment) {
-                        if (!fragment) return;
-                        if (fragment.startsWith('--') && fragment.endsWith('--')) {
-                            var miss = document.createElement('span');
-                            miss.className = 'skill-missing-dep';
-                            miss.textContent = fragment.slice(2, -2);
-                            li.appendChild(miss);
-                        } else {
-                            li.appendChild(document.createTextNode(fragment));
-                        }
-                    });
-                } else {
-                    li.textContent = lineText;
-                }
-
-                list.appendChild(li);
+                appendSkill(skill, true);
             });
         }
 
@@ -285,9 +494,13 @@
     }
 
     function renderInfo(payload) {
-        if (!infoOverlay || !infoContent) return;
+        if (!infoOverlay || !infoMainContent) return;
 
-        infoContent.innerHTML = '';
+        activeInfoPayload = payload || {};
+
+        infoMainContent.innerHTML = '';
+
+        var toolsLookup = buildToolLookup(payload && payload.tools);
 
         var topSection = document.createElement('section');
         topSection.className = 'info-section info-top';
@@ -314,11 +527,18 @@
 
         topSection.appendChild(img);
         topSection.appendChild(soulWrap);
-        infoContent.appendChild(topSection);
+        infoMainContent.appendChild(topSection);
 
-        infoContent.appendChild(renderToolsSection(payload && payload.tools));
-        infoContent.appendChild(renderSkillsSection(payload && payload.skills_available, payload && payload.skills_unavailable));
+        infoMainContent.appendChild(renderToolsSection(payload && payload.tools));
+        infoMainContent.appendChild(
+            renderSkillsSection(
+                payload && payload.skills_available,
+                payload && payload.skills_unavailable,
+                toolsLookup
+            )
+        );
 
+        showInfoMainPage();
         infoOverlay.hidden = false;
     }
 
@@ -366,6 +586,20 @@
 
     infoOverlay = document.getElementById('info-overlay');
     infoContent = document.getElementById('info-content');
+    infoMainContent = document.getElementById('info-content-main');
+    infoDetailContent = document.getElementById('info-content-detail');
+    infoBackButton = document.getElementById('info-back');
+
+    document.getElementById('font-normal').addEventListener('click', function() {
+        setInfoTextSize('size-normal');
+    });
+    document.getElementById('font-large').addEventListener('click', function() {
+        setInfoTextSize('size-large');
+    });
+    document.getElementById('font-xlarge').addEventListener('click', function() {
+        setInfoTextSize('size-xlarge');
+    });
+    infoBackButton.addEventListener('click', showInfoMainPage);
 
     document.getElementById('info-close').addEventListener('click', hideInfo);
     infoOverlay.addEventListener('click', function(event) {

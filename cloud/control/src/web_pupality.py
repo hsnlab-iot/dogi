@@ -271,6 +271,14 @@ def get_pupality_info(agent_name):
         metadata, _body = _parse_skill_frontmatter(raw)
         skill_id = str(metadata.get('id') or skill_ref)
         skill_name = str(metadata.get('name') or skill_id)
+        skill_description = str(metadata.get('description') or '').strip()
+        skill_doc_url = str(
+            metadata.get('url')
+            or metadata.get('link')
+            or metadata.get('doc_url')
+            or ''
+        ).strip()
+        skill_content = str(_body or '').strip()
         required = metadata.get('required_mcp_tools') if isinstance(metadata, dict) else []
         if not isinstance(required, list):
             required = []
@@ -281,6 +289,9 @@ def get_pupality_info(agent_name):
             payload['skills_unavailable'].append({
                 'id': skill_id,
                 'name': skill_name,
+                'description': skill_description,
+                'doc_url': skill_doc_url,
+                'content': skill_content,
                 'required_mcp_tools': required,
                 'missing_required_mcp_tools': missing,
                 'reason': 'missing_required_mcp_tools',
@@ -289,6 +300,9 @@ def get_pupality_info(agent_name):
             payload['skills_available'].append({
                 'id': skill_id,
                 'name': skill_name,
+                'description': skill_description,
+                'doc_url': skill_doc_url,
+                'content': skill_content,
                 'required_mcp_tools': required,
             })
 
