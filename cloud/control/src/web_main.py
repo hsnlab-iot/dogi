@@ -6,6 +6,7 @@ import urllib.request
 import urllib.parse
 import libtmux
 import config
+import ollama as ollama_runtime
 import time
 
 import utils
@@ -149,6 +150,18 @@ def api_status():
         })
     except Exception as exc:
         return jsonify({'status': 'Error', 'error': str(exc)})
+
+
+@app.route('/api/ollama/status')
+def api_ollama_status():
+    """Return live Ollama runtime worker status including /api/ps model state."""
+    include_ps_arg = str(request.args.get('include_ps', '1')).strip().lower()
+    include_ps = include_ps_arg in ('1', 'true', 'yes', 'on')
+
+    try:
+        return jsonify(ollama_runtime.get_runtime_status(include_ps=include_ps))
+    except Exception as exc:
+        return jsonify({'status': 'error', 'error': str(exc)}), 500
 
 
 @app.route('/reload', methods=['POST', 'GET'])

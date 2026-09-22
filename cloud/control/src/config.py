@@ -5,6 +5,7 @@ import importlib
 import re
 from pathlib import Path
 from boltons.fileutils import atomic_save
+import ollama as ollama_runtime
 try:
     tomllib = importlib.import_module('tomllib')
 except ModuleNotFoundError:
@@ -297,6 +298,7 @@ def _build_runtime_state():
         'openai_prompt_frequency_penalty': None,
         'openai_json_scheme': None,
         'openai_binary_images': None,
+        'openai_ollama': None,
         'tts_api_base': None,
         'tts_voice': None,
         'tts_model': None,
@@ -333,6 +335,7 @@ def _build_default_config():
         'openai': {
             'api_base': 'http://localhost:11434/v1',
             'api_key': 'not-needed',
+            'ollama': False,
             'keep_alive': '30m',
             'enable_thinking': False,
             'thinking_budget': 500,
@@ -573,6 +576,7 @@ def init(folder = ''):
     _state['folder'] = folder
     print(f"Initializing config with folder: '{_state['folder']}'")
     _state['config_data'] = _load_config_file()
+    _sync_ollama_runtime_for_current_selection()
     
     """
     # Load this on damand
@@ -588,6 +592,9 @@ def init(folder = ''):
 
 def reinit(folder = None):
     """Reload configuration from disk and rebuild cached clients and sockets."""
+    previous_owner = _get_ollama_owner_id(_state.get('folder'))
+    ollama_runtime.unregister_owner(previous_owner)
+
     _close_socket(_state['control_socket'])
 
     _state.update(_build_runtime_state())
@@ -609,6 +616,47 @@ def reinit(folder = None):
         print("Reinit")
    
     init(folder)
+
+
+def _get_ollama_owner_id(folder):
+    normalized = str(folder or '').strip() or 'default'
+    return f'pupality:{normalized}'
+
+
+def _get_ollama_desired_models():
+    models_section = get_config_data().get('models', {})
+    if not isinstance(models_section, dict):
+        return []
+
+    desired = set()
+    for key in ('general', 'translation', 'vision'):
+        model_name = str(models_section.get(key) or '').strip()
+        if not model_name:
+            continue
+        if model_name.lower() == 'opus':
+            continue
+        desired.add(model_name)
+
+    return sorted(desired)
+
+
+def _sync_ollama_runtime_for_current_selection():
+    owner = _get_ollama_owner_id(_state.get('folder'))
+    if not get_openai_ollama():
+        ollama_runtime.unregister_owner(owner)
+        return
+
+    openai_api_base = str(_get_config_value('openai', 'api_base') or '').strip()
+    if not openai_api_base:
+        ollama_runtime.unregister_owner(owner)
+        return
+
+    ollama_runtime.update_owner_models(
+        openai_api_base=openai_api_base,
+        owner=owner,
+        models=_get_ollama_desired_models(),
+        keep_alive=get_openai_keep_alive(),
+    )
 
 
 def get_soul_content():
@@ -840,6 +888,22 @@ def get_openai_binary_images():
         print(f"Using OpenAI binary_images: {_state['openai_binary_images']}")
 
     return _state['openai_binary_images']
+
+
+def get_openai_ollama():
+    """Singleton to ensure OpenAI-compatible ollama backend flag stays in memory."""
+    if _state['openai_ollama'] is None:
+        raw_value = _get_config_value('openai', 'ollama', False)
+        if isinstance(raw_value, bool):
+            _state['openai_ollama'] = raw_value
+        elif isinstance(raw_value, str):
+            _state['openai_ollama'] = raw_value.strip().lower() in ('1', 'true', 'yes', 'on')
+        else:
+            _state['openai_ollama'] = bool(raw_value)
+
+        print(f"Using OpenAI ollama backend: {_state['openai_ollama']}")
+
+    return _state['openai_ollama']
 
 def get_translation_model():
     """Singleton to ensure translation model stays in memory."""

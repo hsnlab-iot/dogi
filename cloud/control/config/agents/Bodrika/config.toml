@@ -28,6 +28,7 @@ translation_max_output_tokens = 2048
 prompt_temperature = 0.9
 prompt_frequency_penalty = 1.5
 binary_images = false
+ollama = true
 
 [tts]
 protocol = "opentts"
