@@ -159,10 +159,29 @@ def _extract_tool_ids_from_source_file(source_file, server_name):
     return ids
 
 
+def _resolve_robot_ip_placeholder(target, descriptor_file, tool_ref):
+    token = '[ROBOT_IP]'
+    if token not in target:
+        return target
+
+    robot_ip = str(os.environ.get('ROBOT_IP') or '').strip()
+    if not robot_ip:
+        print(
+            f"Error: skipping tool '{tool_ref}' from {descriptor_file} because "
+            "ROBOT_IP is not defined but target contains [ROBOT_IP]."
+        )
+        return None
+
+    return target.replace(token, robot_ip)
+
+
 def _tool_descriptor_to_endpoint(tool_ref, descriptor_file, descriptor):
     kind = str(descriptor.get('type') or '').strip().lower()
     target = descriptor.get('url') or descriptor.get('target') or descriptor.get('connection')
     target = str(target or '').strip()
+    target = _resolve_robot_ip_placeholder(target, descriptor_file, tool_ref)
+    if target is None:
+        return None, None
 
     if not kind or not target:
         print(

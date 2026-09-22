@@ -1,7 +1,6 @@
 name: capture
 type: sse
-url: http://onboard:8000/mcp/sse
-public_url: http://<host>:8000/mcp/sse
+url: http://[ROBOT_IP]:8000/mcp/sse
 
 description: >
   Captures a raw camera frame from the onboard primary camera (/dev/video0) and   returns it as a base64 JPEG data URL. WARNING: Injecting raw image base64 payloads into the LLM context consumes a very high number of tokens (often 1000+ tokens per image).  Use this tool ONLY when raw visual payload bytes are strictly required by external pipelines or UI renderers. For environmental visual queries or scene descriptions, ALWAYS prefer other tools to save context tokens, when available.

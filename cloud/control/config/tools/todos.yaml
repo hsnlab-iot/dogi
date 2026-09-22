@@ -1,6 +1,6 @@
 name: todos
 type: str
-url: http://robot_ip:5060/mcp/todos
+url: http://dogi-mcp:5060/mcp/todos
 
 description: >
   Manages date-scoped task lists, goals, and persistent state tracking across execution sessions. Use this tool to log upcoming actions, check current task progress, mark completed objectives, and generate summary reports of daily robot activities.

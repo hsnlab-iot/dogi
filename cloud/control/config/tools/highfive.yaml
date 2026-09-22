@@ -1,6 +1,7 @@
 name: highfive
 type: ssh
 url: robot@10.6.6.20:~/kutyus_env/bin:~/mcptest/server.py
+
 description: Highfive MCP server over SSH stdio
 source_file: src/test/mcpserver_highfive.py
 provided_mcp_tools:

@@ -1,6 +1,6 @@
 name: body
 type: str
-url: http://onboard-mcp:5000/mcp
+url: http://[ROBOT_IP]:5000/mcp
 
 description: >
   Direct physical movement and stance control for the DOGZILLA quadruped chassis.  Provides low-level directional locomotion (walking, turning, stopping), in-place torso attitude adjustments (yaw/pitch tilt and twist with planted feet), and high-level predefined expressiveness and functional routines (sitting, waving, crawling, dancing).

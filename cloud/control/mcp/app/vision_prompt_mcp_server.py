@@ -384,6 +384,7 @@ def vision_prompt(prompt: str, answer_length: str = "short") -> str:
     """
     try:
         started_at = time.time()
+        answer_length = answer_length.strip()
         _log("DEBUG", f"vision_prompt called with prompt: {prompt[:100]}..." if len(prompt) > 100 else f"vision_prompt called with prompt: {prompt}")
         _log("DEBUG", f"answer_length: {answer_length}")
         if not prompt or not prompt.strip():
