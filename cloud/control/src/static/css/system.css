@@ -13,65 +13,114 @@ body {
 
 .container {
     display: flex;
-    align-items: flex-start;
-    gap: 20px;
+    gap: 16px;
     height: 100vh;
     box-sizing: border-box;
     padding: 12px;
     overflow: hidden;
 }
 
+/* Videó konténer: max a képernyő 2/3-a (66.66vw), leér az aljáig */
 .video-container {
-    width: 896px;
-    height: 672px;
-    border: 2px solid #000;
-    flex-shrink: 0;
-    overflow: hidden;
+    flex: 1 1 auto;
+    max-width: calc(66.66vw - 20px);
+    height: 100%;
+    border: 2px solid #333;
+    border-radius: 6px;
     background: #000;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
 }
 
 .video-container img {
     width: 100%;
     height: 100%;
     display: block;
-    object-fit: cover;
+    object-fit: contain; /* Megtartja az aspect ratio-t, nem torzul */
 }
 
-.joystick-column,
-.button-column {
+/* Vezérlő panel: maradék 1/3-os sáv */
+.control-panel {
+    flex: 1 1 33.33vw;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+/* Joysticks keretben egymás mellett: kitöltik a teljes szélességet */
+.joysticks-wrapper {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.joystick-box {
+    flex: 1 1 50%; /* Mindkét doboz egyenlően 50%-ot vesz fel a szélességből */
     display: flex;
     flex-direction: column;
     align-items: center;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    box-sizing: border-box;
 }
 
-.joystick-column {
-    gap: 12px;
+.joystick-label {
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #ccc;
+    text-transform: uppercase;
 }
 
+/* A joy-pad kitölti a dobozt szélességben, de nem haladja meg a képernyőmagasság 25%-át */
 .joy-pad {
-    width: 200px;
-    height: 200px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: 220px; /* Szükség esetén meggátolja a túlzott eltorzulást */
+    height: 22vh;    /* Képernyőmagasság negyedénél kényelmesen kisebb marad */
+    max-height: 22vh;
 }
 
-.button-column {
+.joy-pad canvas {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+}
+
+/* Gombok elrendezése sorokba */
+.buttons-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.button-group {
+    display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    max-width: 260px;
+    align-items: center;
 }
 
 .circle-button {
-    width: 50px;
-    height: 50px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     border: none;
     color: white;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: bold;
     text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    transition: background-color 0.3s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: background-color 0.2s ease, transform 0.15s ease;
 }
 
 .circle-button:hover {
@@ -80,29 +129,21 @@ body {
 
 .circle-button:active {
     transform: translateY(0);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
 }
 
-.button-neutral {
-    background-color: darkred;
-}
+.button-neutral { background-color: darkred; }
+.button-neutral:hover { background-color: #7a0000; }
 
-.button-neutral:hover {
-    background-color: #7a0000;
-}
+.button-action { background-color: red; }
+.button-action:hover { background-color: #c90000; }
 
-.button-action {
-    background-color: red;
-}
+.button-warn { background-color: darkorange; }
+.button-warn:hover { background-color: #b86900; }
 
-.button-action:hover {
-    background-color: #c90000;
-}
-
-.button-warn {
-    background-color: darkorange;
-}
-
-.button-warn:hover {
-    background-color: #b86900;
+/* Dinamikus kártyák helye (Ollama, statisztika, stb.) */
+.cards-wrapper {
+    margin-top: auto; /* Alulra tolja a kártyákat */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }

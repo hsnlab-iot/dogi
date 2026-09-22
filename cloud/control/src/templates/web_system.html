@@ -9,25 +9,54 @@
 <body>
 
 <div class="container">
+    <!-- Bal oldali videó panel -->
     <div class="video-container">
         <img src="/video/mjpeg" alt="MJPEG Video" />
     </div>
 
-    <div class="joystick-column">
-        <div id="joy1Div" class="joy-pad"></div>
-        <div id="joy2Div" class="joy-pad"></div>
-    </div>
-    <div class="button-column">
-        <button id="button_on" class="circle-button button-neutral">On</button>
-        <button id="button_off" class="circle-button button-neutral">Off</button>
-        <button id="button_reset" class="circle-button button-neutral">Reset</button>
-        <button id="button_reload" class="circle-button button-neutral">Reload</button>
-        <button id="button_pee" class="circle-button button-action">Pee</button>
-        <button id="button_wave" class="circle-button button-action">Wave</button>
-        <button id="button_look" class="circle-button button-action">Look</button>
-        <button id="button_sit" class="circle-button button-action">Sit</button>
-        <button id="button_joke" class="circle-button button-warn">Joke</button>
-        <button id="button_what" class="circle-button button-warn">What</button>
+    <!-- Jobb oldali vezérlő panel -->
+    <div class="control-panel">
+        <!-- Joystickok felül kerettel és felirattal -->
+        <div class="joysticks-wrapper">
+            <div class="joystick-box">
+                <span class="joystick-label">Move</span>
+                <div id="joy1Div" class="joy-pad"></div>
+            </div>
+            <div class="joystick-box">
+                <span class="joystick-label">Attitude</span>
+                <div id="joy2Div" class="joy-pad"></div>
+            </div>
+        </div>
+
+        <!-- Gombok csoportosítva, sorokba rendezve -->
+        <div class="buttons-wrapper">
+            <!-- Rendszer gombok (sötétpiros) -->
+            <div class="button-group">
+                <button id="button_on" class="circle-button button-neutral">On</button>
+                <button id="button_off" class="circle-button button-neutral">Off</button>
+                <button id="button_reset" class="circle-button button-neutral">Reset</button>
+                <button id="button_reload" class="circle-button button-neutral">Reload</button>
+            </div>
+
+            <!-- Akció gombok (piros) -->
+            <div class="button-group">
+                <button id="button_pee" class="circle-button button-action">Pee</button>
+                <button id="button_wave" class="circle-button button-action">Wave</button>
+                <button id="button_look" class="circle-button button-action">Look</button>
+                <button id="button_sit" class="circle-button button-action">Sit</button>
+            </div>
+
+            <!-- Figyelmeztető / Egyéb gombok (narancs) -->
+            <div class="button-group">
+                <button id="button_joke" class="circle-button button-warn">Joke</button>
+                <button id="button_what" class="circle-button button-warn">What</button>
+            </div>
+        </div>
+
+        <!-- Előkészített felület a kártyáknak (pl. Ollama) -->
+        <div id="cards-container" class="cards-wrapper">
+            <!-- Dinamikus kártyák helye -->
+        </div>
     </div>
 </div>
 
@@ -40,11 +69,9 @@
     });
 
     var Joy1 = new JoyStick('joy1Div', {}, function(stickData) {
-        // Send the stickData as a JSON string
         socket.emit('joy1', stickData.cardinalDirection);
     });
     var Joy2 = new JoyStick('joy2Div', {}, function(stickData) {
-        // Send the stickData as a JSON string
         socket.emit('joy2', stickData.cardinalDirection);
     });
 
@@ -76,22 +103,20 @@
         socket.emit('action', 'off');
     });
     document.querySelector('#button_what').addEventListener('click', function() {
-        // Fetch the current JPEG frame from the video source
         fetch('/video/jpeg')
             .then(response => response.blob())
             .then(blob => {
-            const reader = new FileReader();
-            reader.onloadend = function() {
-                const dataURL = reader.result;
-                socket.emit('image', dataURL);
-                setTimeout(function() {
-                    socket.emit('action', 'what');
-                }, 500);
-            };
-            reader.readAsDataURL(blob);
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    const dataURL = reader.result;
+                    socket.emit('image', dataURL);
+                    setTimeout(function() {
+                        socket.emit('action', 'what');
+                    }, 500);
+                };
+                reader.readAsDataURL(blob);
             });
     });
-
 </script>
 
 </body>
