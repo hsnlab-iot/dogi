@@ -29,9 +29,15 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.components.containers import landmark as landmark_pb2
 import threading
-mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
-mp_drawing_styles = mp.solutions.drawing_styles
+
+# Ez le kell cserélni, eddigi megoldás rossz
+#mp_hands = mp.solutions.hands
+#mp_drawing = mp.solutions.drawing_utils
+#mp_drawing_styles = mp.solutions.drawing_styles
+
+mp_hands = mp.tasks.vision.HandLandmarksConnections
+mp_drawing = mp.tasks.vision.drawing_utils
+mp_drawing_styles = mp.tasks.vision.drawing_styles
 
 # Global variables to calculate FPS
 COUNTER, FPS = 0, 0
@@ -225,15 +231,17 @@ def run(model: str, num_hands: int,
                       label_text_color, label_thickness, cv2.LINE_AA)
 
         # Draw hand landmarks on the frame
-        hand_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
-        hand_landmarks_proto.landmark.extend([
-          landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y,
-                                          z=landmark.z) for landmark in
-          hand_landmarks
-        ])
+        # This part seems wholely unnecessary/Deprecated
+        #hand_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
+        #hand_landmarks_proto.landmark.extend([
+        #  landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y,
+        #                                  z=landmark.z) for landmark in
+        #  hand_landmarks
+        #])
         mp_drawing.draw_landmarks(
           current_frame,
-          hand_landmarks_proto,
+          #hand_landmarks_proto,
+          hand_landmarks,
           mp_hands.HAND_CONNECTIONS,
           mp_drawing_styles.get_default_hand_landmarks_style(),
           mp_drawing_styles.get_default_hand_connections_style())
