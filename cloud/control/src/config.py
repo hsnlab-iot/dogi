@@ -295,6 +295,98 @@ def _collect_available_tool_capabilities(tool_metadata):
 
     return capabilities
 
+
+def _parse_tools_meta_section(tools_section):
+    """Parse [tools.meta] / [tools.override] section into descriptor-keyed objects."""
+    if not isinstance(tools_section, dict):
+        return {}
+
+    raw_meta = tools_section.get('meta') or tools_section.get('override') or {}
+    if not isinstance(raw_meta, dict):
+        return {}
+
+    parsed = {}
+    for key, raw_value in raw_meta.items():
+        descriptor_key = str(key or '').strip()
+        if not descriptor_key:
+            continue
+
+        if isinstance(raw_value, dict):
+            parsed[descriptor_key] = raw_value
+            continue
+
+        if isinstance(raw_value, str):
+            raw_text = raw_value.strip()
+            if not raw_text:
+                continue
+            try:
+                decoded = json.loads(raw_text)
+            except Exception as exc:
+                print(
+                    f"Warning: tools meta for '{descriptor_key}' is not valid JSON: {exc}"
+                )
+                continue
+            if not isinstance(decoded, dict):
+                print(
+                    f"Warning: tools meta for '{descriptor_key}' must be a JSON object"
+                )
+                continue
+            parsed[descriptor_key] = decoded
+            continue
+
+        print(
+            f"Warning: tools meta for '{descriptor_key}' has unsupported type "
+            f"{type(raw_value).__name__}"
+        )
+
+    return parsed
+
+
+def _build_tool_call_meta_map(tool_metadata, descriptor_meta):
+    """Expand descriptor-keyed meta to function tool names used at call time."""
+    if not tool_metadata or not descriptor_meta:
+        return {}
+
+    lookup = {}
+    descriptor_meta_keys = {str(k).strip(): v for k, v in descriptor_meta.items() if str(k).strip()}
+
+    for meta in tool_metadata:
+        ref = str(meta.get('ref') or '').strip()
+        ref_stem = Path(ref).stem if ref else ''
+        file_stem = Path(str(meta.get('file') or '')).stem if str(meta.get('file') or '').strip() else ''
+        server_name = str(meta.get('name') or '').strip()
+
+        candidates = [ref, ref_stem, file_stem, server_name]
+        resolved_meta = None
+        for candidate in candidates:
+            if not candidate:
+                continue
+            if candidate in descriptor_meta_keys:
+                resolved_meta = descriptor_meta_keys[candidate]
+                break
+
+        if not isinstance(resolved_meta, dict):
+            continue
+
+        tool_name_candidates = set()
+        for provided in meta.get('provided_mcp_tools', []) or []:
+            provided_value = str(provided).strip()
+            if not provided_value:
+                continue
+            tool_name_candidates.add(provided_value)
+            if '/' in provided_value:
+                tool_name_candidates.add(provided_value.rsplit('/', 1)[1])
+
+        if server_name:
+            tool_name_candidates.add(server_name)
+
+        for tool_name in tool_name_candidates:
+            if not tool_name:
+                continue
+            lookup[tool_name] = dict(resolved_meta)
+
+    return lookup
+
 def _build_runtime_state():
     return {
         'folder': None,
@@ -327,6 +419,7 @@ def _build_runtime_state():
         'soul_content': None,
         'tools_list': None,
         'tools_meta': None,
+        'tools_call_meta': None,
         'skills_list': None,
         'skills_unavailable': None,
         'skills_content': None,
@@ -1134,6 +1227,7 @@ def get_tools():
 
         values = []
         metadata = []
+        tool_call_meta = {}
 
         tool_refs = []
         if isinstance(tools_section, dict) and isinstance(tools_section.get('list'), list):
@@ -1175,8 +1269,12 @@ def get_tools():
                     'provided_mcp_tools': [],
                 })
 
+        descriptor_meta = _parse_tools_meta_section(tools_section)
+        tool_call_meta = _build_tool_call_meta_map(metadata, descriptor_meta)
+
         _state['tools_list'] = values
         _state['tools_meta'] = metadata
+        _state['tools_call_meta'] = tool_call_meta
 
     return _state['tools_list']
 
@@ -1185,6 +1283,21 @@ def get_tools_metadata():
     if _state['tools_meta'] is None:
         get_tools()
     return _state['tools_meta'] or []
+
+
+def get_tool_meta(tool_name):
+    """Return configured _meta object for a runtime tool call name, if any."""
+    if _state['tools_call_meta'] is None:
+        get_tools()
+
+    key = str(tool_name or '').strip()
+    if not key:
+        return None
+
+    meta = (_state.get('tools_call_meta') or {}).get(key)
+    if isinstance(meta, dict):
+        return dict(meta)
+    return None
 
 
 def get_skills():

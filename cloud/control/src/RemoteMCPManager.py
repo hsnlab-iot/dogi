@@ -193,14 +193,14 @@ class RemoteMCPManager:
         future = asyncio.run_coroutine_threadsafe(self.session.list_tools(), self.loop)
         return future.result() # Itt vár (blokkol)
 
-    async def call_tool_async(self, tool_name, args):
+    async def call_tool_async(self, tool_name, args, meta: dict | None = None):
         """Async tool call"""
-        return await self.session.call_tool(tool_name, arguments=args)
+        return await self.session.call_tool(tool_name, arguments=args, meta=meta)
 
-    def call_tool_blocking(self, tool_name, args, timeout_seconds: float | None = None):
+    def call_tool_blocking(self, tool_name, args, timeout_seconds: float | None = None, meta: dict | None = None):
         """Blocking tool call — for use outside async context."""
         future = asyncio.run_coroutine_threadsafe(
-            self.call_tool_async(tool_name, args), self.loop
+            self.call_tool_async(tool_name, args, meta=meta), self.loop
         )
         wait_timeout = MCP_TOOL_CALL_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
         return future.result(timeout=wait_timeout)

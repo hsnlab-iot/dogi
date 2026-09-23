@@ -119,8 +119,28 @@ def _start_stt_listener():
 def _call_tool_with_timeout(rmcp, function_name: str, function_args: dict, timeout_seconds: float = 60.0) -> CallToolResult:
     """Call tool with timeout to prevent indefinite hangs."""
     print(f"[call_tool_timeout] Calling {function_name} with timeout {timeout_seconds}s", flush=True)
+
+    meta = config.get_tool_meta(function_name)
+    if isinstance(meta, dict) and meta:
+        print(f"[tools.meta] found _meta for tool '{function_name}': {meta}")
+    else:
+        meta = None
+
+    raw_mcp_payload = {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {
+            "name": function_name,
+            "arguments": function_args
+        }
+    }
+    if meta:
+        raw_mcp_payload["params"]["_meta"] = meta
+
+    print("[call_tool_timeout][tool_request]" + json.dumps(raw_mcp_payload, indent=2, ensure_ascii=False), flush=True)
+
     with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(rmcp.call_tool_blocking, function_name, function_args)
+        future = executor.submit(rmcp.call_tool_blocking, function_name, function_args, meta=meta)
         try:
             print(f"[call_tool_timeout] Waiting for {function_name}...", flush=True)
             result = future.result(timeout=timeout_seconds)
@@ -279,7 +299,8 @@ def handle_prompt(data):
                                 if tool[1] == function_name:
                                     rmcp = tool[0]
                                     try:
-                                        result = _call_tool_with_timeout(rmcp, function_name, json.loads(function_args), timeout_seconds=60.0)
+                                        parsed_args = json.loads(function_args)
+                                        result = _call_tool_with_timeout(rmcp, function_name, parsed_args, timeout_seconds=60.0)
                                         print(f"[tools] Tool result: {result}", flush=True)
                                         tool_response, tool_texts, tool_image = mcp_to_openai_multimodal_tool(result, tool_call.id)
 

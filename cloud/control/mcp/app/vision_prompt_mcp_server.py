@@ -12,7 +12,7 @@ import threading
 
 import requests
 import uvicorn
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 from openai import OpenAI
 
 try:
@@ -262,7 +262,7 @@ def _extract_content_text(content: object) -> str:
     return ""
 
 
-def _call_openai_chat_completions(content_parts: list[dict], max_tokens: int | None = None) -> str:
+def _call_openai_chat_completions(content_parts: list[dict], max_tokens: int | None = None, model_override: str | None = None) -> str:
     messages: list[dict] = []
     if not OPENAI_ENABLE_THINKING:
         messages.append(
@@ -286,8 +286,9 @@ def _call_openai_chat_completions(content_parts: list[dict], max_tokens: int | N
     )
 
     effective_max_tokens = max_tokens if max_tokens is not None else OPENAI_MAX_TOKENS
+    effective_model = str(model_override or OPENAI_MODEL).strip() or OPENAI_MODEL
     request_payload = {
-        "model": OPENAI_MODEL,
+        "model": effective_model,
         "messages": messages,
         "max_tokens": effective_max_tokens,
         "temperature": OPENAI_TEMPERATURE,
@@ -307,7 +308,7 @@ def _call_openai_chat_completions(content_parts: list[dict], max_tokens: int | N
 
     _log("DEBUG", "OpenAI raw request:")
     _log("DEBUG", json.dumps(request_payload, indent=2, ensure_ascii=False))
-    _log("DEBUG", f"Calling OpenAI chat.completions at {OPENAI_BASE_URL} with timeout {OPENAI_TIMEOUT_SECONDS}s")
+    _log("DEBUG", f"Calling OpenAI chat.completions at {OPENAI_BASE_URL} with model {effective_model} and timeout {OPENAI_TIMEOUT_SECONDS}s")
     sys.stdout.flush()
 
     try:
@@ -375,7 +376,7 @@ mcp = FastMCP("vision-prompt")
 
 
 @mcp.tool()
-def vision_prompt(prompt: str, answer_length: str = "short") -> str:
+def vision_prompt(prompt: str, ctx: Context, answer_length: str = "short") -> str:
     """Capture a fresh snapshot through the camera and run a prompt on it.
     
     Args:
@@ -399,6 +400,18 @@ def vision_prompt(prompt: str, answer_length: str = "short") -> str:
         snapshot_url = SNAPSHOT_URL
         prompt_text = prompt.strip()
         _log("DEBUG", f"Starting vision_prompt processing")
+
+        model_override = None
+        try:
+            request_context = getattr(ctx, "request_context", None)
+            meta = getattr(request_context, "meta", None) if request_context is not None else None
+            if isinstance(meta, dict):
+                override_value = meta.get("model")
+                if override_value:
+                    model_override = str(override_value).strip()
+                    _log("INFO", f"Using model override from ctx.request_context.meta: {model_override}")
+        except Exception as exc:
+            _log("WARNING", f"Failed to read ctx.request_context.meta: {type(exc).__name__}: {str(exc)}")
 
         content_parts: list[dict] = [
             {
@@ -435,7 +448,7 @@ def vision_prompt(prompt: str, answer_length: str = "short") -> str:
             )
 
         _log("DEBUG", f"Calling OpenAI with {len(content_parts)} content parts")
-        text = _call_openai_chat_completions(content_parts, max_tokens=max_tokens)
+        text = _call_openai_chat_completions(content_parts, max_tokens=max_tokens, model_override=model_override)
         if not text:
             _log("ERROR", "OpenAI returned empty text")
             raise RuntimeError("prompt returned empty text")
