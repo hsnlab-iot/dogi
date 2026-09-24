@@ -139,7 +139,6 @@ def _compute_stream_stats(window_seconds=5.0):
             'window_seconds': float(window_seconds),
             'fps': 0.0,
             'bitrate_bps': 0.0,
-            'bitrate_mbps': 0.0,
             'resolution': {
                 'width': width,
                 'height': height,
@@ -157,7 +156,6 @@ def _compute_stream_stats(window_seconds=5.0):
         'window_seconds': float(window_seconds),
         'fps': round(float(fps), 2),
         'bitrate_bps': round(float(bitrate_bps), 2),
-        'bitrate_mbps': round(float(bitrate_bps / 1_000_000.0), 4),
         'resolution': {
             'width': width,
             'height': height,

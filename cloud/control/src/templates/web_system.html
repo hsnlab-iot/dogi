@@ -66,14 +66,20 @@
                 <canvas id="ping-chart" width="420" height="150"></canvas>
             </section>
 
-            <section class="status-card">
-                <h3>Cloud Stream</h3>
-                <div id="status-cloud-stream" class="status-scroll">Loading...</div>
+            <section class="status-card chart-bg-card">
+                <canvas id="cloud-stream-chart" class="bg-chart"></canvas>
+                <div class="card-content">
+                    <h3>Cloud Stream</h3>
+                    <div id="status-cloud-stream" class="status-scroll">Loading...</div>
+                </div>
             </section>
 
-            <section class="status-card">
-                <h3>Robot Stream</h3>
-                <div id="status-robot-stream" class="status-scroll">Loading...</div>
+            <section class="status-card chart-bg-card">
+                <canvas id="robot-stream-chart" class="bg-chart"></canvas>
+                <div class="card-content">
+                    <h3>Robot Stream</h3>
+                    <div id="status-robot-stream" class="status-scroll">Loading...</div>
+                </div>
             </section>
         </div>
     </div>
@@ -138,7 +144,10 @@
     });
 
     var pingHistory = [];
-    var pingHistoryMax = 60;
+    var cloudBitrateHistory = [];
+    var robotBitrateHistory = [];
+    var historyMax = 60;
+
     var statusOllama = document.getElementById('status-ollama');
     var statusPing = document.getElementById('status-ping');
     var cloud_statusStream = document.getElementById('status-cloud-stream');
@@ -242,6 +251,82 @@
         pingCtx.fill();
     }
 
+    function drawBitrateBackgroundChart(canvasId, historyData, colorHex) {
+        var canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        var rect = canvas.getBoundingClientRect();
+        if (canvas.width !== rect.width || canvas.height !== rect.height) {
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+
+        var width = canvas.width;
+        var height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+
+        var values = historyData.filter(function(v) { return v !== null; });
+        if (!values.length) return;
+
+        var maxMbps = Math.max(0.5, Math.max.apply(null, values) * 1.2);
+        var minMbps = 0;
+        var chartLeft = 40;
+        var chartRight = width - 10;
+        var chartTop = 10;
+        var chartBottom = height - 20;
+        var chartWidth = chartRight - chartLeft;
+        var chartHeight = chartBottom - chartTop;
+
+        // Grid lines & Axis labels
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.font = '10px monospace';
+        ctx.lineWidth = 1;
+
+        for (var i = 0; i <= 2; i++) {
+            var y = chartTop + (chartHeight * i / 2);
+            ctx.beginPath();
+            ctx.moveTo(chartLeft, y);
+            ctx.lineTo(chartRight, y);
+            ctx.stroke();
+            var valMbps = (maxMbps - ((maxMbps - minMbps) * i / 2));
+            ctx.fillText(valMbps.toFixed(1) + 'M', 6, y + 3);
+        }
+
+        var points = [];
+        var denom = Math.max(1, historyData.length - 1);
+        historyData.forEach(function(val, idx) {
+            if (val === null) return;
+            var x = chartLeft + (chartWidth * idx / denom);
+            var ratio = (val - minMbps) / Math.max(0.001, (maxMbps - minMbps));
+            var y = chartBottom - (ratio * chartHeight);
+            points.push({ x: x, y: y });
+        });
+
+        if (points.length < 2) return;
+
+        // Area Fill
+        ctx.fillStyle = colorHex + '22'; // low opacity fill
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, chartBottom);
+        points.forEach(function(pt) { ctx.lineTo(pt.x, pt.y); });
+        ctx.lineTo(points[points.length - 1].x, chartBottom);
+        ctx.closePath();
+        ctx.fill();
+
+        // Line
+        ctx.strokeStyle = colorHex;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (var p = 1; p < points.length; p++) {
+            ctx.lineTo(points[p].x, points[p].y);
+        }
+        ctx.stroke();
+    }
+
     function renderOllamaStatus(ollamaPayload) {
         if (!statusOllama) return;
 
@@ -304,7 +389,7 @@
         } else {
             pingHistory.push(null);
         }
-        while (pingHistory.length > pingHistoryMax) {
+        while (pingHistory.length > historyMax) {
             pingHistory.shift();
         }
 
@@ -331,20 +416,26 @@
         if (!streamPayload || !streamPayload.ok) {
             var err = streamPayload && streamPayload.error ? String(streamPayload.error) : 'cloud stream stats unavailable';
             cloud_statusStream.innerHTML = '<div class="mono-line">' + escapeHtml(err) + '</div>';
-            return;
+            cloudBitrateHistory.push(null);
+        } else {
+            var resolution = streamPayload.resolution || {};
+            var fps = Number(streamPayload.fps || 0).toFixed(2);
+            var bytesPerSec = streamPayload.bytes_per_sec !== undefined ? streamPayload.bytes_per_sec : ((streamPayload.bitrate_bps || 0) / 8);
+            var formattedBitrate = formatBitrate(bytesPerSec);
+            var label = resolution.label || 'unknown';
+
+            var mbps = (bytesPerSec * 8) / 1000000;
+            cloudBitrateHistory.push(mbps);
+
+            cloud_statusStream.innerHTML = [
+                '<div class="mono-line"><strong>Resolution:</strong> ' + escapeHtml(label) + '</div>',
+                '<div class="mono-line"><strong>FPS:</strong> ' + fps + '</div>',
+                '<div class="mono-line"><strong>Bitrate:</strong> ' + formattedBitrate + '</div>'
+            ].join('');
         }
 
-        var resolution = streamPayload.resolution || {};
-        var fps = Number(streamPayload.fps || 0).toFixed(2);
-        var bytesPerSec = streamPayload.bytes_per_sec !== undefined ? streamPayload.bytes_per_sec : ((streamPayload.bitrate_bps || 0) / 8);
-        var formattedBitrate = formatBitrate(bytesPerSec);
-        var label = resolution.label || 'unknown';
-
-        cloud_statusStream.innerHTML = [
-            '<div class="mono-line"><strong>Resolution:</strong> ' + escapeHtml(label) + '</div>',
-            '<div class="mono-line"><strong>FPS:</strong> ' + fps + '</div>',
-            '<div class="mono-line"><strong>Bitrate:</strong> ' + formattedBitrate + '</div>',
-        ].join('');
+        while (cloudBitrateHistory.length > historyMax) cloudBitrateHistory.shift();
+        drawBitrateBackgroundChart('cloud-stream-chart', cloudBitrateHistory, '#38bdf8');
     }
 
     function robot_renderStreamStatus(streamPayload) {
@@ -353,21 +444,27 @@
         if (!streamPayload || !streamPayload.ok) {
             var err = streamPayload && streamPayload.error ? String(streamPayload.error) : 'robot stream stats unavailable';
             robot_statusStream.innerHTML = '<div class="mono-line">' + escapeHtml(err) + '</div>';
-            return;
+            robotBitrateHistory.push(null);
+        } else {
+            var fps = Number(streamPayload.fps || 0).toFixed(2);
+            var bytesPerSec = streamPayload.bytes_per_sec !== undefined ? streamPayload.bytes_per_sec : 0;
+            var formattedBitrate = formatBitrate(bytesPerSec);
+            var seqNumber = streamPayload.frames !== undefined ? escapeHtml(streamPayload.frames) : '-';
+            var totalBytes = streamPayload.bytes !== undefined ? (Number(streamPayload.bytes) / (1024 * 1024)).toFixed(2) + ' MB' : '-';
+
+            var mbps = (bytesPerSec * 8) / 1000000;
+            robotBitrateHistory.push(mbps);
+
+            robot_statusStream.innerHTML = [
+                '<div class="mono-line"><strong>FPS:</strong> ' + fps + '</div>',
+                '<div class="mono-line"><strong>Bitrate:</strong> ' + formattedBitrate + '</div>',
+                '<div class="mono-line"><strong>Sequence (Frames):</strong> ' + seqNumber + '</div>',
+                '<div class="mono-line"><strong>Total Transferred:</strong> ' + totalBytes + '</div>'
+            ].join('');
         }
 
-        var fps = Number(streamPayload.fps || 0).toFixed(2);
-        var bytesPerSec = streamPayload.bytes_per_sec !== undefined ? streamPayload.bytes_per_sec : 0;
-        var formattedBitrate = formatBitrate(bytesPerSec);
-        var seqNumber = streamPayload.frames !== undefined ? escapeHtml(streamPayload.frames) : '-';
-        var totalBytes = streamPayload.bytes !== undefined ? (Number(streamPayload.bytes) / (1024 * 1024)).toFixed(2) + ' MB' : '-';
-
-        robot_statusStream.innerHTML = [
-            '<div class="mono-line"><strong>FPS:</strong> ' + fps + '</div>',
-            '<div class="mono-line"><strong>Bitrate:</strong> ' + formattedBitrate + '</div>',
-            '<div class="mono-line"><strong>Sequence (Frames):</strong> ' + seqNumber + '</div>',
-            '<div class="mono-line"><strong>Total Transferred:</strong> ' + totalBytes + '</div>'
-        ].join('');
+        while (robotBitrateHistory.length > historyMax) robotBitrateHistory.shift();
+        drawBitrateBackgroundChart('robot-stream-chart', robotBitrateHistory, '#a855f7');
     }
 
     function updateSystemStatus() {

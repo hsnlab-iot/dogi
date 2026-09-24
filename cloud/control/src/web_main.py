@@ -178,7 +178,6 @@ def _fetch_stream_stats(host, port, timeout_seconds=1.0):
             'error': str(exc),
             'fps': 0.0,
             'bitrate_bps': 0.0,
-            'bitrate_mbps': 0.0,
             'resolution': {'width': 0, 'height': 0, 'label': 'unknown'},
             'sample_count': 0,
             'window_seconds': 0.0,
