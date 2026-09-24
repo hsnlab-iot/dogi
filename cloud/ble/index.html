@@ -75,7 +75,7 @@
         <div class="video-control-card">
           <div class="card-title">Video Stream Quality</div>
           <div class="slider-container">
-            <input type="range" id="videoSlider" min="0" max="4" step="1" value="0" onchange="onVideoQualityChange(this.value)">
+            <input type="range" id="videoSlider" class="cmd-control" min="0" max="4" step="1" value="0" onchange="onVideoQualityChange(this.value)" disabled>
             <div class="slider-labels">
               <span>OFF</span>
               <span>256K</span>
@@ -90,8 +90,8 @@
         <div class="card">
           <div class="card-title">WiFi Interface</div>
           <div class="btn-group">
-            <button class="action-btn secondary" onclick="sendCommand('WSTA')">WiFi STA</button>
-            <button class="action-btn secondary" onclick="sendCommand('WAP')">WiFi AP</button>
+            <button class="action-btn secondary cmd-control" onclick="sendCommand('WSTA')" disabled>WiFi STA</button>
+            <button class="action-btn secondary cmd-control" onclick="sendCommand('WAP')" disabled>WiFi AP</button>
           </div>
         </div>
 
@@ -99,8 +99,8 @@
         <div class="card">
           <div class="card-title">Connection Route</div>
           <div class="btn-group">
-            <button class="action-btn secondary" onclick="sendCommand('USEWIFI')">Use WiFi</button>
-            <button class="action-btn secondary" onclick="sendCommand('USE5G')">Use 5G</button>
+            <button class="action-btn secondary cmd-control" onclick="sendCommand('USEWIFI')" disabled>Use WiFi</button>
+            <button class="action-btn secondary cmd-control" onclick="sendCommand('USE5G')" disabled>Use 5G</button>
           </div>
         </div>
 
@@ -108,8 +108,8 @@
         <div class="card">
           <div class="card-title">System</div>
           <div class="btn-group">
-            <button class="action-btn secondary" onclick="sendCommand('RESTART')">Restart dogi</button>
-            <button class="action-btn danger" onclick="sendCommand('SHUTDOWN')">Shutdown</button>
+            <button class="action-btn secondary cmd-control" onclick="sendCommand('RESTART')" disabled>Restart dogi</button>
+            <button class="action-btn danger cmd-control" onclick="sendCommand('SHUTDOWN')" disabled>Shutdown</button>
           </div>
         </div>
 
@@ -131,6 +131,10 @@
             <div class="field">
               <label>WiFi mode:</label>
               <input type="text" id="wifimode" readonly placeholder="---">
+            </div>
+            <div class="field" style="grid-column: span 2;">
+              <label>Onboard Docker Status:</label>
+              <input type="text" id="onboardStatus" readonly placeholder="---">
             </div>
           </div>
         </div>
@@ -166,6 +170,11 @@
       <div class="modal-content">
         <div class="card-title" style="margin-bottom: 8px;">Settings</div>
         
+        <div class="field" style="margin-bottom: 15px;">
+          <label for="pskInput">Security PIN / Shared Secret:</label>
+          <input type="password" id="pskInput" value="721135" placeholder="Enter PIN/Password">
+        </div>
+
         <div class="switch-label">
           <span>Demo / Simulation Mode</span>
           <label class="switch">
@@ -174,14 +183,13 @@
           </label>
         </div>
 
-        <button class="action-btn" onclick="toggleModal('modal-settings', false)" style="margin-top: 10px;">Close</button>
+        <button class="action-btn" onclick="saveSettings()" style="margin-top: 10px;">Save & Close</button>
       </div>
     </div>
 
   </div>
 
   <script>
-    // BLE Service & Characteristic UUIDs matching App Inventor spec
     const SERVICE_UUID = "b4e1d091-8571-4b5e-8564-000000000000";
     const CMD_UUID     = "b4e1d091-8571-4b5e-8564-000000000001";
     const STATUS_UUID  = "b4e1d091-8571-4b5e-8564-000000000002";
@@ -193,14 +201,65 @@
     let cmdCharacteristic = null;
     let statusCharacteristic = null;
 
+    let clientKeyPair = null;
+    let aesSessionKey = null;
+
     let isDemoMode = false;
     let demoInterval = null;
+    let isConnected = false;
+
+    // SCREEN WAKE LOCK VARIABLE
+    let wakeLock = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedPsk = localStorage.getItem('dogi_psk') || '721135';
+      document.getElementById('pskInput').value = savedPsk;
+      updateUIState(false);
+      
+      // Képernyő ébren tartása betöltéskor
+      requestWakeLock();
+    });
+
+    // WAKE LOCK LOGIKA: Képernyő aktívan tartása
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          log('Screen Wake Lock is active (screen will stay awake).');
+
+          wakeLock.addEventListener('release', () => {
+            log('Screen Wake Lock was released.');
+          });
+        } catch (err) {
+          log(`Wake Lock error: ${err.name}, ${err.message}`);
+        }
+      } else {
+        log('Screen Wake Lock API is not supported on this browser.');
+      }
+    }
+
+    // Újraaktiválás, ha a böngésző lap/alkalmazás újra fókuszba kerül
+    document.addEventListener('visibilitychange', async () => {
+      if (wakeLock !== null && document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    });
+
+    function saveSettings() {
+      const psk = document.getElementById('pskInput').value.trim();
+      localStorage.setItem('dogi_psk', psk);
+      log("Security PIN / PSK updated.");
+      toggleModal('modal-settings', false);
+    }
 
     function log(msg) {
       const output = document.getElementById('logOutput');
       const timestamp = new Date().toLocaleTimeString();
-      output.innerText += `[${timestamp}] ${msg}\n`;
-      output.scrollTop = output.scrollHeight;
+      if (output) {
+        output.innerText += `[${timestamp}] ${msg}\n`;
+        output.scrollTop = output.scrollHeight;
+      }
+      console.log(msg);
     }
 
     function clearLogs() {
@@ -229,14 +288,70 @@
       }
     }
 
+    function updateUIState(connected) {
+      isConnected = connected;
+      const connectBtn = document.getElementById('connectBtn');
+      const controls = document.querySelectorAll('.cmd-control');
+
+      if (connected) {
+        connectBtn.innerText = "Connected";
+        connectBtn.style.backgroundColor = "#10b981";
+        controls.forEach(ctrl => ctrl.removeAttribute('disabled'));
+      } else {
+        connectBtn.innerText = "Connect";
+        connectBtn.style.backgroundColor = "";
+        controls.forEach(ctrl => ctrl.setAttribute('disabled', 'true'));
+        document.getElementById('wlan0').value = '---';
+        document.getElementById('wwan0').value = '---';
+        document.getElementById('route').value = '---';
+        document.getElementById('wifimode').value = '---';
+        document.getElementById('onboardStatus').value = '---';
+      }
+    }
+
     function toggleDemoMode(enabled) {
       isDemoMode = enabled;
       log(`Demo mode ${enabled ? 'enabled' : 'disabled'}`);
       if (enabled) {
+        updateUIState(true);
         startDemoTelemetry();
       } else {
+        updateUIState(false);
         if (demoInterval) clearInterval(demoInterval);
       }
+    }
+
+    async function deriveNoisePSKKey(serverPubKeyB64, pskPassphrase) {
+      const serverKeyBytes = Uint8Array.from(atob(serverPubKeyB64), c => c.charCodeAt(0));
+      const serverPublicKey = await window.crypto.subtle.importKey(
+        "raw", serverKeyBytes, { name: "X25519" }, false, []
+      );
+
+      const dhBits = await window.crypto.subtle.deriveBits(
+        { name: "X25519", public: serverPublicKey },
+        clientKeyPair.privateKey,
+        256
+      );
+
+      const pskEncoder = new TextEncoder();
+      const hkdfKey = await window.crypto.subtle.importKey(
+        "raw", dhBits, { name: "HKDF" }, false, ["deriveKey"]
+      );
+
+      aesSessionKey = await window.crypto.subtle.deriveKey(
+        {
+          name: "HKDF",
+          hash: "SHA-256",
+          salt: pskEncoder.encode(pskPassphrase),
+          info: pskEncoder.encode("noise-psk-ble-v1")
+        },
+        hkdfKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+
+      log("Noise-PSK Encrypted channel established!");
     }
 
     async function scanBLE() {
@@ -254,6 +369,8 @@
           optionalServices: [SERVICE_UUID]
         });
 
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
         const select = document.getElementById('deviceSelect');
         select.innerHTML = `<option value="${bleDevice.id}">${bleDevice.name || 'Dogi Robot'}</option>`;
         log(`Found device: ${bleDevice.name || bleDevice.id}`);
@@ -265,6 +382,7 @@
     async function connectBLE() {
       if (isDemoMode) {
         log("Demo Mode: Connected to simulated Dogi.");
+        updateUIState(true);
         return;
       }
 
@@ -277,17 +395,42 @@
         log("Connecting to GATT Server...");
         gattServer = await bleDevice.gatt.connect();
         const service = await gattServer.getPrimaryService(SERVICE_UUID);
-        
+
         cmdCharacteristic = await service.getCharacteristic(CMD_UUID);
         statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
 
         await statusCharacteristic.startNotifications();
+        statusCharacteristic.removeEventListener('characteristicvaluechanged', handleStatusUpdate);
         statusCharacteristic.addEventListener('characteristicvaluechanged', handleStatusUpdate);
 
-        log("Connected successfully! Subscribed to telemetry updates.");
-        await sendCommand('CONNECT');
+        log("Generating Ephemeral Keypair...");
+        clientKeyPair = await window.crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveBits"]);
+        const rawPub = await window.crypto.subtle.exportKey("raw", clientKeyPair.publicKey);
+        const pubB64 = btoa(String.fromCharCode(...new Uint8Array(rawPub)));
+
+        log("Initiating Handshake...");
+        await cmdCharacteristic.writeValue(new TextEncoder().encode(`KEYEX:${pubB64}`));
+
       } catch (err) {
         log(`Connection failed: ${err.message}`);
+        updateUIState(false);
+      }
+    }
+
+    function onDisconnected() {
+      log("BLE connection lost! Attempting auto-reconnect...");
+      aesSessionKey = null;
+      updateUIState(false);
+
+      if (!isDemoMode && bleDevice) {
+        setTimeout(async () => {
+          try {
+            log("Auto-reconnecting to Dogi...");
+            await connectBLE();
+          } catch (err) {
+            log("Auto-reconnect failed. Tap Connect manually.");
+          }
+        }, 2000);
       }
     }
 
@@ -304,8 +447,22 @@
       }
 
       try {
-        const encoder = new TextEncoder();
-        await cmdCharacteristic.writeValue(encoder.encode(cmd));
+        let payloadStr = cmd;
+        if (aesSessionKey) {
+          const iv = window.crypto.getRandomValues(new Uint8Array(12));
+          const ciphertext = await window.crypto.subtle.encrypt(
+            { name: "AES-GCM", iv: iv },
+            aesSessionKey,
+            new TextEncoder().encode(cmd)
+          );
+
+          payloadStr = "ENC:" + JSON.stringify({
+            nonce: btoa(String.fromCharCode(...iv)),
+            ct: btoa(String.fromCharCode(...new Uint8Array(ciphertext)))
+          });
+        }
+
+        await cmdCharacteristic.writeValue(new TextEncoder().encode(payloadStr));
       } catch (err) {
         log(`Failed to send command: ${err.message}`);
       }
@@ -316,25 +473,70 @@
       sendCommand(cmd);
     }
 
-    function handleStatusUpdate(event) {
-      const decoder = new TextDecoder('utf-8');
-      const rawString = decoder.decode(event.target.value);
-      log(`Received raw data: ${rawString}`);
+    async function handleStatusUpdate(event) {
+      let rawString = new TextDecoder('utf-8').decode(event.target.value);
+      if (!rawString) return;
 
-      const parts = rawString.split('@');
-      parts.forEach(part => {
-        if (part.includes('IP:')) {
-          const val = part.split('IP:')[1];
-          document.getElementById('wlan0').value = val;
-        } else if (part.includes('wwan:')) {
-          const val = part.split('wwan:')[1];
-          document.getElementById('wwan0').value = val;
-        } else if (part.includes('MODE:')) {
-          const val = part.split('MODE:')[1];
-          document.getElementById('wifimode').value = val;
-        } else if (part.includes('Route:')) {
-          const val = part.split('Route:')[1];
-          document.getElementById('route').value = val;
+      rawString = rawString.trim().replace(/\x00/g, '');
+
+      if (rawString.startsWith("KEYEX_RESP:")) {
+        const serverPubB64 = rawString.split("KEYEX_RESP:")[1];
+        const psk = localStorage.getItem('dogi_psk') || '721135';
+        await deriveNoisePSKKey(serverPubB64, psk);
+        await sendCommand('CONNECT');
+        return;
+      }
+
+      if (rawString.startsWith("ENC:")) {
+        try {
+          const data = JSON.parse(rawString.substring(4));
+          const iv = Uint8Array.from(atob(data.nonce), c => c.charCodeAt(0));
+          const ct = Uint8Array.from(atob(data.ct), c => c.charCodeAt(0));
+
+          const decrypted = await window.crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: iv },
+            aesSessionKey,
+            ct
+          );
+          rawString = new TextDecoder('utf-8').decode(decrypted).trim();
+        } catch (e) {
+          log("Decryption failed! Check PIN/PSK setting.");
+          return;
+        }
+      }
+
+      log(`[STATUS IN] ${rawString}`);
+
+      if (rawString === "WELCOME" || rawString === "PONG") {
+        updateUIState(true);
+        log("Connected & Authenticated!");
+        return;
+      }
+
+      // Rugalmas mezőillesztés Pipe (|) és/vagy At (@) elválasztásra
+      const tokens = rawString.split(/[@|]/);
+
+      tokens.forEach(token => {
+        const item = token.trim();
+        const upper = item.toUpperCase();
+
+        if (upper.includes('WLAN0') || upper.includes('WLAN') || (upper.includes('IP:') && !upper.includes('WWAN'))) {
+          const val = item.includes(':') ? item.split(':')[1] : item;
+          document.getElementById('wlan0').value = val.trim();
+        } 
+        else if (upper.includes('WWAN0') || upper.includes('WWAN')) {
+          const val = item.includes(':') ? item.split(':')[1] : item;
+          document.getElementById('wwan0').value = val.trim();
+        } 
+        else if (upper.startsWith('MODE:')) {
+          document.getElementById('wifimode').value = item.split(':')[1].trim();
+        } 
+        else if (upper.startsWith('ROUTE:')) {
+          document.getElementById('route').value = item.split(':')[1].trim();
+        }
+        else if (upper.startsWith('ONBOARD:')) {
+          const val = item.substring(8).trim();
+          document.getElementById('onboardStatus').value = val;
         }
       });
     }
@@ -343,14 +545,13 @@
       if (demoInterval) clearInterval(demoInterval);
       demoInterval = setInterval(() => {
         if (!isDemoMode) return;
-        const simulatedData = "IP:192.168.1.100@wwan:10.0.0.42@MODE:STA@Route:WiFi";
+        const simulatedData = "wlan0:192.168.1.248 | wwan0:10.20.5.38 | MODE:STA | ROUTE:WIFI | ONBOARD:Up 15 minutes";
         handleStatusUpdate({
           target: { value: new TextEncoder().encode(simulatedData) }
         });
       }, 5000);
     }
 
-    // Register Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
