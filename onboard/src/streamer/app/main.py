@@ -103,18 +103,24 @@ def create_app(cfg):
     async def health():
         return get_health(streamer, start_time)
 
+    @app.get("/stats")
+    async def stat():
+        return streamer.get_stats(window_sec=3.0)
+
     return app
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=None)
+    parser.add_argument("--override", default=None)
     parser.add_argument("--debug", action="store_true", help="enable debug logging")
     args = parser.parse_args()
 
     # Find default config file in current folder if --config not provided.
     import os
     config_path = args.config
+    override_path = args.override
     if not config_path:
         for candidate in ("camera.toml", "config.toml", "config.example.toml"):
             if os.path.exists(candidate):
@@ -129,8 +135,10 @@ def main():
     logger = logging.getLogger(__name__)
 
     logger.info('Using config file: %s', config_path)
+    if override_path:
+        logger.info('Using override file: %s', override_path)
 
-    cfg = load_config(config_path)
+    cfg = load_config(config_path, override_path)
     # pre-flight environment check for GStreamer components
     try:
         from .streamer import check_environment
@@ -144,7 +152,7 @@ def main():
         logger.error('Missing required GStreamer elements: %s', missing)
         logger.error('GStreamer environment report: %s', env)
         raise SystemExit(2)
-
+   
     if not env.get('hw_encoder'):
         logger.warning('No hardware H.264 encoder detected; software encoding will be used.')
 

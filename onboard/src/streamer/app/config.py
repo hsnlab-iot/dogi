@@ -1,5 +1,6 @@
 import dataclasses
 import tomli
+import os
 from typing import Optional
 
 
@@ -52,9 +53,37 @@ class Config:
     snapshot: SnapshotConfig = dataclasses.field(default_factory=SnapshotConfig)
 
 
-def load_config(path: str) -> Config:
+def deep_update(base: dict, override: dict) -> dict:
+    """Recursively update a nested dictionary with another."""
+    for key, value in override.items():
+        if isinstance(value, dict) and key in base and isinstance(base[key], dict):
+            deep_update(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def _from_dict(cls, data: dict):
+    """Instantiates a dataclass using provided dict data, falling back to class defaults."""
+    default_instance = cls()
+    # Extract default attributes into a dictionary
+    defaults = dataclasses.asdict(default_instance)
+    # Merge TOML dictionary over default values
+    defaults.update(data)
+    # Filter out keys in TOML that aren't defined in the dataclass to avoid TypeError
+    valid_keys = {f.name for f in dataclasses.fields(cls)}
+    filtered_data = {k: v for k, v in defaults.items() if k in valid_keys}
+    return cls(**filtered_data)
+
+def load_config(path: str, override_path: str | None = None) -> Config:
+    # 1. Load primary config file
     with open(path, "rb") as f:
         data = tomli.load(f)
+
+    # 2. Deep merge override TOML if present
+    if override_path and os.path.exists(override_path):
+        with open(override_path, "rb") as f:
+            deep_update(data, tomli.load(f))
 
     cfg = Config()
 

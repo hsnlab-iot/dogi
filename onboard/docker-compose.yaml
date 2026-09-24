@@ -10,6 +10,7 @@ services:
       - SERIAL_PORT=/dev/serial0
     volumes:
       - ./src/streamer.cfg:/root/streamer.cfg:ro
+      - ./src/streamer.override.cfg:/root/streamer.override.cfg:ro
     expose:
       - "8000"
       - "8001"

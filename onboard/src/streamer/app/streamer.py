@@ -8,6 +8,7 @@ import numpy as np
 import time
 import logging
 import simplejpeg
+from collections import deque
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,12 @@ class Streamer:
         self._device_probe = {}
         # cache the exact working temporary pipeline launch string per device
         self._device_working_launch = {}
+        
+        self._sent_bytes = 0
+        # Store up to 35 samples (~3.5 seconds at 100ms intervals)
+        self._samples = deque(maxlen=35)
+        self._sampler_thread = None
+        self._sampler_stop_event = threading.Event()        
 
     def is_running(self) -> bool:
         with self._lock:
@@ -307,6 +314,8 @@ class Streamer:
                     logger.debug('Could not write pipeline dot file')
             except Exception:
                 pass
+        
+        self._start_sampler()
 
     def stop(self) -> None:
         with self._lock:
@@ -322,6 +331,8 @@ class Streamer:
             self._appsink = None
             self._valve = None
             self._running = False
+
+        self._stop_sampler()
 
     def snapshot(self, cfg, timeout_sec: float = 1.0):
         """Capture a single frame. If the streaming pipeline is running, briefly open the valve
@@ -563,6 +574,90 @@ class Streamer:
             logger.exception('simplejpeg.encode_jpeg failed')
             return None
 
+    def get_udpsink_bytes(self) -> int:
+        """Read total bytes emitted directly from the GStreamer udpsink element."""
+        with self._lock:
+            if self.pipeline:
+                udpsink = self.pipeline.get_by_name('udpsink')
+                if udpsink:
+                    # Returns total bytes sent by udpsink
+                    return udpsink.get_property('bytes-served')
+        return 0
+
+    def get_stream_frames(self) -> int:
+            """Fetch cumulative rendered frames from videorate."""
+            with self._lock:
+                if self.pipeline:
+                    vrate = self.pipeline.get_by_name('videorate')
+                    if vrate:
+                        return vrate.get_property('out')
+            return 0
+
+    def get_stats(self, window_sec: float = 3.0) -> dict:
+        """Returns current counts and rolling averages for bytes/sec and fps over window_sec."""
+        now = time.monotonic()
+        cutoff = now - window_sec
+
+        total_bytes = self.get_udpsink_bytes()
+        total_frames = self.get_stream_frames()
+
+        with self._lock:
+            valid_samples = [s for s in self._samples if s[0] >= cutoff]
+
+            if len(valid_samples) < 2:
+                return {
+                    "bytes": total_bytes,
+                    "frames": total_frames,
+                    "bytes_per_sec": 0.0,
+                    "fps": 0.0,
+                }
+
+            t0, b0, f0 = valid_samples[0]
+            t1, b1, f1 = valid_samples[-1]
+            dt = t1 - t0
+
+            if dt <= 0:
+                return {
+                    "bytes": total_bytes,
+                    "frames": total_frames,
+                    "bytes_per_sec": 0.0,
+                    "fps": 0.0,
+                }
+
+            return {
+                "bytes": total_bytes,
+                "frames": total_frames,
+                "bytes_per_sec": round(max(0.0, (b1 - b0) / dt), 2),
+                "fps": round(max(0.0, (f1 - f0) / dt), 2),
+            }
+
+
+    def _start_sampler(self):
+        self._sampler_stop_event.clear()
+        self._samples.clear()
+        self._sampler_thread = threading.Thread(
+            target=self._sample_loop, daemon=True
+        )
+        self._sampler_thread.start()
+
+    def _stop_sampler(self):
+        self._sampler_stop_event.set()
+        if self._sampler_thread and self._sampler_thread.is_alive():
+            self._sampler_thread.join(timeout=1.0)
+        self._sampler_thread = None
+
+    def _sample_loop(self):
+        """Background worker that records bytes every 100ms."""
+        while not self._sampler_stop_event.is_set():
+            now = time.monotonic()
+            current_bytes = self.get_udpsink_bytes()
+            current_frames = self.get_stream_frames()
+            
+            with self._lock:
+                self._samples.append((now, current_bytes, current_frames))
+            
+            time.sleep(0.1)
+
 
 def check_environment():
     """Check availability of required GStreamer elements and hardware encoders.
@@ -586,6 +681,3 @@ def check_environment():
 
     logger.debug('Hardware encoder present: %s', hw)
     return {'elements': available, 'hw_encoder': hw}
-
-
-
