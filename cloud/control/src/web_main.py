@@ -1,7 +1,7 @@
 import os
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, urlsplit
 import urllib.request
 import urllib.parse
 import libtmux
@@ -159,8 +159,8 @@ def _get_ping_snapshot():
         return dict(_ping_state)
 
 
-def _fetch_stream_stats(host, timeout_seconds=1.0):
-    url = f'http://{host}:5051/stats'
+def _fetch_stream_stats(host, port, timeout_seconds=1.0):
+    url = f'http://{host}:{port}/stats'
     try:
         req = urllib.request.Request(url, method='GET')
         with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
@@ -211,7 +211,9 @@ def api_status():
     """Return aggregated runtime status for streamer, ollama models and ping."""
     host = urlparse(request.url_root).hostname or 'localhost'
 
-    streamer = _fetch_stream_stats(host, timeout_seconds=1.0)
+    cloud_streamer = _fetch_stream_stats(host, 5051, timeout_seconds=1.0)
+    robot_streamer_url = urlsplit(config.get_streamer_url())
+    robot_streamer = _fetch_stream_stats(robot_streamer_url.hostname, robot_streamer_url.port, timeout_seconds=1.0)
     ping = _get_ping_snapshot()
 
     try:
@@ -227,7 +229,7 @@ def api_status():
 
     ollama_models = _flatten_ollama_models(ollama_payload)
 
-    fps = float(streamer.get('fps') or 0.0)
+    fps = float(cloud_streamer.get('fps') or 0.0)
     ping_rtt = float(ping.get('rtt_ms') or -1.0)
     model_count = len(ollama_models)
 
@@ -241,7 +243,8 @@ def api_status():
         'status': ' | '.join(status_parts),
         'statusHTML': ' | '.join(status_parts),
         'timestamp': time.time(),
-        'streamer': streamer,
+        'cloud_streamer': cloud_streamer,
+        'robor_streamer': robot_streamer,
         'ping': ping,
         'ollama': ollama_payload,
         'ollama_models': ollama_models,
@@ -274,6 +277,11 @@ def api_hf_status():
         return {'status': 'offline'}
     else:
         return {'status': 'online'}
+
+@app.route('/api/status/robotvideo')
+def api_robotvideo_status():
+    robot_streamer_url = urlsplit(config.get_streamer_url())
+    return  _fetch_stream_stats(robot_streamer_url.hostname, robot_streamer_url.port, timeout_seconds=1.0)
 
 @app.route('/reload', methods=['POST', 'GET'])
 def reload_config():

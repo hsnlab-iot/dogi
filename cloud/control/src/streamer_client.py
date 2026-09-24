@@ -22,19 +22,9 @@ logging.basicConfig(level=logging.INFO)
 
 
 def _load_streamer_url():
-    cfg = config.get_config_data()
-    url = cfg.get('streamer', {}).get('url')
+    url = config.get_streamer_url()
     if not url:
         raise RuntimeError('streamer.url not found in config')
-
-    # Replace placeholder tokens like ROBOT_IP or robot_ip with env var if present
-    if 'ROBOT_IP' in url or 'robot_ip' in url:
-        env_val = os.environ.get('ROBOT_IP') or os.environ.get('robot_ip')
-        if env_val:
-            url = url.replace('ROBOT_IP', env_val).replace('robot_ip', env_val)
-            LOG.info('Replaced robot IP placeholder with %s', env_val)
-        else:
-            LOG.info('Found robot IP placeholder but no env var ROBOT_IP set; leaving as-is')
 
     return url.rstrip('/')
 

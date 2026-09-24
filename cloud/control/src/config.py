@@ -415,6 +415,7 @@ def _build_runtime_state():
         'tts_model': None,
         'tts_protocol': None,
         'tts_parameters': None,
+        'streamer_url': None,
         'cache_dir': None,
         'soul_content': None,
         'tools_list': None,
@@ -470,6 +471,9 @@ def _build_default_config():
         'ports': {
             'voice': 5059,
             'control': 5002,
+        },
+        'streamer': {
+            'url': '',
         },
     }
 
@@ -1219,6 +1223,25 @@ def get_control_socket():
         _state['control_socket'] = sock
 
     return _state['control_socket']
+
+
+def get_streamer_url():
+    """Singleton to ensure streamer URL stays in memory."""
+    if _state['streamer_url'] is None:
+        raw_url = _get_config_value('streamer', 'url', '')
+        url = str(raw_url or '').strip()
+
+        if 'ROBOT_IP' in url or 'robot_ip' in url:
+            env_val = os.environ.get('ROBOT_IP') or os.environ.get('robot_ip')
+            if env_val:
+                url = url.replace('ROBOT_IP', env_val).replace('robot_ip', env_val)
+            else:
+                print('Warning: streamer.url contains ROBOT_IP placeholder but env var is not set')
+
+        _state['streamer_url'] = url.rstrip('/') if url else ''
+        print(f"Using streamer URL: {_state['streamer_url']}")
+
+    return _state['streamer_url']
 
 def get_tools():
     """Singleton to read and cache tools config once."""

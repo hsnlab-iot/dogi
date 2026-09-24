@@ -53,7 +53,7 @@
             </div>
         </div>
 
-        <!-- Előkészített felület a kártyáknak (pl. Ollama) -->
+        <!-- Dinamikus kártyák -->
         <div id="cards-container" class="cards-wrapper">
             <section class="status-card">
                 <h3>Ollama Models (ps)</h3>
@@ -67,8 +67,13 @@
             </section>
 
             <section class="status-card">
-                <h3>Video Stream</h3>
-                <div id="status-stream" class="status-scroll">Loading...</div>
+                <h3>Cloud Stream</h3>
+                <div id="status-cloud-stream" class="status-scroll">Loading...</div>
+            </section>
+
+            <section class="status-card">
+                <h3>Robot Stream</h3>
+                <div id="status-robot-stream" class="status-scroll">Loading...</div>
             </section>
         </div>
     </div>
@@ -136,9 +141,10 @@
     var pingHistoryMax = 60;
     var statusOllama = document.getElementById('status-ollama');
     var statusPing = document.getElementById('status-ping');
-    var statusStream = document.getElementById('status-stream');
+    var cloud_statusStream = document.getElementById('status-cloud-stream');
+    var robot_statusStream = document.getElementById('status-robot-stream');
     var pingChart = document.getElementById('ping-chart');
-    var pingCtx = pingChart.getContext('2d');
+    var pingCtx = pingChart ? pingChart.getContext('2d') : null;
 
     function escapeHtml(value) {
         return String(value || '')
@@ -147,6 +153,19 @@
             .replaceAll('>', '&gt;')
             .replaceAll('"', '&quot;')
             .replaceAll("'", '&#39;');
+    }
+
+    function formatBitrate(bytesPerSec) {
+        var bps = (Number(bytesPerSec) || 0) * 8;
+        var kbps = bps / 1000;
+        var mbps = bps / 1000000;
+
+        if (mbps >= 1.0) {
+            return mbps.toFixed(2) + ' Mbps (' + Math.round(kbps) + ' kbps)';
+        } else if (kbps >= 1.0) {
+            return kbps.toFixed(1) + ' kbps (' + Math.round(bps) + ' bps)';
+        }
+        return Math.round(bps) + ' bps';
     }
 
     function drawPingChart() {
@@ -306,33 +325,56 @@
         drawPingChart();
     }
 
-    function renderStreamStatus(streamPayload) {
-        if (!statusStream) return;
+    function cloud_renderStreamStatus(streamPayload) {
+        if (!cloud_statusStream) return;
 
         if (!streamPayload || !streamPayload.ok) {
-            var err = streamPayload && streamPayload.error ? String(streamPayload.error) : 'stream stats unavailable';
-            statusStream.innerHTML = '<div class="mono-line">' + escapeHtml(err) + '</div>';
+            var err = streamPayload && streamPayload.error ? String(streamPayload.error) : 'cloud stream stats unavailable';
+            cloud_statusStream.innerHTML = '<div class="mono-line">' + escapeHtml(err) + '</div>';
             return;
         }
 
         var resolution = streamPayload.resolution || {};
         var fps = Number(streamPayload.fps || 0).toFixed(2);
-        var bitrateMbps = Number(streamPayload.bitrate_mbps || 0).toFixed(3);
-        var bitrateBps = Number(streamPayload.bitrate_bps || 0).toFixed(0);
+        var bytesPerSec = streamPayload.bytes_per_sec !== undefined ? streamPayload.bytes_per_sec : ((streamPayload.bitrate_bps || 0) / 8);
+        var formattedBitrate = formatBitrate(bytesPerSec);
         var label = resolution.label || 'unknown';
 
-        statusStream.innerHTML = [
+        cloud_statusStream.innerHTML = [
             '<div class="mono-line"><strong>Resolution:</strong> ' + escapeHtml(label) + '</div>',
             '<div class="mono-line"><strong>FPS:</strong> ' + fps + '</div>',
-            '<div class="mono-line"><strong>Bitrate:</strong> ' + bitrateMbps + ' Mbps (' + bitrateBps + ' bps)</div>',
-            '<div class="mono-line"><strong>Samples:</strong> ' + escapeHtml(streamPayload.sample_count || 0) + ' over ' + escapeHtml(streamPayload.window_seconds || 0) + 's</div>'
+            '<div class="mono-line"><strong>Bitrate:</strong> ' + formattedBitrate + '</div>',
+        ].join('');
+    }
+
+    function robot_renderStreamStatus(streamPayload) {
+        if (!robot_statusStream) return;
+
+        if (!streamPayload || !streamPayload.ok) {
+            var err = streamPayload && streamPayload.error ? String(streamPayload.error) : 'robot stream stats unavailable';
+            robot_statusStream.innerHTML = '<div class="mono-line">' + escapeHtml(err) + '</div>';
+            return;
+        }
+
+        var fps = Number(streamPayload.fps || 0).toFixed(2);
+        var bytesPerSec = streamPayload.bytes_per_sec !== undefined ? streamPayload.bytes_per_sec : 0;
+        var formattedBitrate = formatBitrate(bytesPerSec);
+        var seqNumber = streamPayload.frames !== undefined ? escapeHtml(streamPayload.frames) : '-';
+        var totalBytes = streamPayload.bytes !== undefined ? (Number(streamPayload.bytes) / (1024 * 1024)).toFixed(2) + ' MB' : '-';
+
+        robot_statusStream.innerHTML = [
+            '<div class="mono-line"><strong>FPS:</strong> ' + fps + '</div>',
+            '<div class="mono-line"><strong>Bitrate:</strong> ' + formattedBitrate + '</div>',
+            '<div class="mono-line"><strong>Sequence (Frames):</strong> ' + seqNumber + '</div>',
+            '<div class="mono-line"><strong>Total Transferred:</strong> ' + totalBytes + '</div>'
         ].join('');
     }
 
     function updateSystemStatus() {
         var ollamaUrl = 'http://{{ host }}:5059/api/status/ollama?include_ps=1';
         var pingUrl = 'http://{{ host }}:5059/api/status/ping';
-        var streamUrl = 'http://{{ host }}:5059/video/stats';
+        var cloud_streamUrl = 'http://{{ host }}:5059/video/stats';
+        var robot_streamUrl = 'http://{{ host }}:5059/api/status/robotvideo';
 
         function fetchJsonOrThrow(url) {
             return fetch(url).then(function(response) {
@@ -346,31 +388,41 @@
         Promise.allSettled([
             fetchJsonOrThrow(ollamaUrl),
             fetchJsonOrThrow(pingUrl),
-            fetchJsonOrThrow(streamUrl)
+            fetchJsonOrThrow(cloud_streamUrl),
+            fetchJsonOrThrow(robot_streamUrl)
         ])
         .then(function(results) {
             var ollamaResult = results[0];
             var pingResult = results[1];
-            var streamResult = results[2];
+            var cloud_streamResult = results[2];
+            var robot_streamResult = results[3];
 
             if (ollamaResult.status === 'fulfilled') {
                 renderOllamaStatus(ollamaResult.value);
-            } else {
+            } else if (statusOllama) {
                 statusOllama.textContent = 'ollama fetch failed: ' + String(ollamaResult.reason || 'unknown error');
             }
 
             if (pingResult.status === 'fulfilled') {
                 renderPingStatus(pingResult.value);
-            } else {
+            } else if (statusPing) {
                 statusPing.textContent = 'ping fetch failed: ' + String(pingResult.reason || 'unknown error');
             }
 
-            if (streamResult.status === 'fulfilled') {
-                var streamPayload = streamResult.value;
-                streamPayload.ok = true;
-                renderStreamStatus(streamPayload);
-            } else {
-                statusStream.textContent = 'stream fetch failed: ' + String(streamResult.reason || 'unknown error');
+            if (cloud_streamResult.status === 'fulfilled') {
+                var cloud_streamPayload = cloud_streamResult.value;
+                cloud_streamPayload.ok = true;
+                cloud_renderStreamStatus(cloud_streamPayload);
+            } else if (cloud_statusStream) {
+                cloud_statusStream.textContent = 'cloud stream fetch failed: ' + String(cloud_streamResult.reason || 'unknown error');
+            }
+
+            if (robot_streamResult.status === 'fulfilled') {
+                var robot_streamPayload = robot_streamResult.value;
+                robot_streamPayload.ok = true;
+                robot_renderStreamStatus(robot_streamPayload);
+            } else if (robot_statusStream) {
+                robot_statusStream.textContent = 'robot stream fetch failed: ' + String(robot_streamResult.reason || 'unknown error');
             }
         });
     }
