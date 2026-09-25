@@ -194,8 +194,6 @@
     const CMD_UUID     = "b4e1d091-8571-4b5e-8564-000000000001";
     const STATUS_UUID  = "b4e1d091-8571-4b5e-8564-000000000002";
 
-    const VIDEO_COMMANDS = ['VID_OFF', 'VID_256K', 'VID_512K', 'VID_1024K', 'VID_2048K'];
-
     let bleDevice = null;
     let gattServer = null;
     let cmdCharacteristic = null;
@@ -469,8 +467,8 @@
     }
 
     function onVideoQualityChange(val) {
-      const cmd = VIDEO_COMMANDS[val];
-      sendCommand(cmd);
+      // Elküldi a VIDEO parancsot a kiválasztott index értékkel (pl. VIDEO 0, VIDEO 1)
+      sendCommand(`VIDEO ${val}`);
     }
 
     async function handleStatusUpdate(event) {
@@ -538,6 +536,12 @@
           const val = item.substring(8).trim();
           document.getElementById('onboardStatus').value = val;
         }
+        else if (upper.startsWith('VID:')) {
+          const val = parseInt(item.split(':')[1].trim(), 10);
+          if (!isNaN(val) && val >= 0 && val <= 4) {
+            document.getElementById('videoSlider').value = val;
+          }
+        }
       });
     }
 
@@ -545,7 +549,7 @@
       if (demoInterval) clearInterval(demoInterval);
       demoInterval = setInterval(() => {
         if (!isDemoMode) return;
-        const simulatedData = "wlan0:192.168.1.248 | wwan0:10.20.5.38 | MODE:STA | ROUTE:WIFI | ONBOARD:Up 15 minutes";
+        const simulatedData = "wlan0:192.168.1.248 | wwan0:10.20.5.38 | MODE:STA | ROUTE:WIFI | ONBOARD:Up 15 minutes | VID:2";
         handleStatusUpdate({
           target: { value: new TextEncoder().encode(simulatedData) }
         });
