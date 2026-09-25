@@ -1,15 +1,15 @@
 [pupcard]
 language = "HUN"
 model = "ornith-1.5:9b + Qwen3-VL:4b"
-tts = "Meta ENG"
+tts = "F5 HUN"
 
 [general]
-cache = "~/.cache/chewie"
-log = "~/log/chewie"
+cache = "~/.cache/fonix"
+log = "~/log/fonix"
 
 [language]
-ui = "en"
-prompt = "en"
+ui = "hu"
+prompt = "hu"
 
 [models]
 general = "ornith-1.5:9b"
