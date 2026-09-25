@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import time
+from enum import Enum
 from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 from contextlib import contextmanager
 from typing import Optional, Dict, Any
@@ -81,10 +82,19 @@ if OPENAI_IMAGE_INPUT_MODE not in {"url", "base64"}:
 
 # Answer length configuration (maps to max tokens)
 ANSWER_CONFIG = CONFIG.get("answer_lengths", {})
+
+# ==========================================
+# ENUM DEFINÍCIÓ A HALLUCINÁCIÓK ELLEN
+# ==========================================
+class AnswerLength(str, Enum):
+    SHORT = "short"
+    MEDIUM = "medium"
+    LONG = "long"
+
 ANSWER_LENGTH_TOKENS = {
-    "short": int(ANSWER_CONFIG.get("short", 256)),
-    "medium": int(ANSWER_CONFIG.get("medium", 512)),
-    "long": int(ANSWER_CONFIG.get("long", 2048)),
+    AnswerLength.SHORT: int(ANSWER_CONFIG.get("short", 256)),
+    AnswerLength.MEDIUM: int(ANSWER_CONFIG.get("medium", 512)),
+    AnswerLength.LONG: int(ANSWER_CONFIG.get("long", 2048)),
 }
 
 openai_client = OpenAI(
@@ -376,7 +386,7 @@ mcp = FastMCP("vision-prompt")
 
 
 @mcp.tool()
-def vision_prompt(prompt: str, ctx: Context, answer_length: str = "short") -> str:
+def vision_prompt(prompt: str, ctx: Context, answer_length: AnswerLength = AnswerLength.SHORT) -> str:
     """Capture a fresh snapshot through the camera and run a prompt on it.
     
     Args:
@@ -385,17 +395,14 @@ def vision_prompt(prompt: str, ctx: Context, answer_length: str = "short") -> st
     """
     try:
         started_at = time.time()
-        answer_length = answer_length.strip()
         _log("DEBUG", f"vision_prompt called with prompt: {prompt[:100]}..." if len(prompt) > 100 else f"vision_prompt called with prompt: {prompt}")
-        _log("DEBUG", f"answer_length: {answer_length}")
+        _log("DEBUG", f"answer_length: {answer_length.value}")
         if not prompt or not prompt.strip():
             raise ValueError("prompt must not be empty")
 
-        # Validate and get max tokens for answer length
-        if answer_length not in ANSWER_LENGTH_TOKENS:
-            raise ValueError(f"answer_length must be one of {list(ANSWER_LENGTH_TOKENS.keys())}, got '{answer_length}'")
+        # Get max tokens for answer length directly from mapping
         max_tokens = ANSWER_LENGTH_TOKENS[answer_length]
-        _log("DEBUG", f"Using max_tokens={max_tokens} for answer_length='{answer_length}'")
+        _log("DEBUG", f"Using max_tokens={max_tokens} for answer_length='{answer_length.value}'")
 
         snapshot_url = SNAPSHOT_URL
         prompt_text = prompt.strip()
@@ -483,7 +490,7 @@ if __name__ == "__main__":
     print(f"Using thinking mode: {OPENAI_ENABLE_THINKING}", flush=True)
     print(f"HTTP timeout: {HTTP_TIMEOUT_SECONDS}s", flush=True)
     print(f"Debug level: {list(LOG_LEVELS.keys())[DEBUG_LEVEL]}", flush=True)
-    print(f"Available answer lengths: {list(ANSWER_LENGTH_TOKENS.keys())}", flush=True)
+    print(f"Available answer lengths: {[e.value for e in AnswerLength]}", flush=True)
     if SOCKETIO_URL:
         print(f"SocketIO snapshot support enabled: {SOCKETIO_URL} (event: '{SOCKETIO_EVENT}')", flush=True)
     else:
