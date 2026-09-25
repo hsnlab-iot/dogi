@@ -129,6 +129,10 @@ def run(model: str, num_hands: int,
   recognition_frame = None
   recognition_result_list = []
 
+  # List to store gesture labels -NEW
+  recognized_gesture_list = []
+  most_common_gesture = 'None'
+
   def save_result(result: vision.GestureRecognizerResult,
                   unused_output_image: mp.Image, timestamp_ms: int):
       global FPS, COUNTER, START_TIME
@@ -137,6 +141,10 @@ def run(model: str, num_hands: int,
       if COUNTER % fps_avg_frame_count == 0:
           FPS = fps_avg_frame_count / (time.time() - START_TIME)
           START_TIME = time.time()
+
+          # Cutting elements from recognized_gesture_list to only go back for 1 second based on FPS -NEW
+          while(len(recognized_gesture_list) > FPS):
+              recognized_gesture_list.pop(0)
 
       recognition_result_list.append(result)
       COUNTER += 1
@@ -211,6 +219,9 @@ def run(model: str, num_hands: int,
           score = round(gesture[0].score, 2)
           result_text = f'{category_name} ({score})'
 
+          # Appending the new detected gesture into the list -NEW
+          recognized_gesture_list.append(category_name) 
+
           # Compute text size
           text_size = \
           cv2.getTextSize(result_text, cv2.FONT_HERSHEY_DUPLEX, label_font_size,
@@ -253,7 +264,17 @@ def run(model: str, num_hands: int,
         cv2.imshow('gesture_recognition', recognition_frame)
         publisher.send(recognition_frame.tobytes())
 
-    if category_name is not None and category_name != 'None':
+    if len(recognized_gesture_list) > 0:
+      # Finding the most probable gesture shown -NEW
+      most_common_gesture = max(set(recognized_gesture_list), key=recognized_gesture_list.count)
+      most_common_percentage = recognized_gesture_list.count(most_common_gesture) / len(recognized_gesture_list)
+
+    # Check if the most common gesture is not None, and if the majority is big enough -NEW
+    #if category_name is not None and category_name != 'None': 
+    #  print(category_name)
+
+    if(most_common_gesture is not None and most_common_gesture != 'None' and most_common_percentage >= 0.75):
+      category_name = most_common_gesture
       print(category_name)
 
       if time.time() > next_action:
