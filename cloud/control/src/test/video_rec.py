@@ -1,44 +1,73 @@
 import cv2
 import zmq
 import numpy as np
+import argparse
 
-# Subscribe to video
+# ---- Command line arguments ----
+parser = argparse.ArgumentParser(description="Record video from ZMQ stream")
+parser.add_argument('--show',  help='display video window (requires graphics display)')
+parser.add_argument('--output', default='output.mp4',
+                    help='output file name (default: output.mp4)')
+parser.add_argument('--seconds', type=float, default=0,
+                    help='auto-stop after N seconds (0 = run until Ctrl+C)')
+args = parser.parse_args()
+
+# ---- ZMQ setup ----
 zmqcontext = zmq.Context()
 subscriber = zmqcontext.socket(zmq.SUB)
 subscriber.setsockopt(zmq.CONFLATE, 1)
-subscriber.setsockopt_string(zmq.SUBSCRIBE, '')  # Subscribe to all topics
-subscriber.connect("ipc:///tmp/video_frames_c.ipc")  # IPC socket address
+subscriber.setsockopt(zmq.RCVTIMEO, 1000)
+subscriber.setsockopt_string(zmq.SUBSCRIBE, '')
+subscriber.connect("ipc:///tmp/video_frames_c.ipc")
 
-# Define the output video file
-output_file = 'output.mp4'
+# ---- Video writer setup ----
+width, height = 640, 480
+fps = 30.0
 
-width = 640
-height = 480
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+video_writer = cv2.VideoWriter(args.output, cv2.CAP_FFMPEG, fourcc, fps, (width, height))
 
-# Define the codec and create a VideoWriter object
-fourcc = cv2.VideoWriter_fourcc(*'H264')
-video_writer = cv2.VideoWriter(output_file, fourcc, 30.0, (width, height))
+if not video_writer.isOpened():
+    raise RuntimeError("VideoWriter failed to open")
 
-while True:
-    try:
-        frame_bytes = subscriber.recv()
-        img_array = np.frombuffer(frame_bytes, dtype=np.uint8)
-        img_array = img_array.reshape((height, width, 3))
+frame_count = 0
+import time
+start = time.time()
 
-        img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
-        cv2.imshow("Dogi video + REC", img_array)
+try:
+    while True:
+        try:
+            frame_bytes = subscriber.recv()
+            frame = np.frombuffer(frame_bytes, dtype=np.uint8).reshape((height, width, 3))
 
-        # Write the frame to the video file
-        video_writer.write(img_array)
+            video_writer.write(frame)
+            frame_count += 1
 
-    except zmq.error.Again:
-        pass  # No frame received, continue processing
+            # Optional display — only if requested and display exists
+            if args.show:
+                cv2.imshow("Dogi video + REC", frame)
+                if cv2.waitKey(1) == ord('q'):
+                    print("\n'q' pressed — stopping")
+                    break
 
-    if cv2.waitKey(1) == ord('q'):
-        break
+            if frame_count % 30 == 0:
+                print(f"recorded {frame_count} frames", flush=True)
 
-# Release the video writer, video capture, and close the window
-video_writer.release()
-subscriber.close()
-zmqcontext.term()
-cv2.destroyAllWindows()
+        except zmq.error.Again:
+            pass
+
+        # Optional auto-stop
+        if args.seconds > 0 and time.time() - start > args.seconds:
+            print("\nTime limit reached — stopping")
+            break
+
+except KeyboardInterrupt:
+    print("\nCtrl+C — stopping")
+
+finally:
+    video_writer.release()
+    subscriber.close()
+    zmqcontext.term()
+    if args.show:
+        cv2.destroyAllWindows()
+    print(f"Saved {args.output} with {frame_count} frames")
