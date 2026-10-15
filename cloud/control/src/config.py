@@ -1047,7 +1047,13 @@ def get_openai_client():
         api_base = _get_config_value('openai', 'api_base')
         api_key = _get_config_value('openai', 'api_key')
         if not api_base:
-            raise ValueError(f'openai.api_base is not set in {CONFIG_PATH}')
+            raise ValueError('openai.api_base is not set in configuration')
+
+        if not api_key or str(api_key).startswith('your-'):
+            env_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') or os.environ.get('OPENAI_API_KEY')
+            if env_key:
+                api_key = env_key
+
         try:
             from phoenix.otel import register
             tracer_provider = register(
@@ -1068,17 +1074,17 @@ def get_openai_client():
 
         client = OpenAI(api_key=api_key, base_url=api_base)
 
+        available_models = []
         try:
             models = client.models.list()
             available_models = [model.id for model in models.data[:5]]
         except Exception as exc:
-            error_message = f'OpenAI server is not available at {api_base}: {exc}'
-            print(error_message)
-            raise RuntimeError(error_message) from exc
+            print(f'Warning: OpenAI server at {api_base} models list check returned: {exc}')
 
         _state['openai_client'] = client
         print(f'Initialized OpenAI client with base URL: {api_base}')
-        print(f'Available OpenAI models: {available_models}')
+        if available_models:
+            print(f'Available OpenAI models: {available_models}')
 
     return _state['openai_client']
 
