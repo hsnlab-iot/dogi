@@ -129,6 +129,7 @@ pageconfig = [ \
     { 'name': 'Follow', 'port': PORT, 'page': '/apps/follow/', 'app': '/app/kovesd.py' }, \
     { 'name': 'Show', 'port': PORT, 'page': '/apps/show/', 'app': '/app/mutasd.py' }, \
     { 'name': 'Prompt', 'port': PORT, 'page': '/apps/prompt/', 'app': '/app/prompt.py' }, \
+    { 'name': 'Agent', 'port': PORT, 'page': '/apps/agent/', 'app': '/app/agent.py' }, \
     { 'name': 'Pupality', 'port': PORT, 'page': '/apps/pupality/', 'app': '' }, \
     { 'name': 'System', 'port': PORT, 'page': '/apps/system/', 'app': '' } \
 ]
@@ -142,6 +143,7 @@ def index():
         'page3_name': pageconfig[3]['name'],
         'page4_name': pageconfig[4]['name'],
         'page5_name': pageconfig[5]['name'],
+        'page6_name': pageconfig[6]['name'],
     }
     return render_template('web_main.html', **context)
 

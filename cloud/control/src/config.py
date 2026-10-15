@@ -475,6 +475,12 @@ def _build_default_config():
         'streamer': {
             'url': '',
         },
+        'llm': {
+            'type': 'ollama',
+            'url': 'http://10.6.6.20:11434/v1',
+            'key': 'not-needed',
+            'model': '',
+        },
     }
 
 
@@ -779,16 +785,16 @@ def get_soul_content():
     """Singleton to read and cache SOUL content once."""
     if _state['soul_content'] is None:
 
-        fallback = False
+        need_translation = False
         config_dir = Path(CONFIG_DIR)
         agent_dir = _get_current_agent_dir()
         soul_filename = f'SOUL.{get_prompt_language()}.md'
         soul_path = agent_dir / soul_filename if agent_dir else config_dir / soul_filename
     
-        if not soul_path.exists():
+        if not soul_path.exists() and get_prompt_language() != 'en':
             soul_filename = 'SOUL.en.md'
             soul_path = agent_dir / soul_filename if agent_dir else config_dir / soul_filename
-            fallback = True
+            need_translation = True
 
         try:
             _state['soul_content'] = soul_path.read_text(encoding='utf-8').strip()
@@ -799,7 +805,7 @@ def get_soul_content():
         
         # If the fallback was used, and prompt is not in English,
         # try to translate it to ui language
-        if fallback or get_prompt_language() != 'en':
+        if need_translation:
             import utils
 
             print(f'Translating SOUL content to {get_prompt_language()}...')
@@ -1039,6 +1045,58 @@ def get_vision_model():
         print(f"Using vision model: {_state['vision_model']}")
 
     return _state['vision_model']
+
+
+def get_llm():
+    """Return the raw [llm] configuration section."""
+    return get_config_data().get('llm', {})
+
+
+def get_llm_type():
+    """Return LLM provider type: 'ollama', 'openai', 'nim', or 'google'."""
+    llm = get_llm()
+    val = llm.get('type')
+    if val:
+        return str(val).strip().lower()
+    openai_cfg = get_config_data().get('openai', {})
+    scheme = str(openai_cfg.get('scheme', '')).strip().lower()
+    if scheme in ('nim', 'google', 'openai', 'ollama'):
+        return scheme
+    if openai_cfg.get('ollama'):
+        return 'ollama'
+    return 'ollama'
+
+
+def get_llm_url():
+    """Return LLM endpoint URL."""
+    llm = get_llm()
+    val = llm.get('url') or llm.get('api_base')
+    if val:
+        return str(val).strip()
+    return get_config_data().get('openai', {}).get('api_base', '')
+
+
+def get_llm_key():
+    """Return LLM API key."""
+    llm = get_llm()
+    val = llm.get('key') or llm.get('api_key')
+    if val is not None and not str(val).startswith('your-'):
+        return str(val).strip()
+    env_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') or os.environ.get('OPENAI_API_KEY') or os.environ.get('NVIDIA_API_KEY')
+    if env_key:
+        return env_key
+    if val is not None:
+        return str(val).strip()
+    return get_config_data().get('openai', {}).get('api_key', 'not-needed')
+
+
+def get_llm_model():
+    """Return configured model for the LLM."""
+    llm = get_llm()
+    val = llm.get('model')
+    if val:
+        return str(val).strip()
+    return get_general_model()
 
 
 def get_openai_client():

@@ -16,6 +16,12 @@ general = "nvidia/nemotron-3-ultra-550b-a55b"
 translation = ""
 vision = ""
 
+[llm]
+type = "nim"
+url = "https://integrate.api.nvidia.com/v1"
+key = "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"
+model = "nvidia/nemotron-3-ultra-550b-a55b"
+
 [openai]
 api_base = "https://integrate.api.nvidia.com/v1"
 api_key = "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"

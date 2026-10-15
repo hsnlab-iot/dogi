@@ -16,6 +16,12 @@ general = "gemini-2.5-flash"
 translation = ""
 vision = ""
 
+[llm]
+type = "google"
+url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+key = "your-gemini-api-key"
+model = "gemini-2.5-flash"
+
 [openai]
 api_base = "https://generativelanguage.googleapis.com/v1beta/openai/"
 api_key = "your-gemini-api-key"

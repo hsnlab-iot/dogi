@@ -25,6 +25,7 @@ tmux new-session -d -s webkeresd "cd /app && source /opt/venv/bin/activate && py
 tmux new-session -d -s webkovesd "cd /app && source /opt/venv/bin/activate && python3 web_kovesd.py ; sleep inf"
 tmux new-session -d -s webmutasd "cd /app && source /opt/venv/bin/activate && python3 web_mutasd.py ; sleep inf"
 tmux new-session -d -s webprompt "cd /app && source /opt/venv/bin/activate && python3 web_prompt.py ; sleep inf"
+tmux new-session -d -s webagent "cd /app && source /opt/venv/bin/activate && python3 web_agent.py ; sleep inf"
 tmux new-session -d -s webpupality "cd /app && source /opt/venv/bin/activate && python3 web_pupality.py ; sleep inf"
 
 tail -f /dev/null

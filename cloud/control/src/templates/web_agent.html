@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Web Agent</title>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/agent.css') }}">
+</head>
+<body>
+
+<div class="container">
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <!-- Prompt Input -->
+        <div class="input-section">
+            <label for="prompt-input">Prompt:</label>
+            <div class="prompt-row">
+                <textarea id="prompt-input" placeholder="Enter your prompt here..."></textarea>
+                <button id="prompt-new" class="prompt-button new">NEW</button>
+                <button id="prompt-send" class="prompt-button prompt" disabled>Prompt</button>
+            </div>
+        </div>
+
+        <!-- Agent Response -->
+        <div class="response-section">
+            <label>Response:</label>
+            <textarea id="response-output" readonly placeholder="Response will appear here..."></textarea>
+        </div>
+
+        <!-- Tools Response -->
+        <div class="tools-response-section">
+            <label>Tools response:</label>
+            <div class="tools-response-content">
+                <textarea id="tools-response-output" readonly placeholder="Tools response will appear here..."></textarea>
+                <div class="image-preview-container">
+                    <img id="tools-response-preview" src="" alt="Tools response preview">
+                </div>
+                <div id="tools-response-thumbnails" class="image-thumbnails-row" aria-label="Tools response thumbnails">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar-column">
+        <div class="speak-section">
+            <label class="checkbox-label" for="speak-checkbox">
+                <span>Speak</span>
+                <input type="checkbox" id="speak-checkbox">
+            </label>
+        </div>
+
+        <div class="tools-list-section">
+            <label>Tools:</label>
+            <div id="tools-loading">LOADING...</div>
+            <ul id="tools-list">
+                <!-- Tool list items will appear here -->
+            </ul>
+        </div>
+
+        <div class="stats-section">
+            <label>Prompt Stats:</label>
+            <div id="prompt-stats" class="stats-grid">
+                <div class="stats-item">
+                    <span class="stats-name">Context window size</span>
+                    <span id="stats-context-window" class="stats-value">-</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-name">Bytes</span>
+                    <span id="stats-bytes" class="stats-value">-</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-name">Tokens</span>
+                    <span id="stats-tokens" class="stats-value">-</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-name">Response time</span>
+                    <span id="stats-response-time" class="stats-value">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var socket = io({
+        path: '/apps/agent/socket.io/'
+    });
+    var DEFAULT_TOOLS_IMAGE_HISTORY_LIMIT = 5;
+    var toolsImageHistoryLimit = DEFAULT_TOOLS_IMAGE_HISTORY_LIMIT;
+    var toolsImageHistory = [];
+
+    function isSpeakEnabled() {
+        var checkbox = document.getElementById('speak-checkbox');
+        return !!(checkbox && checkbox.checked);
+    }
+
+    function emitSpeakState() {
+        socket.emit('speak', { enabled: isSpeakEnabled() });
+    }
+
+    function setToolsImageHistoryLimit(limit) {
+        var parsed = parseInt(limit, 10);
+        if (!Number.isFinite(parsed) || parsed < 1) return;
+        toolsImageHistoryLimit = parsed;
+        if (toolsImageHistory.length > toolsImageHistoryLimit) {
+            toolsImageHistory = toolsImageHistory.slice(toolsImageHistory.length - toolsImageHistoryLimit);
+        }
+        renderToolsImageThumbnails();
+    }
+
+    window.setToolsImageHistoryLimit = setToolsImageHistoryLimit;
+
+    function updateToolsPreview(src) {
+        var preview = document.getElementById('tools-response-preview');
+        if (!preview) return;
+        if (!src) {
+            preview.removeAttribute('src');
+            preview.style.display = 'none';
+            return;
+        }
+        preview.src = src;
+        preview.style.display = 'block';
+    }
+
+    function renderToolsImageThumbnails() {
+        var row = document.getElementById('tools-response-thumbnails');
+        if (!row) return;
+
+        while (row.firstChild) row.removeChild(row.firstChild);
+
+        toolsImageHistory.forEach(function(src) {
+            var thumb = document.createElement('img');
+            thumb.className = 'tools-response-thumb';
+            thumb.src = src;
+            thumb.alt = 'Tools response thumbnail';
+
+            thumb.addEventListener('mouseenter', function() {
+                updateToolsPreview(src);
+            });
+
+            thumb.addEventListener('mouseleave', function() {
+                updateToolsPreview('');
+            });
+
+            row.appendChild(thumb);
+        });
+
+        updateToolsPreview('');
+    }
+
+    function resetPromptStats() {
+        setStatsValue('stats-context-window', '-');
+        setStatsValue('stats-bytes', '-');
+        setStatsValue('stats-tokens', '-');
+        setStatsValue('stats-response-time', '-');
+    }
+
+    function resetPromptView() {
+        var promptInput = document.getElementById('prompt-input');
+        var responseOutput = document.getElementById('response-output');
+        var toolsResponseOutput = document.getElementById('tools-response-output');
+
+        if (promptInput) promptInput.value = '';
+        if (responseOutput) {
+            responseOutput.value = '';
+            responseOutput.classList.remove('error');
+            responseOutput.style.color = '';
+        }
+        if (toolsResponseOutput) toolsResponseOutput.value = '';
+
+        toolsImageHistory = [];
+        renderToolsImageThumbnails();
+        resetPromptStats();
+    }
+
+    function setStatsValue(id, value) {
+        var element = document.getElementById(id);
+        if (!element) return;
+        element.textContent = value;
+    }
+
+    function formatInteger(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+        return value.toLocaleString();
+    }
+
+    function formatSeconds(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+        return value.toFixed(2) + ' s';
+    }
+
+    function updatePromptStats(stats) {
+        var contextWindow = stats && stats.prompt_tokens;
+        var bytes = stats && stats.prompt_size_bytes;
+        var totalTokens = stats && stats.total_tokens;
+        var elapsedSeconds = stats && stats.elapsed_seconds;
+
+        setStatsValue('stats-context-window', formatInteger(contextWindow));
+        setStatsValue('stats-bytes', formatInteger(bytes));
+        setStatsValue('stats-tokens', formatInteger(totalTokens));
+        setStatsValue('stats-response-time', formatSeconds(elapsedSeconds));
+    }
+
+    function insertPromptText(text) {
+        var promptInput = document.getElementById('prompt-input');
+        if (!promptInput) return;
+
+        var incoming = String(text || '').trim();
+        if (!incoming) return;
+
+        var isFocused = document.activeElement === promptInput;
+        var value = promptInput.value || '';
+
+        if (isFocused && typeof promptInput.selectionStart === 'number' && typeof promptInput.selectionEnd === 'number') {
+            var start = promptInput.selectionStart;
+            var end = promptInput.selectionEnd;
+            promptInput.value = value.slice(0, start) + incoming + value.slice(end);
+            var cursor = start + incoming.length;
+            promptInput.selectionStart = cursor;
+            promptInput.selectionEnd = cursor;
+            return;
+        }
+
+        var separator = value && !value.endsWith('\n') ? '\n' : '';
+        promptInput.value = value + separator + incoming;
+        promptInput.scrollTop = promptInput.scrollHeight;
+    }
+    
+    socket.on('ui_update_tools_response', function(data) {
+        console.log('tools_response event', data.data);
+        var text = document.getElementById('tools-response-output');
+        if (data && typeof data.max_images !== 'undefined') {
+            setToolsImageHistoryLimit(data.max_images);
+        }
+        if (text && data && typeof data.data !== 'undefined') {
+            var payload = String(data.data || '');
+            if (payload.startsWith('data:image')) {
+                toolsImageHistory.push(payload);
+                if (toolsImageHistory.length > toolsImageHistoryLimit) {
+                    toolsImageHistory = toolsImageHistory.slice(toolsImageHistory.length - toolsImageHistoryLimit);
+                }
+                renderToolsImageThumbnails();
+            } else {
+                if (text) {
+                    text.value += '\n';
+                    text.value += payload;
+                    text.scrollTop = text.scrollHeight;
+                }
+            }
+        }
+    });
+
+    socket.on('ui_update_response', function(data) {
+        console.log('response event', data);
+        var text = document.getElementById('response-output');
+        if (text && data && typeof data.data !== 'undefined') {
+            text.value += '\n';
+            text.value += data.data;
+            text.scrollTop = text.scrollHeight;
+
+            if (data.error || String(data.data).startsWith('Error:')) {
+                text.classList.add('error');
+                text.style.color = '#d32f2f';
+            }
+        }
+    });
+
+    socket.on('ui_update_stats', function(data) {
+        console.log('stats event', data && data.data);
+        if (data && data.data) {
+            updatePromptStats(data.data);
+        }
+    });
+
+    socket.on('ui_update_tools', function(data) {
+        console.log('tools event', data.data);
+
+        var toolsLoading = document.getElementById('tools-loading');
+        if (toolsLoading) toolsLoading.style.display = 'none';
+        var toolsList = document.getElementById('tools-list');
+        if (toolsList) toolsList.style.display = 'block';
+
+        while (toolsList.firstChild) toolsList.removeChild(toolsList.firstChild);
+        if (!data.data) return;
+        try {
+            data.data.forEach(function(name) {
+                var li = document.createElement('li');
+                li.textContent = String(name);
+                toolsList.appendChild(li);
+            });
+        } catch (e) {
+            console.error('failed to render tools list', e);
+        }
+    });
+
+    function bindNewButton() {
+        var newBtn = document.getElementById('prompt-new');
+        if (!newBtn) return;
+        newBtn.onclick = function () {
+            resetPromptView();
+            socket.emit('new');
+        };
+    }
+
+    function bindSpeakCheckbox() {
+        var speakCheckbox = document.getElementById('speak-checkbox');
+        if (!speakCheckbox) return;
+
+        speakCheckbox.addEventListener('change', function() {
+            emitSpeakState();
+        });
+    }
+
+    function setToPrompt() {
+        var sendBtn = document.getElementById('prompt-send');
+        var promptInput = document.getElementById('prompt-input');
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Prompt';
+        sendBtn.classList.remove('abort');
+        sendBtn.classList.add('prompt');
+        sendBtn.onclick = function () {
+            var text = promptInput.value || '';
+            var resp = document.getElementById('response-output');
+            if (resp) {
+                resp.classList.remove('error');
+                resp.style.color = '';
+            }
+            socket.emit('prompt', {
+                prompt: text,
+                speak: isSpeakEnabled()
+            });
+        };
+    }
+
+    function setToAbort() {
+        var sendBtn = document.getElementById('prompt-send');
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Abort';
+        sendBtn.classList.remove('prompt');
+        sendBtn.classList.add('abort');
+        sendBtn.onclick = function () {
+            socket.emit('abort_prompt');
+        };
+    }
+
+    socket.on('ui_update_prompt', function(data) {
+        if (data.data == 'prompt') {
+            setToPrompt();
+        }
+        else if (data.data == 'abort') {
+            setToAbort();
+        }
+    });
+
+    socket.on('ui_update_prompt_insert', function(data) {
+        if (data && typeof data.data !== 'undefined') {
+            insertPromptText(data.data);
+        }
+    });
+
+    socket.on('connect', function() {
+        emitSpeakState();
+    });
+
+    socket.on('update_qr', function(data) {
+        window.parent.postMessage({
+            type: 'update_qr',
+            qr_url: data.qr_url,
+            label: data.label
+        }, '*');
+    });
+
+    bindNewButton();
+    bindSpeakCheckbox();
+    resetPromptStats();
+
+</script>
+
+</body>
+</html>
+

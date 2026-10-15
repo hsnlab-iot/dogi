@@ -22,7 +22,7 @@ RUN \
   uv pip install  mcp python-socketio[client] && \
   uv pip install  arize-phoenix-otel openinference-instrumentation-openai openai ollama && \
   uv pip install  boltons gevent gevent-websocket ujson websockets wsproto && \
-  uv pip install  ably rich qrcode
+  uv pip install  ably rich qrcode pydantic-ai
 
 RUN \
   uv pip install f5-tts torch torchaudio \

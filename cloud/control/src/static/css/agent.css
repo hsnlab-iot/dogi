@@ -1,0 +1,327 @@
+/* Global styles for Agent UI */
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    font-size: 24px;
+    background-color: #222;
+    color: white;
+}
+
+/* General container styling: grid layout */
+.container {
+    display: grid;
+    grid-template-columns: 1fr 260px;
+    gap: 16px;
+    padding: 12px;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+}
+
+.main-content {
+    grid-column: 1 / 2;
+    display: block;
+    padding: 0 12px;
+    outline: 2px dashed rgba(255, 0, 0, 0.15);
+}
+
+.sidebar-column {
+    grid-column: 2 / 3;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 100%;
+    outline: 2px dashed rgba(0, 0, 255, 0.08);
+}
+
+.tools-list-section {
+    min-width: 220px;
+}
+
+.speak-section {
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+}
+
+label {
+    display: block;
+    color: white;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.input-section,
+.response-section,
+.tools-response-section,
+.tools-list-section,
+.stats-section {
+    width: 100%;
+}
+
+.main-content > .input-section,
+.main-content > .response-section,
+.main-content > .tools-response-section {
+    display: block;
+    width: 100%;
+    margin-bottom: 18px;
+    float: none !important;
+    clear: both !important;
+}
+
+textarea,
+#response-output,
+.response-content {
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    overflow-y: auto;
+}
+
+textarea {
+    display: block;
+    width: 100% !important;
+}
+
+.main-content textarea,
+.main-content .response-content {
+    box-sizing: border-box;
+    width: 100% !important;
+}
+
+@media (max-width: 900px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+    .sidebar-column {
+        grid-column: 1 / -1;
+    }
+}
+
+#prompt-input {
+    min-height: 80px;
+    height: 80px;
+    font-size: 1.1em;
+    resize: none;
+    overflow-y: auto;
+}
+
+.prompt-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.prompt-row textarea#prompt-input {
+    flex: 1 1 auto;
+}
+
+.prompt-button {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 18px;
+    width: 80px;
+    height: 80px;
+    padding: 0;
+}
+
+.prompt-button:active {
+    transform: translateY(1px);
+}
+
+.prompt-button.prompt {
+    background: #28a745;
+    color: #fff;
+    border: none;
+}
+
+.prompt-button.new {
+    background: #d97a1d;
+    color: #fff;
+    border: none;
+}
+
+.prompt-button.abort {
+    background: #dc3545;
+    color: #fff;
+    border: none;
+}
+
+.prompt-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#response-output {
+    min-height: 120px;
+    height: 25vh;
+    resize: vertical;
+    overflow-y: auto;
+    font-size: 1.1rem;
+    color: #000;
+}
+
+#response-output.error {
+    color: #d32f2f !important;
+    border-color: #d32f2f;
+    font-weight: 600;
+}
+
+#tools-response-output {
+    min-height: 100px;
+    height: 20vh;
+    resize: vertical;
+    overflow-y: auto;
+    font-size: 1.1rem;
+}
+
+.tools-response-content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: visible;
+}
+
+.image-preview-container {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 12px);
+    display: flex;
+    justify-content: center;
+    z-index: 50;
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
+#tools-response-preview {
+    max-width: 640px;
+    max-height: 480px;
+    width: auto;
+    height: auto;
+    display: block;
+    object-fit: contain;
+    background: rgba(34, 34, 34, 0.95);
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.image-thumbnails-row {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 2px;
+}
+
+.tools-response-thumb {
+    max-width: 150px;
+    max-height: 200px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#tools-loading {
+    color: #fff;
+    font-weight: bold;
+    text-align: left;
+    margin: 6px 0 8px 0;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.25; }
+    100% { opacity: 1; }
+}
+
+#tools-list {
+    display: none;
+    list-style-type: disc;
+    padding-left: 20px;
+    margin: 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#tools-list li {
+    background: transparent;
+    color: white;
+    padding: 2px 0;
+    line-height: 1.1;
+}
+
+.stats-section {
+    margin-top: auto;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.stats-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stats-item:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.stats-name {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.stats-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    text-align: right;
+}
+

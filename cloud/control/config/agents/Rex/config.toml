@@ -17,6 +17,12 @@ general = "qwen3.5:4b"
 translation = "translategemma:4b"
 vision = ""
 
+[llm]
+type = "ollama"
+url = "http://10.6.6.20:11434/v1"
+key = "not-needed"
+model = "qwen3.5:4b"
+
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
 api_key = "not-needed"

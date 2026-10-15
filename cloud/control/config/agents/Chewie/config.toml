@@ -18,6 +18,12 @@ general = "lfm2.5-thinking:1.2b"
 translation = ""
 vision = "qwen3-vl:4b"
 
+[llm]
+type = "ollama"
+url = "http://10.6.6.20:11434/v1"
+key = "not-needed"
+model = "lfm2.5-thinking:1.2b"
+
 [openai]
 api_base = "http://10.6.6.20:11434/v1"
 api_key = "not-needed"

@@ -58,8 +58,9 @@ body {
 .tab2 { background-color: #33FF57; color: black; }
 .tab3 { background-color: #3357FF; }
 .tab4 { background-color: #F1C40F; color: black; }
-.tab5 { background-color: #9B59B6; }
-.tab6 { background-color: #17A2B8; }
+.tab5 { background-color: #00BCD4; color: black; }
+.tab6 { background-color: #9B59B6; }
+.tab7 { background-color: #17A2B8; }
 
 .tab-voice {
     margin-left: auto;

@@ -68,6 +68,18 @@
         }
     }
 
+    handle_path /apps/agent/socket.io/* {
+        rewrite * /socket.io{uri}
+        reverse_proxy dogi:5058 {
+            header_up X-Forwarded-Prefix /apps/agent/socket.io
+        }
+    }
+    handle_path /apps/agent/* {
+        reverse_proxy dogi:5058 {
+            header_up X-Forwarded-Prefix /apps/agent
+        }
+    }
+
     handle_path /apps/pupality/socket.io/* {
         rewrite * /socket.io{uri}
         reverse_proxy dogi:5057 {
