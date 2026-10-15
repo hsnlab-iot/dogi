@@ -1,0 +1,50 @@
+[pupcard]
+language = "HUN"
+model = "Google Flash"
+tts = "Meta HUN"
+
+[general]
+cache = "~/.cache/villam"
+log = "~/log/villam"
+
+[language]
+ui = "hu"
+prompt = "hu"
+
+[models]
+general = "gemini-2.5-flash"
+translation = ""
+vision = ""
+
+[openai]
+api_base = "https://generativelanguage.googleapis.com/v1beta/openai/"
+api_key = "your-gemini-api-key"
+keep_alive = "30m"
+scheme = "google"
+enable_thinking = false
+thinking_budget = 0
+max_output_tokens = 8192
+translation_max_output_tokens = 2048
+prompt_temperature = 0.7
+prompt_frequency_penalty = 0.5
+binary_images = false
+
+[tts]
+# Facebook hungarian
+protocol = "mms"
+model = "facebook/mms-tts-hun"
+
+[ports]
+voice = 5059
+control = 5002
+
+[streamer]
+url = "http://10.100.0.38:8000"
+stream_ip = "10.100.0.20"
+stream_port = 5100
+
+[tools]
+list = ["highfive", "dice", "body", "visionprompt"]
+
+[skills]
+list = ["hu_ovatos_mozgas", "hu_vizualis_elemzes"]
