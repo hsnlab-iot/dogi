@@ -299,7 +299,7 @@ def run(model: str, num_hands: int,
           next_action = time.time() + 6
           utils.play_wav(config.get_ui_language() + "_Thumb_Down")
         elif category_name == 'Victory':
-          utils.dogy_control('action', (3, )) # Crawl
+          utils.dogy_control('action', (16, )) # Dance
           last_action = time.time()
           next_action = time.time() + 7
           utils.play_wav(config.get_ui_language() + "_Victory")
