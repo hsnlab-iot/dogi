@@ -381,6 +381,28 @@ def _get_openai_nim_extra_body():
     return extra_body
 
 
+def _get_openai_google_extra_body():
+    thinking_enabled = config.get_openai_enable_thinking()
+    budget = config.get_openai_thinking_budget()
+    return {
+        "google": {
+            "thinking_config": {
+                "thinking_budget": budget if thinking_enabled else 0
+            }
+        }
+    }
+
+
+def _get_request_extra_body(num_predict=None):
+    scheme = config.get_openai_json_scheme()
+    if scheme == "nim":
+        return _get_openai_nim_extra_body()
+    if scheme == "google":
+        return _get_openai_google_extra_body()
+    return _get_openai_general_extra_body(num_predict=num_predict)
+
+
+
 def prompt_with_tools(prompt, message_history=None, tools=None, images=None):
 
     messages = message_history if message_history else []
@@ -410,7 +432,7 @@ def prompt_with_tools(prompt, message_history=None, tools=None, images=None):
             })
     
     # If enable_thinking is not sent disable thinking
-    if not config.get_openai_enable_thinking():
+    if not config.get_openai_enable_thinking() and config.get_openai_json_scheme() not in ("google", "nim"):
         messages.append(
             {"role": "assistant", "content": "<think></think>"}
             )
@@ -423,14 +445,7 @@ def prompt_with_tools(prompt, message_history=None, tools=None, images=None):
         model = config.get_general_model()
         print(f"Prompting with text only, using {model}")
 
-    extra_body = {}
-    print(config.get_openai_json_scheme())
-    if config.get_openai_json_scheme() == "nim":
-        extra_body = _get_openai_nim_extra_body()
-    else:
-        extra_body = _get_openai_general_extra_body(
-            num_predict=config.get_openai_max_output_tokens()
-        )
+    extra_body = _get_request_extra_body(num_predict=config.get_openai_max_output_tokens())
 
     request_kwargs = {
         "model": model,
@@ -484,7 +499,7 @@ def prompt(prompt_text, images=None, stream=False):
     openai_client = config.get_openai_client()
     now = time.time()
     content = _build_content(prompt_text, images, config.get_openai_binary_images())
-    extra_body = _get_openai_general_extra_body(
+    extra_body = _get_request_extra_body(
         num_predict=config.get_openai_max_output_tokens()
     )
     thinking_enabled = config.get_openai_enable_thinking()
@@ -493,9 +508,8 @@ def prompt(prompt_text, images=None, stream=False):
         {"role": "system", "content": soul_prompt},
         {"role": "user", "content": content},
     ]
-    if not thinking_enabled:
+    if not thinking_enabled and config.get_openai_json_scheme() not in ("google", "nim"):
         # Prefill answer
-        #messages.append({"role": "assistant", "content": "<think></think>"})
         messages.append({"role": "assistant", "content": "Here is the direct response: "})
 
     request_kwargs = {

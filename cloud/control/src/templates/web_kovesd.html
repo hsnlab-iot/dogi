@@ -2,11 +2,46 @@
 <html>
 <head>
     <title>Web Kovesd</title>
-</head>
-<body style="display: flex; justify-content: center;">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-<div style="width: 960px; height: 720px; border: 2px solid black;">
-    <img src="/video/mjpeg_kovesd" style="width: 100%; height: 100%;" />
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .video-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .video-container img {
+            /* Megadjuk a teljes méretet a konténerhez képest */
+            width: 100%;
+            height: 100%;
+            
+            /* Az object-fit SKÁLÁZZA fel/le a képet a kereten belül, megtartva a képarányt */
+            object-fit: contain;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="video-container">
+    <img src="/video/mjpeg_kovesd" alt="MJPEG Video Stream" />
 </div>
 
 </body>
