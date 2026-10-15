@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kutya Profil Szerkesztő</title>
+    <!-- QR kód beolvasó könyvtár -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #e67e22;
+            --bg-color: #f4f6f7;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 15px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--primary-color);
+        }
+
+        /* 1. Szelfi szekció */
+        .camera-box {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            height: 300px;
+            margin: 0 auto 10px auto;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #video, #photo-preview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #photo-preview {
+            display: none;
+        }
+
+        /* Input mezők és Mikrofon ikon gomb */
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        input[type="text"], textarea {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* Gombok stílusa */
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .btn:active {
+            opacity: 0.8;
+        }
+
+        .btn-accent {
+            background-color: var(--accent-color);
+        }
+
+        .btn-mic {
+            background-color: #27ae60;
+            padding: 10px;
+            font-size: 18px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        /* Modal a QR kód olvasóhoz */
+        #qr-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        #reader {
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Kutya Profil Szerkesztő</h1>
+
+    <!-- 1. Szelfi készítés -->
+    <div class="section">
+        <label>1. Fotó (Szelfi)</label>
+        <div class="camera-box">
+            <video id="video" autoplay playsinline></video>
+            <img id="photo-preview" alt="Legutóbbi szelfi">
+        </div>
+        <div class="controls">
+            <button class="btn" id="snap-btn">📸 Fotó készítése</button>
+            <button class="btn btn-accent" id="retake-btn" style="display:none;">🔄 Újrafelvétel</button>
+        </div>
+        <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+
+    <!-- 2. Név -->
+    <div class="section">
+        <label for="dog-name">2. Karakter neve</label>
+        <div class="input-group">
+            <input type="text" id="dog-name" placeholder="Pl. Bodri">
+            <button class="btn btn-mic" onclick="startSpeechRecognition('dog-name')">🎙️</button>
+        </div>
+    </div>
+
+    <!-- 3. Eredettörténet -->
+    <div class="section">
+        <label for="dog-story">3. Eredettörténet</label>
+        <div class="input-group">
+            <textarea id="dog-story" placeholder="Írd le a kutya eredettörténetét..."></textarea>
+            <button class="btn btn-mic" onclick="startSpeechRecognition('dog-story')">🎙️</button>
+        </div>
+    </div>
+
+    <!-- 4. Tulajdonságok -->
+    <div class="section">
+        <label for="dog-traits">4. Tulajdonságok</label>
+        <div class="input-group">
+            <input type="text" id="dog-traits" placeholder="Pl. okos, fegyelmezett, gyors, imádja a kutatást">
+            <button class="btn btn-mic" onclick="startSpeechRecognition('dog-traits')">🎙️</button>
+        </div>
+    </div>
+
+    <!-- 5. Hangfelvétel és hanglejátszás -->
+    <div class="section">
+        <label>5. Hangfelvétel (Minta felolvasása)</label>
+        <p style="font-size: 13px; color: #666; margin-bottom: 8px;">
+            <i>Olvasd fel: "A Budapesti Műszaki és Gazdaságtudományi Egyetem és az Ericsson a magyar kutatás élvonalában."</i>
+        </p>
+        <div class="controls">
+            <button class="btn" id="record-audio-btn">🔴 Felvétel</button>
+            <button class="btn btn-accent" id="play-audio-btn" disabled>▶️ Lejátszás</button>
+        </div>
+        <audio id="audio-preview" style="display:none;"></audio>
+    </div>
+
+    <!-- 6. Küldés gomb -->
+    <div class="section" style="border:none;">
+        <button class="btn btn-accent" id="send-btn" style="width:100%; padding: 15px; font-size: 18px;">
+            📤 Küldés (QR kód beolvasása)
+        </button>
+    </div>
+</div>
+
+<!-- Modal a QR kód olvasáshoz -->
+<div id="qr-modal">
+    <div id="reader"></div>
+    <button class="btn" id="close-qr-btn" style="margin-top: 15px; background: #e74c3c;">Mégse</button>
+</div>
+
+<script>
+    // --- 1. Szelfi logika ---
+    const video = document.getElementById('video');
+    const photoPreview = document.getElementById('photo-preview');
+    const canvas = document.getElementById('canvas');
+    const snapBtn = document.getElementById('snap-btn');
+    const retakeBtn = document.getElementById('retake-btn');
+    let capturedImageBase64 = null;
+    let cameraStream = null;
+
+    async function initCamera() {
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "user" }, 
+                audio: false 
+            });
+            video.srcObject = cameraStream;
+        } catch (err) {
+            alert("Nem sikerült hozzáférni a kamerához: " + err);
+        }
+    }
+    initCamera();
+
+    snapBtn.addEventListener('click', () => {
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth || 300;
+        canvas.height = video.videoHeight || 300;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        capturedImageBase64 = canvas.toDataURL('image/jpeg');
+        photoPreview.src = capturedImageBase64;
+        
+        video.style.display = 'none';
+        photoPreview.style.display = 'block';
+        snapBtn.style.display = 'none';
+        retakeBtn.style.display = 'inline-flex';
+    });
+
+    retakeBtn.addEventListener('click', () => {
+        capturedImageBase64 = null;
+        photoPreview.style.display = 'none';
+        video.style.display = 'block';
+        snapBtn.style.display = 'inline-flex';
+        retakeBtn.style.display = 'none';
+    });
+
+    // --- Hangfelismerés (Web Speech API) ---
+    function startSpeechRecognition(targetId) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("A böngésződ nem támogatja a natív hangfelismerést.");
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'hu-HU';
+        recognition.interimResults = false;
+
+        const targetInput = document.getElementById(targetId);
+        
+        recognition.onstart = () => {
+            targetInput.placeholder = "Hallgatlak...";
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            if (targetInput.tagName.toLowerCase() === 'textarea') {
+                targetInput.value += (targetInput.value ? ' ' : '') + transcript;
+            } else {
+                targetInput.value = transcript;
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Hangfelismerési hiba:", event.error);
+        };
+
+        recognition.start();
+    }
+
+    // --- 5. Hangfelvétel és Lejátszás (MediaRecorder API) ---
+    const recordAudioBtn = document.getElementById('record-audio-btn');
+    const playAudioBtn = document.getElementById('play-audio-btn');
+    const audioPreview = document.getElementById('audio-preview');
+    let mediaRecorder;
+    let audioChunks = [];
+    let audioBlob = null;
+    let isRecording = false;
+
+    recordAudioBtn.addEventListener('click', async () => {
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (e) => {
+                    audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPreview.src = audioUrl;
+                    playAudioBtn.disabled = false;
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordAudioBtn.textContent = "⏹️ Leállítás";
+                recordAudioBtn.style.backgroundColor = "#e74c3c";
+            } catch (err) {
+                alert("Nem sikerült hozzáférni a mikrofonhoz: " + err);
+            }
+        } else {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            isRecording = false;
+            recordAudioBtn.textContent = "🔴 Újrafelvétel";
+            recordAudioBtn.style.backgroundColor = "var(--primary-color)";
+        }
+    });
+
+    playAudioBtn.addEventListener('click', () => {
+        if (audioPreview.src) {
+            audioPreview.play();
+        }
+    });
+
+    // --- 6. QR Kód Olvasó és Adatküldés ---
+    const sendBtn = document.getElementById('send-btn');
+    const qrModal = document.getElementById('qr-modal');
+    const closeQrBtn = document.getElementById('close-qr-btn');
+    let html5QrcodeScanner = null;
+
+    sendBtn.addEventListener('click', () => {
+        if (!capturedImageBase64) {
+            alert("Kérlek készíts egy szelfit a kutyáról!");
+            return;
+        }
+
+        qrModal.style.display = 'flex';
+        html5QrcodeScanner = new Html5Qrcode("reader");
+        
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            onScanSuccess,
+            onScanFailure
+        ).catch(err => {
+            alert("Hiba a QR olvasó indításakor: " + err);
+            qrModal.style.display = 'none';
+        });
+    });
+
+    closeQrBtn.addEventListener('click', stopQrScanner);
+
+    function stopQrScanner() {
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.stop().then(() => {
+                qrModal.style.display = 'none';
+            }).catch(err => console.error(err));
+        } else {
+            qrModal.style.display = 'none';
+        }
+    }
+
+    async function onScanSuccess(decodedText, decodedResult) {
+    stopQrScanner();
+
+    const profileData = {
+        name: document.getElementById('dog-name').value || "Bodri",
+        story: document.getElementById('dog-story').value,
+        traits: document.getElementById('dog-traits').value,
+        photo: capturedImageBase64,
+    };
+
+    console.log("Küldés erre a címre:", decodedText);
+
+    const formData = new FormData();
+    formData.append('json_data', JSON.stringify(profileData));
+    if (audioBlob) {
+        formData.append('audio', audioBlob, 'voice.webm');
+    }
+
+    try {
+        let response = await fetch(decodedText, {
+            method: 'POST',
+            headers: {
+                'X-Pinggy-No-Screen': 'true',
+                'User-Agent': 'CustomApp'
+            },
+            body: formData
+        });
+
+        if (response.ok) {
+            let resData = await response.json();
+            alert(" SIKER! Szerver válasza: " + JSON.stringify(resData));
+        } else {
+            let errorText = await response.text();
+            alert(` HIBA! HTTP Kód: ${response.status}\nVálasz: ${errorText}`);
+        }
+    } catch (err) {
+        // Ha nem tudott csatlakozni (CORS, hálózat, DNS, érvénytelen HTTPS)
+        alert(` HÁLÓZATI HIBA (Failed to fetch):\n${err.message}\n\nEltérés lehet a hálózatban vagy HTTPS tanúsítványban.`);
+        console.error("Fetch hiba részletei:", err);
+    }
+}
+
+    function onScanFailure(error) {
+        // Ignoráljuk a sikertelen képkockákat
+    }
+</script>
+
+</body>
+</html>
