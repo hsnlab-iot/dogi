@@ -12,15 +12,15 @@ ui = "hu"
 prompt = "hu"
 
 [models]
-general = "gemini-2.5-flash"
+general = "gemini-3.5-flash-lite"
 translation = ""
 vision = ""
 
 [llm]
 type = "google"
-url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+url = "https://generativelanguage.googleapis.com"
 key = "your-gemini-api-key"
-model = "gemini-2.5-flash"
+model = "gemini-3.5-flash-lite"
 
 [openai]
 api_base = "https://generativelanguage.googleapis.com/v1beta/openai/"

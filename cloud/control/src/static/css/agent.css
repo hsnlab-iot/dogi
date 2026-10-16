@@ -6,17 +6,18 @@ body {
 
 body {
     margin: 0;
-    font-size: 24px;
+    font-size: 16px;              /* 24px-ről 16px-re: iframe-ben ez reális */
     background-color: #222;
     color: white;
+    overflow-x: hidden;
 }
 
 /* General container styling: grid layout */
 .container {
     display: grid;
-    grid-template-columns: 1fr 260px;
-    gap: 16px;
-    padding: 12px;
+    grid-template-columns: minmax(0, 1fr) 220px;   /* 260px → 220px */
+    gap: 14px;
+    padding: 10px;
     box-sizing: border-box;
     width: 100%;
     max-width: 100%;
@@ -25,27 +26,28 @@ body {
 
 .main-content {
     grid-column: 1 / 2;
+    min-width: 0;
     display: block;
-    padding: 0 12px;
+    padding: 0 10px;
     outline: 2px dashed rgba(255, 0, 0, 0.15);
 }
 
 .sidebar-column {
     grid-column: 2 / 3;
-    min-width: 220px;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 16px;
     min-height: 100%;
-    outline: 2px dashed rgba(0, 0, 255, 0.08);
+    outline: 2px dashed rgba(0, 0, 0, 0.08);
 }
 
 .tools-list-section {
-    min-width: 220px;
+    min-width: 0;
 }
 
 .speak-section {
-    padding: 12px 14px;
+    padding: 10px 12px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.06);
@@ -60,8 +62,8 @@ body {
 }
 
 .checkbox-label input[type="checkbox"] {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
 }
 
 label {
@@ -77,6 +79,7 @@ label {
 .tools-list-section,
 .stats-section {
     width: 100%;
+    min-width: 0;
 }
 
 .main-content > .input-section,
@@ -84,7 +87,7 @@ label {
 .main-content > .tools-response-section {
     display: block;
     width: 100%;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
     float: none !important;
     clear: both !important;
 }
@@ -112,9 +115,20 @@ textarea {
     width: 100% !important;
 }
 
-@media (max-width: 900px) {
+/* Text wrapping: long words/lines can't stretch the layout */
+#response-output,
+#tools-response-output,
+.response-content,
+.tools-response-content {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+/* Ha az iframe keskeny, a belső sidebar alá kerül */
+@media (max-width: 800px) {
     .container {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     .sidebar-column {
         grid-column: 1 / -1;
@@ -124,7 +138,7 @@ textarea {
 #prompt-input {
     min-height: 80px;
     height: 80px;
-    font-size: 1.1em;
+    font-size: 1.05em;
     resize: none;
     overflow-y: auto;
 }
@@ -137,6 +151,7 @@ textarea {
 
 .prompt-row textarea#prompt-input {
     flex: 1 1 auto;
+    min-width: 0;
 }
 
 .prompt-button {
@@ -145,10 +160,11 @@ textarea {
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 18px;
+    font-size: 15px;
     width: 80px;
     height: 80px;
     padding: 0;
+    flex-shrink: 0;
 }
 
 .prompt-button:active {
@@ -183,7 +199,7 @@ textarea {
     height: 25vh;
     resize: vertical;
     overflow-y: auto;
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: #000;
 }
 
@@ -198,7 +214,7 @@ textarea {
     height: 20vh;
     resize: vertical;
     overflow-y: auto;
-    font-size: 1.1rem;
+    font-size: 1rem;
 }
 
 .tools-response-content {
@@ -218,10 +234,11 @@ textarea {
     z-index: 50;
     pointer-events: none;
     transform: translateX(-50%);
+    max-width: 100%;
 }
 
 #tools-response-preview {
-    max-width: 640px;
+    max-width: min(640px, 90vw);
     max-height: 480px;
     width: auto;
     height: auto;
@@ -241,6 +258,7 @@ textarea {
     overflow-x: auto;
     overflow-y: hidden;
     padding: 4px 2px;
+    max-width: 100%;
 }
 
 .tools-response-thumb {
@@ -273,7 +291,7 @@ textarea {
     list-style-type: disc;
     padding-left: 20px;
     margin: 0;
-    max-height: 70vh;
+    max-height: 60vh;
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -282,28 +300,82 @@ textarea {
     background: transparent;
     color: white;
     padding: 2px 0;
-    line-height: 1.1;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+
+#tools-list,
+.speak-section,
+.stats-section {
+    max-width: 100%;
 }
 
 .stats-section {
     margin-top: auto;
-    padding: 12px 14px;
+    padding: 10px 12px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
 }
 
 .stats-grid {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
 }
 
+/* A név és érték egymás alá törik, ha nem fér ki */
 .stats-item {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    gap: 12px;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    min-width: 0;
+}
+
+.stats-item:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.stats-name {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.75);
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.stats-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    text-align: right;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    max-width: 55%;
+    flex-shrink: 1;
+}
+
+/* Sidebar és stats: semmi nem lóghat ki jobbra */
+.container {
+    grid-template-columns: minmax(0, 1fr) minmax(160px, 240px);
+}
+
+.sidebar-column {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.stats-item {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;              /* kritikus: a flex-child zsugorodhat */
     padding-bottom: 8px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -314,14 +386,30 @@ textarea {
 }
 
 .stats-name {
-    font-size: 16px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.75);
+    flex: 1 1 auto;
+    min-width: 0;              /* nevéből annyi marad, amennyi fér */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .stats-value {
-    font-size: 18px;
+    font-size: 12px;
     font-weight: 700;
     color: white;
+    flex: 0 1 auto;            /* zsugorodhat, ha kell */
+    min-width: 0;              /* kritikus! */
     text-align: right;
+    white-space: normal;       /* TÖRHETŐ — ez hiányzott */
+    overflow-wrap: anywhere;   /* még a szám is törik, ha nincs más */
 }
 
+.stats-section {
+    width: 100%;               /* sosem szélesebb a szülőnél */
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}

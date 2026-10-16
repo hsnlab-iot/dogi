@@ -28,6 +28,7 @@ services:
       - ABLY_USER_KEY=${ABLY_USER_KEY}
       - ABLY_MASTER_KEY=${ABLY_MASTER_KEY}
       - ABLY_ROOM_ID=${ABLY_ROOM_ID}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     ports:
       #- "6080:6080" # the remote display port
       - "5100:5100/udp" # the incoming video port

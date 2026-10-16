@@ -4,7 +4,9 @@ import socket
 import pickle
 import threading
 import json
+import json as _json
 import asyncio
+import httpx
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 
 from typing import List, Dict, Any
@@ -63,6 +65,84 @@ speak_enabled = False
 # History context
 message_history = []
 current_agent = None
+
+
+async def log_request(request: httpx.Request):
+    body = request.content.decode('utf-8', errors='replace')
+    logger.info(f"=== HTTP REQUEST {request.method} {request.url} ===")
+    try:
+        parsed = json.loads(request.content)
+        logger.info(json.dumps(parsed, indent=2, ensure_ascii=False))
+    except Exception:
+        logger.info(request.content.decode('utf-8', errors='replace')[:5000])
+
+def _merge_sse_chunks(body: str):
+    """Merge OpenAI-style SSE chunks into one pretty JSON dict."""
+    final = {}
+    for line in body.splitlines():
+        line = line.strip()
+        if not line.startswith('data:'):
+            continue
+        payload = line[5:].strip()
+        if payload == '[DONE]':
+            continue
+        try:
+            chunk = _json.loads(payload)
+        except Exception:
+            continue
+        for key, value in chunk.items():
+            if key == 'choices':
+                final.setdefault('choices', [])
+                for c in value:
+                    idx = c.get('index', 0)
+                    while len(final['choices']) <= idx:
+                        final['choices'].append({'index': idx, 'message': {}})
+                    msg = final['choices'][idx].setdefault('message', {})
+                    delta = c.get('delta', {})
+                    for field in ('content', 'reasoning', 'role'):
+                        if delta.get(field):
+                            msg[field] = msg.get(field, '') + delta[field]
+                    for tc in delta.get('tool_calls', []) or []:
+                        tcs = msg.setdefault('tool_calls', [])
+                        i = tc.get('index', 0)
+                        while len(tcs) <= i:
+                            tcs.append({'function': {'name': '', 'arguments': ''}})
+                        if tc.get('id'):
+                            tcs[i]['id'] = tc['id']
+                        if tc.get('function', {}).get('name'):
+                            tcs[i]['function']['name'] += tc['function']['name']
+                        if tc.get('function', {}).get('arguments'):
+                            tcs[i]['function']['arguments'] += tc['function']['arguments']
+                    if c.get('finish_reason'):
+                        final['choices'][idx]['finish_reason'] = c['finish_reason']
+            elif key in ('id', 'object', 'created', 'model', 'usage', 'system_fingerprint'):
+                if key == 'usage' and value:
+                    final[key] = value
+                elif key not in final:
+                    final[key] = value
+    return final
+
+async def log_response(response: httpx.Response):
+    logger.info(f"=== HTTP RESPONSE {response.status_code} ===")
+    await response.aread()
+    body = response.content.decode('utf-8', errors='replace')
+    if body.lstrip().startswith('data:') or 'chat.completion.chunk' in body[:2000]:
+        merged = _merge_sse_chunks(body)
+        logger.info(json.dumps(merged, indent=2, ensure_ascii=False))
+    else:
+        try:
+            logger.info(json.dumps(_json.loads(body), indent=2, ensure_ascii=False))
+        except Exception:
+            logger.info(body[:5000])
+
+
+
+def create_http_client():
+    return httpx.AsyncClient(
+        event_hooks={'request': [log_request], 'response': [log_response]},
+        timeout=300.0,
+    )
+
 
 
 def _log_tools(params):
@@ -155,27 +235,31 @@ def create_pydantic_model():
     logger.info(f"Initializing model type='{llm_type}', model='{model_name}', url='{url}'")
 
     if llm_type == "ollama":
+        logger.info(f"Building an ollama model: {url}, {model_name}")
         from pydantic_ai.providers.ollama import OllamaProvider
         from pydantic_ai.models.openai import OpenAIChatModel
-        provider = OllamaProvider(base_url=url or None, api_key=key or None)
+        provider = OllamaProvider(base_url=url or None, api_key=key or None, http_client=create_http_client())
         return OpenAIChatModel(model_name, provider=provider)
 
     elif llm_type == "openai":
+        logger.info(f"Building an openai model: {url}, {model_name}")
         from pydantic_ai.providers.openai import OpenAIProvider
         from pydantic_ai.models.openai import OpenAIChatModel
-        provider = OpenAIProvider(base_url=url or None, api_key=key or None)
+        provider = OpenAIProvider(base_url=url or None, api_key=key or None, http_client=create_http_client())
         return OpenAIChatModel(model_name, provider=provider)
 
     elif llm_type == "nim":
+        logger.info(f"Building a nim model: {url}, {model_name}")
         from pydantic_ai.providers.openai import OpenAIProvider
         from pydantic_ai.models.openai import OpenAIChatModel
-        provider = OpenAIProvider(base_url=url or None, api_key=key or None)
+        provider = OpenAIProvider(base_url=url or None, api_key=key or None, http_client=create_http_client())
         return OpenAIChatModel(model_name, provider=provider)
 
     elif llm_type == "google":
+        logger.info(f"Building a google model: {url}, {model_name}")
         from pydantic_ai.providers.google import GoogleProvider
         from pydantic_ai.models.google import GoogleModel
-        provider = GoogleProvider(api_key=key, base_url=url or None)
+        provider = GoogleProvider(api_key=key, base_url=url or None, http_client=create_http_client())
         return GoogleModel(model_name, provider=provider)
 
     else:
@@ -251,6 +335,7 @@ async def build_agent():
         else:
             args_dict = None
         logger.info(f"TOOL CALL {part.tool_name} args={json.dumps(args_dict, ensure_ascii=False, default=str)}")
+        sio.emit('ui_update', {'type': 'response', 'data': f'Tool call {part.tool_name} args={json.dumps(args_dict, ensure_ascii=False, default=str)}'})
 
     @agent.on_event(FunctionToolResultEvent)
     def on_tool_result(ctx: RunContext, event: FunctionToolResultEvent):
