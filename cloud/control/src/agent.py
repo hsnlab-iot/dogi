@@ -52,7 +52,13 @@ asyncio.set_event_loop(loop)
 config.init()
 toolscfg = config.get_tools()
 
-MCP_HEADERS = {'X-API-Key': os.getenv('MCP_KEY', 'none')}
+MCP_HEADERS = {
+    'X-API-Key': os.getenv('MCP_KEY', 'none'),
+    'X-SocketIO-Url': 'http://dogi:5058',
+}
+if config.get_vision_model():
+    MCP_HEADERS['X-Llm-Model'] = config.get_vision_model()
+
 CALL_TIMEOUT = 120.0   # or whatever your slowest tool needs
 
 # Worker control globals

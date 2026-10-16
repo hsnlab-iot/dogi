@@ -7,6 +7,8 @@ from enum import Enum
 from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 from contextlib import contextmanager
 from typing import Optional, Dict, Any
+
+#from flask import ctx
 import socketio
 import asyncio
 import threading
@@ -110,46 +112,36 @@ def _log(level: str, msg: str):
         print(f"[vision_prompt][{level.lower()}] {msg}", flush=True)
         sys.stdout.flush()
 
+def _send_snapshot_via_socketio(image: str, socketio_url: str, timeout: float = 5.0) -> bool:
+    """Connect to the socketio server, emit the snapshot, and disconnect.
 
-_socketio_lock = threading.Lock()
-
-
-def _ensure_socketio_connected() -> bool:
-    """Best-effort Socket.IO connection that never raises to callers."""
-    global sio
-
-    if not SOCKETIO_URL:
+    Returns True if the message was emitted, False otherwise. Never raises.
+    """
+    if not socketio_url:
         return False
 
-    with _socketio_lock:
-        if sio is None:
-            sio = socketio.Client()
-
-        if sio.connected:
-            return True
-
-        try:
-            sio.connect(SOCKETIO_URL)
-            _log("DEBUG", f"SocketIO connected to {SOCKETIO_URL}")
-            return True
-        except Exception as e:
-            _log("WARNING", f"SocketIO connection failed: {type(e).__name__}: {str(e)}")
-            return False
-
-
-def _send_snapshot_via_socketio(image: str):
-    """Send snapshot to socketio server if configured."""
-    if not _ensure_socketio_connected():
-        return
+    sio = socketio.Client()
 
     try:
-        payload = {
-            "data": image
-        }
-        sio.emit(SOCKETIO_EVENT, payload)
-        _log("DEBUG", f"Snapshot sent to {SOCKETIO_URL} via event '{SOCKETIO_EVENT}'")
+        sio.connect(socketio_url, wait_timeout=timeout)
+    except Exception as e:
+        _log("WARNING", f"SocketIO connect failed ({socketio_url}): {type(e).__name__}: {str(e)}")
+        return False
+
+    try:
+        _log("DEBUG", f"Snapshot payload size: {len(image)} bytes")
+        sio.emit(SOCKETIO_EVENT, {"data": image})
+        _log("DEBUG", f"Snapshot sent to {socketio_url} via event '{SOCKETIO_EVENT}'")
+        time.sleep(1.0)
+        return True
     except Exception as e:
         _log("WARNING", f"Failed to send snapshot via socketio: {type(e).__name__}: {str(e)}")
+        return False
+    finally:
+        try:
+            sio.disconnect()
+        except Exception:
+            pass
 
 def _extract_api_key(headers: list[tuple[bytes, bytes]]) -> str | None:
     for key, value in headers:
@@ -162,7 +154,16 @@ def _extract_api_key(headers: list[tuple[bytes, bytes]]) -> str | None:
 
     return None
 
-
+def _get_header_params(ctx: Context) -> dict:
+    params = {}
+    try:
+        request = getattr(ctx, "request_context", None) and ctx.request_context.request
+        if request is not None:
+            params["socketio_url"] = request.headers.get("x-socketio-url") or None
+            #params["llm_model"] = request.headers.get("x-llm-model") or None
+    except Exception as exc:
+        _log("WARNING", f"Failed to read headers: {type(exc).__name__}: {str(exc)}")
+    return params    
 class APIKeyProtectedApp:
     def __init__(self, inner_app, api_path: str = "/mcp"):
         self.inner_app = inner_app
@@ -408,17 +409,23 @@ def vision_prompt(prompt: str, ctx: Context, answer_length: AnswerLength = Answe
         prompt_text = prompt.strip()
         _log("DEBUG", f"Starting vision_prompt processing")
 
-        model_override = None
-        try:
-            request_context = getattr(ctx, "request_context", None)
-            meta = getattr(request_context, "meta", None) if request_context is not None else None
-            if isinstance(meta, dict):
-                override_value = meta.get("model")
-                if override_value:
-                    model_override = str(override_value).strip()
-                    _log("INFO", f"Using model override from ctx.request_context.meta: {model_override}")
-        except Exception as exc:
-            _log("WARNING", f"Failed to read ctx.request_context.meta: {type(exc).__name__}: {str(exc)}")
+        params = _get_header_params(ctx)
+        model_override = params.get("llm_model")
+        socketio_url = params.get("socketio_url") or SOCKETIO_URL
+
+        if model_override:
+            _log("INFO", f"Model override from header: {model_override}")
+        else:
+            try:
+                request_context = getattr(ctx, "request_context", None)
+                meta = getattr(request_context, "meta", None) if request_context is not None else None
+                if isinstance(meta, dict):
+                    override_value = meta.get("model")
+                    if override_value:
+                        model_override = str(override_value).strip()
+                        _log("INFO", f"Using model override from ctx.request_context.meta: {model_override}")
+            except Exception as exc:
+                _log("WARNING", f"Failed to read ctx.request_context.meta: {type(exc).__name__}: {str(exc)}")
 
         content_parts: list[dict] = [
             {
@@ -441,8 +448,9 @@ def vision_prompt(prompt: str, ctx: Context, answer_length: AnswerLength = Answe
             image_bytes, mime_type = _snapshot_binary(snapshot_url)
             image_url = _to_data_url(image_bytes, mime_type)
 
-            if SOCKETIO_URL:
-                _send_snapshot_via_socketio(image_url)
+            if socketio_url:
+                if not _send_snapshot_via_socketio(image_url, socketio_url):
+                    _log("WARNING", "Snapshot delivery via socketio failed; continuing with OpenAI call")
 
             content_parts.append(
                 {
@@ -478,7 +486,6 @@ def vision_prompt(prompt: str, ctx: Context, answer_length: AnswerLength = Answe
 
 mcp_app = mcp.http_app(transport="streamable-http")
 app = APIKeyProtectedApp(mcp_app)
-sio = None
 
 if __name__ == "__main__":
     print(f"Vision MCP Server starting on http://{HOST}:{PORT}/mcp (streamable-http)", flush=True)
@@ -491,13 +498,6 @@ if __name__ == "__main__":
     print(f"HTTP timeout: {HTTP_TIMEOUT_SECONDS}s", flush=True)
     print(f"Debug level: {list(LOG_LEVELS.keys())[DEBUG_LEVEL]}", flush=True)
     print(f"Available answer lengths: {[e.value for e in AnswerLength]}", flush=True)
-    if SOCKETIO_URL:
-        print(f"SocketIO snapshot support enabled: {SOCKETIO_URL} (event: '{SOCKETIO_EVENT}')", flush=True)
-    else:
-        print("SocketIO snapshot support: disabled", flush=True)
     sys.stdout.flush()
-
-    if SOCKETIO_URL:
-        _ensure_socketio_connected()
 
     uvicorn.run(app, host=HOST, port=PORT)
