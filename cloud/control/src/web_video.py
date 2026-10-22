@@ -32,22 +32,15 @@ subscriber_mutasd.setsockopt(zmq.CONFLATE, 1)
 subscriber_mutasd.setsockopt_string(zmq.SUBSCRIBE, '')  # Subscribe to all topics
 subscriber_mutasd.connect("ipc:///tmp/video_frames_mutasd.ipc")  # IPC socket address
 
-subscriber_vla = zmqcontext.socket(zmq.SUB)
-subscriber_vla.setsockopt(zmq.CONFLATE, 1)
-subscriber_vla.setsockopt_string(zmq.SUBSCRIBE, '')  # Subscribe to all topics
-subscriber_vla.connect("ipc:///tmp/video_frames_vla.ipc")  # IPC socket address
-
 last_frame = None
 last_frame_keresd = None
 last_frame_kovesd = None
 last_frame_mutasd = None
-last_frame_vla = None
 
 lock = Lock()
 lock_keresd = Lock()
 lock_kovesd = Lock()
 lock_mutasd = Lock()
-lock_vla = Lock()
 
 stats_lock = Lock()
 stream_samples = deque(maxlen=180)
@@ -106,23 +99,6 @@ def gen_mjpeg_mutasd():
         with lock_mutasd:
             if last_frame_mutasd is not None:
                 frame = last_frame_mutasd.copy()
-        if frame is None:
-            frame = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
-            _, frame = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 10])
-        yield (b'--frame\r\n'
-            b'Content-Type: image/jpeg\r\n\r\n' + frame.tobytes() + b'\r\n')
-        time.sleep(1/25)
-
-def gen_mjpeg_vla():
-    while True:
-        frame = None
-        with lock_vla:
-            if last_frame_vla is not None:
-                frame = last_frame_vla.copy()
-        if frame is None:
-            with lock:
-                if last_frame is not None:
-                    frame = last_frame.copy()
         if frame is None:
             frame = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
             _, frame = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 10])
@@ -218,10 +194,6 @@ def mjpeg_kovesd():
 def mjpeg_mutasd():
     return mjpeg_response(gen_mjpeg_mutasd())
 
-@app.route("/mjpeg_vla")
-def mjpeg_vla():
-    return mjpeg_response(gen_mjpeg_vla())
-
 
 @app.route('/stats')
 def stream_stats():
@@ -305,25 +277,6 @@ def get_frames_mutasd():
         except zmq.error.Again:
             pass  # No frame received, continue processing
 
-def get_frames_vla():
-    global last_frame_vla
-
-    while True:
-        try:
-            frame_bytes = subscriber_vla.recv()
-            width = 640
-            height = 480
-            img_array = np.frombuffer(frame_bytes, dtype=np.uint8)
-            img_array = img_array.reshape((height, width, 3))
-
-            img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
-            _, frame = cv2.imencode('.jpg', img_array)
-            with lock_vla:
-                last_frame_vla = frame.copy()
-
-        except zmq.error.Again:
-            pass  # No frame received, continue processing
-
 if __name__ == '__main__':
     
     thread1 = Thread(target=get_frames)
@@ -337,9 +290,6 @@ if __name__ == '__main__':
 
     thread4 = Thread(target=get_frames_mutasd)
     thread4.start()
-
-    thread5 = Thread(target=get_frames_vla)
-    thread5.start()
 
     app.run(host='0.0.0.0', port=PORT, threaded=True)
 
