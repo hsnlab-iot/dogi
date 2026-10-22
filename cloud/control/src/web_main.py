@@ -130,21 +130,14 @@ pageconfig = [ \
     { 'name': 'Show', 'port': PORT, 'page': '/apps/show/', 'app': '/app/mutasd.py' }, \
     { 'name': 'Prompt', 'port': PORT, 'page': '/apps/prompt/', 'app': '/app/prompt.py' }, \
     { 'name': 'Agent', 'port': PORT, 'page': '/apps/agent/', 'app': '/app/agent.py' }, \
+    { 'name': 'VLA', 'port': PORT, 'page': '/apps/vla/', 'app': '/app/vla.py' }, \
     { 'name': 'Pupality', 'port': PORT, 'page': '/apps/pupality/', 'app': '' }, \
     { 'name': 'System', 'port': PORT, 'page': '/apps/system/', 'app': '' } \
 ]
 
 @app.route('/')
 def index():
-    context = {
-        'page0_name': pageconfig[0]['name'],
-        'page1_name': pageconfig[1]['name'],
-        'page2_name': pageconfig[2]['name'],
-        'page3_name': pageconfig[3]['name'],
-        'page4_name': pageconfig[4]['name'],
-        'page5_name': pageconfig[5]['name'],
-        'page6_name': pageconfig[6]['name'],
-    }
+    context = { f'page{i}_name': page['name'] for i, page in enumerate(pageconfig) }
     return render_template('web_main.html', **context)
 
 

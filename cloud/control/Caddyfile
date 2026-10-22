@@ -80,6 +80,18 @@
         }
     }
 
+    handle_path /apps/vla/socket.io/* {
+        rewrite * /socket.io{uri}
+        reverse_proxy dogi:5061 {
+            header_up X-Forwarded-Prefix /apps/vla/socket.io
+        }
+    }
+    handle_path /apps/vla/* {
+        reverse_proxy dogi:5061 {
+            header_up X-Forwarded-Prefix /apps/vla
+        }
+    }
+
     handle_path /apps/pupality/socket.io/* {
         rewrite * /socket.io{uri}
         reverse_proxy dogi:5057 {
