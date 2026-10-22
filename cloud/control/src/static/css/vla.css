@@ -9,26 +9,32 @@ body {
     font-size: 16px;
     background-color: #222;
     color: white;
-    overflow-x: hidden;
+    overflow: hidden;
 }
 
 /* General container styling: grid layout */
 .container {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 220px;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
     padding: 10px;
     box-sizing: border-box;
     width: 100%;
     max-width: 100%;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .main-content {
     grid-column: 1 / 2;
     min-width: 0;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    min-height: 0;
     padding: 0 10px;
+    overflow: hidden;
     outline: 2px dashed rgba(255, 0, 0, 0.15);
 }
 
@@ -93,11 +99,19 @@ label {
 }
 
 /* Video output section (replaces response textarea) */
+.video-section {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 .video-container {
     width: 100%;
-    height: 38vh;
+    flex: 1 1 auto;
+    height: auto;
     min-height: 240px;
-    max-height: 480px;
+    max-height: none;
     background-color: #000;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 6px;

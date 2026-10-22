@@ -21,67 +21,15 @@
             </div>
         </div>
 
-        <!-- Video Output (instead of text response) -->
+        <!-- Video display -->
         <div class="video-section">
-            <label>Video output:</label>
             <div class="video-container">
-                <img id="video-stream" src="/video/mjpeg_vla" alt="VLA Video Output" class="video-stream">
+                <img id="video-stream" src="/video/mjpeg" alt="Video Output" class="video-stream">
             </div>
         </div>
 
-        <!-- Tools Response -->
-        <div class="tools-response-section">
-            <label>Tools response:</label>
-            <div class="tools-response-content">
-                <textarea id="tools-response-output" readonly placeholder="Tools response will appear here..."></textarea>
-                <div class="image-preview-container">
-                    <img id="tools-response-preview" src="" alt="Tools response preview">
-                </div>
-                <div id="tools-response-thumbnails" class="image-thumbnails-row" aria-label="Tools response thumbnails">
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- Sidebar -->
-    <div class="sidebar-column">
-        <div class="speak-section">
-            <label class="checkbox-label" for="speak-checkbox">
-                <span>Speak</span>
-                <input type="checkbox" id="speak-checkbox">
-            </label>
-        </div>
-
-        <div class="tools-list-section">
-            <label>Tools:</label>
-            <div id="tools-loading">LOADING...</div>
-            <ul id="tools-list">
-                <!-- Tool list items will appear here -->
-            </ul>
-        </div>
-
-        <div class="stats-section">
-            <label>Prompt Stats:</label>
-            <div id="prompt-stats" class="stats-grid">
-                <div class="stats-item">
-                    <span class="stats-name">Context window size</span>
-                    <span id="stats-context-window" class="stats-value">-</span>
-                </div>
-                <div class="stats-item">
-                    <span class="stats-name">Bytes</span>
-                    <span id="stats-bytes" class="stats-value">-</span>
-                </div>
-                <div class="stats-item">
-                    <span class="stats-name">Tokens</span>
-                    <span id="stats-tokens" class="stats-value">-</span>
-                </div>
-                <div class="stats-item">
-                    <span class="stats-name">Response time</span>
-                    <span id="stats-response-time" class="stats-value">-</span>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -97,7 +45,7 @@
     if (videoElem) {
         videoElem.onerror = function() {
             setTimeout(function() {
-                videoElem.src = '/video/mjpeg_vla?t=' + Date.now();
+                videoElem.src = '/video/mjpeg?t=' + Date.now();
             }, 2000);
         };
     }
