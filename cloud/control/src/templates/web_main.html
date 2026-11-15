@@ -118,6 +118,10 @@
             document.getElementById('myIframe').src = url;
         });
 
+        socket.on('page_error', function(data) {
+            window.alert(data.error);
+        });
+
         socket.on('connect', function() {
             console.log('Connected to server');
         });

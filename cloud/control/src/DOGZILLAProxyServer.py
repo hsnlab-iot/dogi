@@ -1,59 +1,59 @@
-#from DOGZILLALib.DOGZILLALib import DOGZILLALib as dog   # serial tunnel version
-from DOGZILLALib.DOGZILLALib import DOGZILLALibClient as dog  # WebAPI version
-import time
-import socket
 import pickle
+import socket
+import time
+
+
+class CommandProxy:
+    """Keep one local command sender; Stop always works and releases ownership."""
+
+    def __init__(self, dog_control):
+        self.dog_control = dog_control
+        self.owner = None
+        self.owner_since = 0
+
+    def dispatch(self, command, address):
+        if not isinstance(command, dict):
+            raise ValueError("Command must be a dictionary")
+        name, args = command.get("name"), command.get("args")
+        if not isinstance(name, str) or name.startswith("_"):
+            raise ValueError("Invalid command name")
+        if args is not None and not isinstance(args, (list, tuple)):
+            raise ValueError("Command args must be a list or tuple")
+        if name not in dir(self.dog_control):
+            raise ValueError(f"Unknown command: {name}")
+        now = time.monotonic()
+        if name != "stop":
+            if self.owner is not None and now - self.owner_since > 5:
+                self.owner = None
+            if self.owner is None:
+                self.owner, self.owner_since = address, now
+                print("Locking to", address)
+            elif address != self.owner:
+                print("Ignoring data from", address)
+                return False
+        function = getattr(self.dog_control, name)
+        function(*(args or ()))
+        if name == "stop":
+            self.owner = None
+        return True
+
 
 def main():
+    # Web API version; the serial port argument is ignored.
+    from DOGZILLALib.DOGZILLALib import DOGZILLALibClient as dog
 
-    # Create control interface
-    # In the case of WebAPI, the serial port is ignored, however either
-    # set the api base in the function, or set the DOGZILLA_API_BASE env
-    dogControl = dog.DOGZILLA("/dev/ttyAMA0")
+    proxy = CommandProxy(dog.DOGZILLA("/dev/ttyAMA0"))
     time.sleep(1)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
+        udp_socket.bind(("localhost", 5002))
+        while True:
+            data, address = udp_socket.recvfrom(1024)
+            try:
+                # Existing protocol, confined to local processes in this container.
+                proxy.dispatch(pickle.loads(data), address)
+            except Exception as exc:
+                print("Error processing command:", str(exc))
 
-    # Create a UDP socket
-    udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    # Bind the socket to a specific address and port
-    udp_socket.bind(("localhost", 5002))
-
-    addr_lock = None
-    addr_lock_time = None
-
-    while True:
-        # Receive data from the socket
-        data, addr = udp_socket.recvfrom(1024)
-        addr_str = addr[0] + ":" + str(addr[1])
-        
-        if addr_lock_time is not None and time.time() - addr_lock_time > 5:
-            addr_lock = None
-
-        if addr_lock is None:
-            addr_lock = addr_str
-            addr_lock_time = time.time()
-            print("Locking to", addr_lock)
-        elif addr_str != addr_lock:
-            print("Ignoring data from", addr_str)
-            continue
-
-        try:
-            # Process the received command
-            command = pickle.loads(data)
-            command_name = command.get("name")
-            command_args = command.get("args")
-
-            if command_name in dir(dogControl):
-                func = getattr(dogControl, command_name)
-                if command_args is None:
-                    func()
-                else:
-                    func(*command_args)
-            else:
-                print("Unknown command:", command_name)
-
-        except Exception as e:
-            print("Error processing command:", str(e))
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,26 @@
+services:
+  control:
+    image: dogi-control-lightnav:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.vla
+      args:
+        DOGI_CONTROL_BASE: ${DOGI_CONTROL_BASE:-control-control:latest}
+    environment:
+      - VLA_PYTHON=/opt/vla/bin/python
+      - LIGHTNAV_MODEL_PATH=/models/LightNav-0
+      - LIGHTNAV_DTYPE=float16
+      - LIGHTNAV_ATTN=sdpa
+      - VLA_MOVE=${VLA_MOVE:-0}
+      - VLA_SPEED=${VLA_SPEED:-5}
+      - VLA_CAMERA_TIMEOUT=${VLA_CAMERA_TIMEOUT:-1}
+      - VLA_PREDICTION_TIMEOUT=${VLA_PREDICTION_TIMEOUT:-15}
+      - VLA_GOAL_TIMEOUT=${VLA_GOAL_TIMEOUT:-60}
+      - VLA_HISTORY_FRAMES=${VLA_HISTORY_FRAMES:-16}
+    volumes:
+      - type: bind
+        source: ./cache/lightnav/LightNav-0
+        target: /models/LightNav-0
+        read_only: true
+        bind:
+          create_host_path: false

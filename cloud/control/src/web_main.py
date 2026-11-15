@@ -12,6 +12,7 @@ import threading
 import socket
 import errno
 import json
+import shlex
 from datetime import datetime, timezone
 
 import utils
@@ -37,6 +38,8 @@ def _add_status_api_cors_headers(response):
     return response
 
 session = None
+active_page = None
+page_lock = threading.Lock()
 
 _ping_lock = threading.Lock()
 _ping_state = {
@@ -130,7 +133,9 @@ pageconfig = [ \
     { 'name': 'Show', 'port': PORT, 'page': '/apps/show/', 'app': '/app/mutasd.py' }, \
     { 'name': 'Prompt', 'port': PORT, 'page': '/apps/prompt/', 'app': '/app/prompt.py' }, \
     { 'name': 'Agent', 'port': PORT, 'page': '/apps/agent/', 'app': '/app/agent.py' }, \
-    { 'name': 'VLA', 'port': PORT, 'page': '/apps/vla/', 'app': '/app/vla.py' }, \
+    { 'name': 'VLA', 'port': PORT, 'page': '/apps/vla/', 'app': '/app/vla.py',
+      'python': os.getenv('VLA_PYTHON', '/opt/venv/bin/python'),
+      'stop_url': 'http://127.0.0.1:5061/shutdown' }, \
     { 'name': 'Pupality', 'port': PORT, 'page': '/apps/pupality/', 'app': '' }, \
     { 'name': 'System', 'port': PORT, 'page': '/apps/system/', 'app': '' } \
 ]
@@ -287,24 +292,41 @@ def reload_config():
 
 @socketio.on('page_change')
 def handle_event(data):
-    global session
+    global session, active_page
 
-    print('received message: ' + str(data))
-    host = urlparse(request.url_root).hostname
-    page = 'http://' + host + ':' + str(pageconfig[data]['port']) + pageconfig[data]['page']
-    print('URL: ', page)
-    socketio.emit('page_load', page)
+    if type(data) is not int or not 0 <= data < len(pageconfig):
+        return {'ok': False, 'error': 'Invalid page'}
+    with page_lock:
+        if session is not None:
+            if active_page and active_page.get('stop_url'):
+                try:
+                    req = urllib.request.Request(active_page['stop_url'], method='POST')
+                    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                    with opener.open(req, timeout=4) as response:
+                        result = json.load(response)
+                    if result.get('ok') is not True:
+                        raise RuntimeError('Worker rejected shutdown')
+                except Exception as exc:
+                    message = 'Could not stop VLA; page change cancelled. Check its worker log.'
+                    print(message, exc)
+                    socketio.emit('page_error', {'error': message}, to=request.sid)
+                    return {'ok': False, 'error': message}
+            session.kill()
+            session = None
 
-    if session is not None:
-        session.kill()
-        session = None
-
-    if pageconfig[data]['app'] != '':
-        server = libtmux.Server()
-        session = server.new_session(session_name='dogi_session', kill=True)
-        window = session.new_window(attach=True)
-        pane = window.active_pane
-        pane.send_keys(f'cd; source /opt/venv/bin/activate && python {pageconfig[data]["app"]}; sleep inf')
+        selected = pageconfig[data]
+        if selected['app']:
+            server = libtmux.Server()
+            session = server.new_session(session_name='dogi_session', kill=True)
+            pane = session.new_window(attach=True).active_pane
+            python = shlex.quote(selected.get('python', '/opt/venv/bin/python'))
+            script = shlex.quote(selected['app'])
+            pane.send_keys(f'cd; source /opt/venv/bin/activate && {python} {script}; sleep inf')
+        active_page = selected
+        host = urlparse(request.url_root).hostname
+        page = 'http://' + host + ':' + str(selected['port']) + selected['page']
+        socketio.emit('page_load', page)
+        return {'ok': True}
         
 @app.route('/voice/<path:filename>')
 def voice_file(filename):

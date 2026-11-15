@@ -7,6 +7,7 @@ Web servers (using flask):
 5054: (web_mutasd.py) Mutasd app
 5055: (web_kovesd.py) Kovesd app
 5056: (web_prompt.py) Prompt app
+5061: (web_vla.py)    LightNav VLA app (worker: vla.py)
 
 6080: (noVNC)         X desktop for development
 

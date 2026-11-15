@@ -1,0 +1,33 @@
+diff --git a/src/lightnav/inference/model.py b/src/lightnav/inference/model.py
+--- a/src/lightnav/inference/model.py
++++ b/src/lightnav/inference/model.py
+@@ -227,7 +227,7 @@
+     try:
+         model = AutoModelForImageTextToText.from_pretrained(
+             weights_dir,
+-            torch_dtype=torch.bfloat16,
++            torch_dtype=getattr(torch, os.environ.get("LIGHTNAV_DTYPE", "bfloat16")),
+             attn_implementation=attn,
+         )
+     except (ImportError, ValueError) as e:
+@@ -234,7 +234,7 @@
+         print(f"[lightnav] attn_implementation={attn!r} unavailable ({e}); falling back to 'sdpa'")
+         model = AutoModelForImageTextToText.from_pretrained(
+             weights_dir,
+-            torch_dtype=torch.bfloat16,
++            torch_dtype=getattr(torch, os.environ.get("LIGHTNAV_DTYPE", "bfloat16")),
+             attn_implementation="sdpa",
+         )
+     model = model.to(device)
+diff --git a/src/lightnav/inference/engine.py b/src/lightnav/inference/engine.py
+--- a/src/lightnav/inference/engine.py
++++ b/src/lightnav/inference/engine.py
+@@ -322,7 +322,7 @@
+         for k, v in inputs.items():
+             if isinstance(v, torch.Tensor):
+                 if v.dtype.is_floating_point:
+-                    moved[k] = v.to(device=device, dtype=torch.bfloat16)
++                    moved[k] = v.to(device=device, dtype=self.bundle.model.dtype)
+                 else:
+                     moved[k] = v.to(device)
+             else:

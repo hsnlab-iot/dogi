@@ -1,0 +1,12 @@
+**
+!Dockerfile.vla
+!Dockerfile.vla.dockerignore
+!requirements-vla.lock
+!patches/
+!patches/lightnav-fp16.patch
+!src/
+!src/**
+src/test/
+!docker-entrypoint.sh
+**/__pycache__/
+**/.DS_Store
