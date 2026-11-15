@@ -215,14 +215,11 @@ class Camera:
 
 
 class Dog:
-    def __init__(self, move=False, socket_factory=None):
-        self.move = move
+    def __init__(self, socket_factory=None):
         self.socket = None
         self.socket_factory = socket_factory
 
     def send(self, name, args=None):
-        if not self.move:
-            return
         if self.socket is None:
             if self.socket_factory:
                 self.socket = self.socket_factory()
@@ -236,7 +233,7 @@ class Dog:
         self.socket.send(pickle.dumps(command))
 
     def velocity(self, command):
-        logging.info("Dogi vx/vy/turn: %s%s", command, "" if self.move else " (dry run)")
+        logging.info("Dogi vx/vy/turn: %s", command)
         for method, value in zip(("move_x", "move_y", "turn"), command, strict=True):
             self.send(method, (value,))
 
@@ -393,7 +390,6 @@ class Navigation:
                 "discarded_results": self.discarded,
                 "latency_ms": self.latency_ms,
                 "camera_ok": age is not None and age <= self.settings.camera_timeout,
-                "move": self.dog.move,
                 "steering": asdict(self.steering),
                 "decision": self.decision,
                 "camera_pitch": self.camera_pitch,

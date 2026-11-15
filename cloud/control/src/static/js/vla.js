@@ -129,7 +129,6 @@ socket.on('vla_status', function(status) {
     available = socket.connected && status.state !== 'offline';
     ready = available && status.ready === true;
     document.getElementById('vla-state').textContent = status.state || 'Unknown';
-    document.getElementById('vla-mode').textContent = status.move ? 'MOTION ENABLED' : 'Dry run';
     document.getElementById('vla-camera').textContent = status.camera_ok ? 'Camera receiving' : 'Waiting for camera';
     const values = Array.isArray(status.command) ? status.command : [0, 0, 0];
     document.getElementById('vla-command').textContent = ['vx', 'vy', 'turn'].map(function(name, i) {
@@ -145,7 +144,7 @@ socket.on('vla_status', function(status) {
         pitch.oninput();
     }
     document.getElementById('pitch-status').textContent = Number.isInteger(status.camera_pitch) ?
-        (status.move ? 'Requested ' : 'Dry run request ') + status.camera_pitch + '° · Prompt resumes navigation.' :
+        'Requested ' + status.camera_pitch + '° · Prompt resumes navigation.' :
         'Set angle pauses navigation.';
     updateButtons();
 });

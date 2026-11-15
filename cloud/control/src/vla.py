@@ -14,12 +14,7 @@ MODEL_PATH = os.getenv("LIGHTNAV_MODEL_PATH", "/models/LightNav-0")
 
 
 def run_worker():
-    move_value = os.getenv("VLA_MOVE", "0")
-    if move_value not in ("0", "1"):
-        raise ValueError("VLA_MOVE must be 0 (dry run) or 1 (motion enabled)")
-    navigation = Navigation(
-        Camera(), Dog(move=move_value == "1"), lambda: load_agent(MODEL_PATH), Settings.from_env()
-    )
+    navigation = Navigation(Camera(), Dog(), lambda: load_agent(MODEL_PATH), Settings.from_env())
     sio = socketio.Client(reconnection=False)
     shutdown = threading.Event()
     stopping = threading.Event()
@@ -88,7 +83,7 @@ def run_worker():
         sio.connect(
             f"http://127.0.0.1:{PORT}",
             socketio_path="/socket.io/",
-            auth={"role": "worker", "move": navigation.dog.move},
+            auth={"role": "worker"},
             wait_timeout=10,
         )
         navigation.start()

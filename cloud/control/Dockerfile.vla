@@ -28,5 +28,4 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 ENV VLA_PYTHON=/opt/vla/bin/python \
     LIGHTNAV_MODEL_PATH=/models/LightNav-0 \
     LIGHTNAV_DTYPE=float16 \
-    LIGHTNAV_ATTN=sdpa \
-    VLA_MOVE=0
+    LIGHTNAV_ATTN=sdpa

@@ -19,9 +19,8 @@ socketio = SocketIO(
 state_lock = threading.RLock()
 command_lock = threading.Lock()
 worker_sid = owner_sid = None
-worker_moves = False
-fallback_dog = Dog(move=True)  # Reuse one local socket for fallback Stops.
-status = {"state": "offline", "ready": False, "move": False, "command": [0, 0, 0]}
+fallback_dog = Dog()  # Reuse one local socket for fallback Stops.
+status = {"state": "offline", "ready": False, "command": [0, 0, 0]}
 
 
 def publish_status(data):
@@ -33,10 +32,7 @@ def publish_status(data):
 
 def fallback_stop():
     # The proxy accepts Stop from another local sender even during its owner lease.
-    with state_lock:
-        move = worker_moves
-    if move:
-        fallback_dog.stop()
+    fallback_dog.stop()
 
 
 def call_worker(event, data=None, manual_sid=None):
@@ -95,18 +91,17 @@ def shutdown_worker():
 
 @socketio.on("connect")
 def handle_connect(auth=None):
-    global worker_sid, worker_moves, status
+    global worker_sid, status
     if isinstance(auth, dict) and auth.get("role") == "worker":
         if request.remote_addr not in ("127.0.0.1", "::1"):
             return False
         with state_lock:
             if worker_sid is not None:
                 return False
-            worker_sid, worker_moves = request.sid, auth.get("move") is True
+            worker_sid = request.sid
             status = {
                 "state": "loading",
                 "ready": False,
-                "move": worker_moves,
                 "command": [0, 0, 0],
                 "generation": -1,
             }
@@ -135,7 +130,6 @@ def handle_disconnect(reason=None):
             {
                 "state": "offline",
                 "ready": False,
-                "move": worker_moves,
                 "command": [0, 0, 0],
                 "error": "Worker stopped; select VLA again",
             }
