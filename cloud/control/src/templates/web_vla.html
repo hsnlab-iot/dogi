@@ -58,10 +58,8 @@
                 </form>
                 <h2>Adaptive steering</h2>
                 <form id="steering-form">
-                    <label>Forward cone (±°)
-                        <input name="cone_degrees" type="number" min="5" max="60" required>
-                    </label>
-                    <label>Forward yaw (ms)
+                    <input type="hidden" name="cone_degrees" value="25">
+                    <label>Arc yaw (ms)
                         <input name="forward_duration" type="number" min="50" max="500" required>
                     </label>
                     <label>Turn yaw (ms)
@@ -75,15 +73,6 @@
                 </form>
                 <p class="hint">Apply stops movement. Press Prompt to run another trial.</p>
                 <p id="steering-active" class="hint"></p>
-                <svg id="steering-path" viewBox="0 0 200 220" role="img"
-                     aria-label="Predicted path in the robot frame, forward is up">
-                    <path d="M100 15 V205 M10 110 H190" stroke="#555" fill="none"/>
-                    <text x="100" y="13" text-anchor="middle" fill="#ccc" font-size="11">Forward</text>
-                    <path id="forward-cone" fill="#ff634722" stroke="#ff805f"/>
-                    <polyline id="path-line" fill="none" stroke="#7ed6ff" stroke-width="2"/>
-                    <circle cx="100" cy="110" r="4" fill="white"/>
-                    <circle id="path-waypoint" r="5" fill="#ffd479" visibility="hidden"/>
-                </svg>
                 <p id="steering-decision">Waiting for a prediction.</p>
             </section>
         </div>

@@ -2,7 +2,6 @@
 ARG DOGI_CONTROL_BASE=control-control:latest
 FROM ${DOGI_CONTROL_BASE}
 
-ARG LIGHTNAV_REVISION=3015508b70fb6e30bbd66701e94c9b916dcb8df8
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
 
 COPY requirements-vla.lock /tmp/requirements-vla.lock
@@ -11,21 +10,18 @@ RUN uv python install 3.11 && \
     uv pip sync --python /opt/vla/bin/python --no-cache \
     --index-strategy unsafe-best-match /tmp/requirements-vla.lock
 
-COPY patches/lightnav-fp16.patch /tmp/lightnav-fp16.patch
-# Fetch only the files needed to build the package, without demo assets/history.
-RUN git init /opt/lightnav-source && \
-    git -C /opt/lightnav-source remote add origin https://github.com/lightorigins/LightNav-0.git && \
-    git -C /opt/lightnav-source fetch --depth=1 --filter=blob:none origin ${LIGHTNAV_REVISION} && \
-    git -C /opt/lightnav-source checkout FETCH_HEAD -- src pyproject.toml README.md LICENSE && \
-    git -C /opt/lightnav-source apply /tmp/lightnav-fp16.patch && \
-    uv pip install --python /opt/vla/bin/python --no-cache --no-deps --no-build-isolation /opt/lightnav-source && \
+# All transitive dependencies except psutil are already in requirements-vla.lock.
+# --no-deps prevents the adapter install from replacing the Volta torch wheel.
+COPY cache/lightnav/wheels/lightnav_mujoco*.whl /tmp/vla-wheels/
+RUN uv pip install --python /opt/vla/bin/python --no-cache --no-deps \
+        peft==0.22.0 accelerate==1.16.0 psutil==7.2.2 /tmp/vla-wheels/*.whl && \
     uv pip check --python /opt/vla/bin/python && \
-    rm -rf /opt/lightnav-source /tmp/lightnav-fp16.patch /tmp/requirements-vla.lock
+    /opt/vla/bin/python -c "import torch; assert torch.__version__ == '2.11.0+cu126'; from lightnav_mujoco.model.lightnav_adapter import DirectActionLightNav" && \
+    rm -rf /tmp/vla-wheels
 
 COPY src/ /app/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # Preserve the original /opt/venv environment for the other Dogi applications.
 ENV VLA_PYTHON=/opt/vla/bin/python \
     LIGHTNAV_MODEL_PATH=/models/LightNav-0 \
-    LIGHTNAV_DTYPE=float16 \
-    LIGHTNAV_ATTN=sdpa
+    LIGHTNAV_ADAPTER_PATH=/models/adapter

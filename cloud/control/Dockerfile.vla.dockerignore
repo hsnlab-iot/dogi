@@ -2,8 +2,13 @@
 !Dockerfile.vla
 !Dockerfile.vla.dockerignore
 !requirements-vla.lock
-!patches/
-!patches/lightnav-fp16.patch
+!cache/
+cache/*
+!cache/lightnav/
+cache/lightnav/*
+!cache/lightnav/wheels/
+cache/lightnav/wheels/*
+!cache/lightnav/wheels/lightnav_mujoco*.whl
 !src/
 !src/**
 src/test/

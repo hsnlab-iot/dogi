@@ -1,5 +1,6 @@
 """LightNav navigation with held forward motion and short turning pulses."""
 
+import json
 import logging
 import math
 import os
@@ -67,100 +68,57 @@ class Steering:
             raise ValueError("Turn pulse must be longer than the forward correction")
 
 
-def steering_decision(value, speed, steering):
-    points = np.asarray(value, dtype=float)
-    if (
-        points.ndim != 2
-        or points.shape[1] != 3
-        or not 1 <= len(points) <= 16
-        or not np.isfinite(points).all()
-        or np.abs(points).max() > 4
-    ):
-        raise ValueError("Invalid LightNav waypoints")
-    if np.abs(points).max() < 0.005:
+def steering_decision(result, speed, steering):
+    name = result["cmd_name"]
+    if name == "STOP":
         return None
-    bearings = np.arctan2(points[:, 1], points[:, 0])
-    useful = np.flatnonzero(np.hypot(points[:, 0], points[:, 1]) >= 0.08)
-    outside = useful[np.abs(bearings[useful]) > math.radians(steering.cone_degrees)]
-    final_yaw = math.atan2(math.sin(points[-1, 2]), math.cos(points[-1, 2]))
-    if len(outside):
-        index = int(outside[-1])
-        heading = float(bearings[index])
-        turning = True
-    elif not len(useful) and abs(final_yaw) >= 0.15:
-        index = len(points) - 1
-        heading = final_yaw
-        turning = True
-    else:
-        index = int(useful[min(1, len(useful) - 1)]) if len(useful) else len(points) - 1
-        heading = float(bearings[index]) if len(useful) else 0.0
-        turning = False
-
-    forward = points[index, 0]
-    vx = 0.0 if turning or forward < 0.03 else float(np.clip(8 * forward, 0, speed))
-    requested = float(np.clip(60 * heading, -40, 40))
-    if not turning and abs(heading) < 0.15:
-        requested = 0.0
-    turn = math.copysign(40 if turning else 30, requested) if requested else 0.0
-    if steering.invert_yaw:
-        turn = -turn
-    duration = (steering.turn_duration if turning else steering.forward_duration) if turn else None
+    commands = {
+        "FWD_SLOW": (0.5 * speed, 0.0, 0.0),
+        "FWD_FAST": (speed, 0.0, 0.0),
+        "BACK_SLOW": (-0.5 * speed, 0.0, 0.0),
+        "STRAFE_LEFT": (0.0, speed, 0.0),
+        "STRAFE_RIGHT": (0.0, -speed, 0.0),
+        "TURN_LEFT": (0.0, 0.0, 40.0),
+        "TURN_RIGHT": (0.0, 0.0, -40.0),
+        "TURN_LEFT_FINE": (0.0, 0.0, 30.0),
+        "TURN_RIGHT_FINE": (0.0, 0.0, -30.0),
+        "ARC_LEFT": (0.7 * speed, 0.0, 30.0),
+        "ARC_RIGHT": (0.7 * speed, 0.0, -30.0),
+    }
+    vx, vy, turn = commands[name]
+    maneuver = name.split("_")[0].lower()
+    duration = None
+    if turn:
+        duration = steering.turn_duration if maneuver == "turn" else steering.forward_duration
     return {
-        "path": points.tolist(),
-        "waypoint": index + 1,
-        "heading_rad": heading,
-        "maneuver": "turn" if turning else "forward",
-        "requested_turn": requested,
-        "command": (vx, 0.0, turn),
+        "cmd_name": name,
+        "maneuver": maneuver,
+        "command": (vx, vy, -turn if steering.invert_yaw else turn),
         "duration": duration,
+        "action_probs": result["action_probs"],
     }
 
 
-class BoundedHistoryAgent:
-    """Limit SlowFast's full-episode buffer through the public observation API."""
+class DirectActionAgent:
+    def __init__(self, model, history):
+        self.model = model
+        self.history = history
 
-    def __init__(self, agent, max_frames=16):
-        if not isinstance(max_frames, int) or not 2 <= max_frames <= 64:
-            raise ValueError("VLA_HISTORY_FRAMES must be an integer in [2, 64]")
-        self.agent = agent
-        self.max_frames = max_frames
-        self.frames = deque(maxlen=max_frames)
-        self.instruction = ""
-        self._pending = self._fed = 0
+    def reset(self, instruction):
+        self.history.reset()
 
-    def reset(self, instruction=""):
-        self.frames.clear()
-        self.instruction = instruction
-        self._pending = self._fed = 0
-        self.agent.reset(instruction)
+    def observe(self, image, timestamp_s):
+        self.history.push(image, timestamp_s)
 
-    def observe(self, image):
-        self.frames.append(image.copy())
-        self._pending += 1
-
-    def predict_waypoints(self, instruction, *, task_type="tracking"):
-        if self._fed + self._pending > self.max_frames:
-            # SlowFast indexes from episode frame zero. Reset its frame IDs and
-            # caches together before replaying the window; never reload weights.
-            self.agent.reset(self.instruction)
-            frames = list(self.frames)
-            self._fed = 0
-        else:
-            frames = list(self.frames)[-self._pending :] if self._pending else []
-        for image in frames:
-            self.agent.observe(image)
-            self._fed += 1
-        self._pending = 0
-        logging.info("LightNav history: %d/%d frames", self._fed, self.max_frames)
-        return self.agent.predict_waypoints(instruction, task_type=task_type)
+    def predict_action(self, goal):
+        frames, timestamps = self.history.get_frames(relative_timestamps=False)
+        return self.model.predict_action(
+            frames=frames, instruction=goal, frame_timestamps_s=timestamps, greedy=True
+        )
 
 
 def load_agent(path):
-    history_frames = int(os.getenv("VLA_HISTORY_FRAMES", "16"))
-    if not 2 <= history_frames <= 64:
-        raise ValueError("VLA_HISTORY_FRAMES must be an integer in [2, 64]")
     import torch
-    from lightnav.tracking import build_tracking_agent
 
     if not Path(path).is_dir():
         raise RuntimeError(f"Checkpoint directory missing: {path}; see docs/vla.md")
@@ -169,20 +127,24 @@ def load_agent(path):
     major, minor = torch.cuda.get_device_capability()
     if f"sm_{major}{minor}" not in torch.cuda.get_arch_list():
         raise RuntimeError("Torch does not include this GPU; use the pinned CUDA 12.6 wheels")
-    os.environ.setdefault("LIGHTNAV_DTYPE", "float16")
-    os.environ.setdefault("LIGHTNAV_ATTN", "sdpa")
-    logging.info(
-        "Loading LightNav on %s, Torch %s, CUDA %s",
-        torch.cuda.get_device_name(),
-        torch.__version__,
-        torch.version.cuda,
+    from lightnav_mujoco.data.history import VisualHistoryBuffer
+    from lightnav_mujoco.model.lightnav_adapter import DirectActionLightNav
+
+    adapter_dir = os.getenv("LIGHTNAV_ADAPTER_PATH", "/models/adapter")
+    # from_adapter selects attention from metadata and has no backend override.
+    meta = json.loads((Path(adapter_dir) / "direct_action_meta.json").read_text())
+    if meta.get("attn_implementation", "sdpa") != "sdpa":
+        raise ValueError("The V100 requires an adapter exported with SDPA attention")
+    logging.info("Loading direct-action adapter %s on %s", adapter_dir, torch.cuda.get_device_name())
+    model = DirectActionLightNav.from_adapter(
+        adapter_dir, model_path=path, device="cuda", dtype="float16"
     )
-    agent = build_tracking_agent(
-        path, backend="hf", device="cuda", task_key="vlnce", max_new_tokens=32
-    )
-    if agent.engine.bundle.model.dtype != torch.float16:
-        raise RuntimeError("Expected FP16 model; build with patches/lightnav-fp16.patch")
-    return BoundedHistoryAgent(agent, history_frames)
+    # PEFT can restore adapter and vision weights in their training dtype.
+    model.half().eval()
+    if model.dtype != torch.float16 or model.get_base_qwen3_vl().dtype != torch.float16:
+        raise RuntimeError("Expected FP16 LightNav base model")
+    history = VisualHistoryBuffer(model.history_config, model.camera_config, patch_multiple=32)
+    return DirectActionAgent(model, history)
 
 
 class Camera:
@@ -461,11 +423,13 @@ class Navigation:
                 if generation != previous:
                     agent.reset(goal)
                     previous = generation
-                for _, image in frames:
-                    agent.observe(image)
+                for ts, image in frames:
+                    agent.observe(image, ts)
                 observed = capture[0]
-                points, _, latency_ms = agent.predict_waypoints(goal, task_type="vlnce_traj")
-                self._apply_prediction(generation, capture[0], points, latency_ms)
+                start = time.monotonic()
+                result = agent.predict_action(goal)
+                latency_ms = (time.monotonic() - start) * 1000
+                self._apply_prediction(generation, capture[0], result, latency_ms)
             except Exception as exc:
                 with self.changed:
                     if self._current(generation):
@@ -501,7 +465,7 @@ class Navigation:
             self.predicting_at = capture[0]
             return generation, goal, capture, frames
 
-    def _apply_prediction(self, generation, captured_at, points, latency_ms):
+    def _apply_prediction(self, generation, captured_at, result, latency_ms):
         with self.changed:
             if not self._current(generation):
                 self.discarded += 1
@@ -514,9 +478,16 @@ class Navigation:
             self.predicting_at = None
             self.predictions += 1
             self.latency_ms = float(latency_ms)
-            decision = steering_decision(points, self.settings.speed, self.steering)
+            decision = steering_decision(result, self.settings.speed, self.steering)
             if decision is None:
-                self.decision = None
+                self.decision = {
+                    "cmd_name": "STOP",
+                    "maneuver": "stop",
+                    "command": (0.0, 0.0, 0.0),
+                    "duration": None,
+                    "age_ms": (now - captured_at) * 1000,
+                    "action_probs": result["action_probs"],
+                }
                 self.stop(state="completed")
                 return
             self.decision = {**decision, "age_ms": (now - captured_at) * 1000}

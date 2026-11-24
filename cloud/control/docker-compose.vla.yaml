@@ -9,14 +9,13 @@ services:
     environment:
       - VLA_PYTHON=/opt/vla/bin/python
       - LIGHTNAV_MODEL_PATH=/models/LightNav-0
-      - LIGHTNAV_DTYPE=float16
-      - LIGHTNAV_ATTN=sdpa
+      - LIGHTNAV_ADAPTER_PATH=/models/adapter
       - VLA_SPEED=${VLA_SPEED:-5}
       - VLA_CAMERA_TIMEOUT=${VLA_CAMERA_TIMEOUT:-1}
       - VLA_PREDICTION_TIMEOUT=${VLA_PREDICTION_TIMEOUT:-15}
       - VLA_GOAL_TIMEOUT=${VLA_GOAL_TIMEOUT:-60}
-      - VLA_HISTORY_FRAMES=${VLA_HISTORY_FRAMES:-16}
     volumes:
+      - ./cache/lightnav/adapter:/models/adapter:ro
       - type: bind
         source: ./cache/lightnav/LightNav-0
         target: /models/LightNav-0
