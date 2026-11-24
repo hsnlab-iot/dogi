@@ -7,6 +7,9 @@ Web servers (using flask):
 5054: (web_mutasd.py) Mutasd app
 5055: (web_kovesd.py) Kovesd app
 5056: (web_prompt.py) Prompt app
+5057: (web_pupality.py) Pupality app
+5058: (web_agent.py)  Agent app
+5059: (web_main.py)   Main portal app
 5061: (web_vla.py)    LightNav VLA app (worker: vla.py)
 
 6080: (noVNC)         X desktop for development
@@ -25,3 +28,4 @@ Sockets:
 /tmp/video_frames_keresd.ipc: (keresd.py)      Processed frames
 /tmp/video_frames_kovesd.ipc: (kovesd.py)      Processed frames
 /tmp/video_frames_mutasd.ipc: (mutasd.py)      Processed frames
+/tmp/video_frames_vla.ipc: (vla.py)            Processed frames
